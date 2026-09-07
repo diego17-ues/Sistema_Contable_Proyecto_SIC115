@@ -1,0 +1,41 @@
+Requerimientos No Funcionales 
+ Están sujetos a cambios, no es la versión final, pueden agregar otros si fuere necesario 
+
+Seguridad y control interno
+- RNF-01. Control de acceso: autenticación robusta, MFA configurable, perfiles y permisos por entidad, cuenta, período y operación.
+- RNF-02. Segregación de funciones: separar registro, aprobación, pago, modificación de maestros y cierre.
+- RNF-03. Integridad: impedir modificaciones directas a asientos contabilizados; utilizar reversas y ajustes vinculados.
+- RNF-04. Cifrado: proteger datos en tránsito y en reposo.
+- RNF-05. Gestión de sesiones: expiración, bloqueo, recuperación y monitoreo de accesos.
+- RNF-06. Auditoría inmutable: las bitácoras no deben poder alterarse por usuarios operativos.
+- RNF-07. Evidencia reproducible: una auditoría debe poder reconstruir cómo se obtuvo cualquier saldo o reporte.
+Estos requisitos se alinean con ISO/IEC 27001, que busca preservar confidencialidad, integridad y disponibilidad mediante gestión de riesgos, y con COSO, cuyo marco se utiliza para diseñar controles internos sobre información financiera. (ISO/IEC 27001, COSO Internal Control Framework)
+Disponibilidad y continuidad
+- RNF-08. Disponibilidad: definir objetivos de disponibilidad para operaciones, consultas, cierre y reportes.
+- RNF-09. Copias de seguridad: ejecutar respaldos automáticos, cifrados y verificables.
+- RNF-10. Recuperación: definir RPO y RTO, y realizar pruebas periódicas de restauración.
+- RNF-11. Continuidad: mantener procedimientos para continuar operaciones críticas ante interrupciones.
+- RNF-12. Recuperación ante desastres: documentar dependencias, responsables, prioridades y procedimientos de recuperación.
+ISO 22301 proporciona un marco internacional para preparar, responder y recuperarse ante interrupciones operativas. (ISO 22301)
+Rendimiento, interoperabilidad y mantenimiento
+- RNF-13. Rendimiento: establecer tiempos máximos para registrar operaciones, consultar saldos, ejecutar conciliaciones y generar estados.
+- RNF-14. Escalabilidad: soportar múltiples entidades, sucursales, monedas, calendarios, libros y grandes volúmenes de transacciones.
+- RNF-15. Interoperabilidad: ofrecer API y formatos CSV, XLSX, XML, JSON, XBRL e integración con bancos, facturación, nómina e inventarios.
+- RNF-16. Precisión numérica: soportar decimales configurables, reglas de redondeo, monedas y diferencias por conversión.
+- RNF-17. Mantenibilidad normativa: actualizar tasas, reglas, taxonomías, plantillas y políticas sin modificar el núcleo del sistema.
+- RNF-18. Observabilidad: registrar métricas, errores, alertas, fallos de integración, asientos rechazados y descuadres.
+- RNF-19. Usabilidad: mostrar mensajes de validación claros y orientar al usuario sobre cómo corregir errores.
+- RNF-20. Privacidad y conservación: aplicar la legislación de protección de datos y conservación documental de cada jurisdicción.
+3. Criterios de aceptación esenciales
+El sistema debería cumplir, como mínimo, lo siguiente:
+1. No permite contabilizar un comprobante descuadrado o asociado a un período cerrado.
+2. Todo asiento contabilizado conserva usuario, fecha, soporte, aprobación y origen.
+3. Ningún registro contabilizado se elimina físicamente.
+4. Los estados financieros se reconstruyen a partir del mayor y los auxiliares.
+5. Las correcciones generan un vínculo explícito con el registro original.
+6. El cierre identifica pendientes, descuadres, conciliaciones y aprobaciones faltantes.
+7. La información de ingresos, arrendamientos, impuestos, deterioro y provisiones conserva sus supuestos y cálculos.
+8. Las exportaciones XBRL se validan contra la taxonomía correspondiente.
+9. Los accesos y cambios sensibles quedan disponibles para auditoría.
+10. La configuración normativa puede cambiar por fecha de vigencia sin alterar períodos históricos.
+Como base de control y auditoría, conviene considerar ISA 230 para documentación, ISA 315 para identificación y evaluación de riesgos de incorrección material, ISA 500 para evidencia y ISA 700 para la formación de la opinión del auditor. (IAASB — ISA 315, IAASB — ISA 700)
