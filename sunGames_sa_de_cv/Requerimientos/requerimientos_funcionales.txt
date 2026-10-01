@@ -7,9 +7,9 @@ TOMO 1 ---REQUERIMIENTOS FUNCIONALES---- (Están sujetos a cambios)
 
 Requerimiento Global:
 Configuración contable y normativa
-- RF-01. Marco normativo configurable: permitir seleccionar NIIF completas, NIIF para PYMES, normas locales y fecha de vigencia.
+- RF-01. Marco normativo configurable: permitir seleccionar NIIF para PYMES, como marco referencial para el trabajo.
 - RF-02. Versionado normativo: conservar la versión aplicada a cada período, regla, plantilla, taxonomía y cálculo.
-- RF-03. Plan de cuentas: administrar cuentas contables, subcuentas, centros de costo, proyectos, segmentos, entidades y dimensiones analíticas.
+- RF-03. Plan de cuentas: administrar cuentas contables de activos, pasivos, patrimonio y demás cuentas principales.
 - RF-04. Mapeo normativo: asociar cada cuenta con rubros de estados financieros, notas, categorías NIIF y conceptos XBRL.
 - RF-05. Políticas contables: registrar políticas, juicios, estimaciones, materialidad, vidas útiles, tasas y métodos de valoración.
 IFRS 18 sustituirá a IAS 1 para períodos anuales que comiencen desde el 1 de enero de 2027, por lo que el sistema debería soportar ambos marcos durante la transición. IFRS 18 introduce, entre otros elementos,
