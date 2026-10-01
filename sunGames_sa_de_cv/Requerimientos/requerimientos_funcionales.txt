@@ -8,51 +8,38 @@ TOMO 1 ---REQUERIMIENTOS FUNCIONALES---- (Están sujetos a cambios)
 Requerimiento Global:
 Configuración contable y normativa
 - RF-01. Marco normativo configurable: permitir seleccionar NIIF para PYMES, como marco referencial para el trabajo.
-- RF-02. Versionado normativo: conservar la versión aplicada a cada período, regla, plantilla, taxonomía y cálculo.
-- RF-03. Plan de cuentas: administrar cuentas contables de activos, pasivos, patrimonio y demás cuentas principales.
-- RF-04. Mapeo normativo: asociar cada cuenta con rubros de estados financieros, notas, categorías NIIF y conceptos XBRL.
-- RF-05. Políticas contables: registrar políticas, juicios, estimaciones, materialidad, vidas útiles, tasas y métodos de valoración.
-IFRS 18 sustituirá a IAS 1 para períodos anuales que comiencen desde el 1 de enero de 2027, por lo que el sistema debería soportar ambos marcos durante la transición. IFRS 18 introduce, entre otros elementos,
- subtotales definidos de resultado, medidas de desempeño definidas por la gerencia y nuevos principios de agregación y desagregación. (IFRS Foundation — IFRS 18)
+- RF-02. Plan de cuentas: administrar cuentas contables de activos, pasivos, patrimonio y demás cuentas principales.
+- RF-03. Período Contable: Crear un solo periodo contable para efectos de ejemplificación de la materia.
+- RF-04. Parámetros Contables: Crear periodos mensuales y anuales y controlar su estado.
+- RF-05. Permitir usuarios y roles claros: perfiles de administrador, contador y consulta, con permisos diferenciados.
+
 Registro y control de operaciones
-- RF-06. Partida doble: validar que todo comprobante tenga débitos iguales a créditos.
-- RF-07. Base de devengo: registrar operaciones en el período económico que corresponda, independientemente del cobro o pago.
-- RF-08. Comprobantes: permitir comprobantes manuales, recurrentes, automáticos, reversas, ajustes y reclasificaciones.
-- RF-09. Validaciones: impedir el uso de cuentas inactivas, períodos cerrados, monedas inválidas o dimensiones obligatorias incompletas.
-- RF-10. Soportes: asociar facturas, contratos, órdenes, recibos, conciliaciones y demás evidencia documental.
-- RF-11. Aprobaciones: configurar flujos de revisión según importe, tipo de operación, entidad, cuenta o riesgo.
+- RF-06. Partida doble: validar que todo comprobante tenga débitos iguales a créditos. Prohibir el registro de una partida no cuadrada.
+- RF-07. Validaciones: bloquear el uso de cuentas inactivas, periodo cerrados y montos válidos.
+- RF-08. Tipos de Partida: permitir crear partidas dobles, de ajuste, y de inicio de periodo. Utilizar partidas para corregir errores ya registrados.
+- RF-09. Libros Contables: Se deben crear los libros contables obligatorios en base a la normativa NIIF sección 2.
+- RF-10. Ciclo de vida de partidas: Una partida puede iniciar como borrador y luego contabilizarse, ya contabilizada no se puede editar.
+- RF-11. Soportes: Asociar cada partida doble a un documento de respaldo, como una factura o un comprobante de ingreso.
+- RF-12. Registrar depreciación: Registrar activos y generar la depreciación mensual en linea recta por fondo de amortizacion.
+- RF-13. Manejo de Cuentas T: Generar cuentas T, mostrando los flujos de efectivo dentro de la empresa de forma automática.
+- RF-14. Mayorización: Mostrar un estado de mayorización integral, mostrando coherencia en la ecuación contable.
 
-Requerimiento Global:
-Estados financieros y cierre
-- RF-12. Estados financieros: generar estado de situación financiera, estado de resultado y otro resultado integral, cambios en patrimonio, flujos de efectivo y notas.
-- RF-13. Información comparativa: generar comparativos entre períodos y conservar saldos iniciales, reexpresiones y reclasificaciones.
-- RF-14. Estado de flujos de efectivo: clasificar flujos operativos, de inversión y financiación conforme a IAS 7.
-- RF-15. Cierre periódico: ejecutar cierres mensuales y anuales mediante listas de verificación, bloqueos y autorizaciones.
-- RF-16. Reapertura controlada: permitir reabrir períodos únicamente con autorización, motivo, usuario y registro de impacto.
-- RF-17. Eventos posteriores: registrar eventos posteriores al cierre, diferenciando eventos ajustables y no ajustables conforme a IAS 10.
-- RF-18. Corrección de errores: soportar correcciones prospectivas, retrospectivas y reexpresión de comparativos conforme a IAS 8.
-IAS 7 exige clasificar los flujos de efectivo entre actividades operativas, de inversión y financiación; IAS 8 regula políticas, estimaciones y errores; IAS 10 distingue eventos ajustables de eventos no ajustables. (IAS 7, IAS 8, IAS 10)
-Módulos específicos NIIF
-- RF-19. Ingresos: administrar contratos, obligaciones de desempeño, precio de transacción, asignación y reconocimiento en el tiempo o en un momento determinado según IFRS 15.
-- RF-20. Instrumentos financieros: clasificar activos y pasivos, calcular deterioro por pérdidas crediticias esperadas y generar revelaciones de riesgo según IFRS 9 e IFRS 7.
-- RF-21. Valor razonable: registrar jerarquía de valor razonable, técnicas de valoración, supuestos, fuentes y sensibilidad conforme a IFRS 13.
-- RF-22. Arrendamientos: controlar contratos, plazos, opciones, tasas de descuento, activos por derecho de uso, pasivos y modificaciones según IFRS 16.
-- RF-23. Propiedad, planta y equipo: administrar componentes, depreciación, vidas útiles, deterioro, revaluaciones, bajas y transferencias.
-- RF-24. Intangibles: controlar reconocimiento, amortización, vidas útiles, deterioro y activos en desarrollo.
-- RF-25. Inventarios: gestionar entradas, salidas, métodos de costo, obsolescencia, conteos y valor neto realizable.
-- RF-26. Deterioro: calcular valor recuperable de activos y unidades generadoras de efectivo según IAS 36.
-- RF-27. Provisiones y contingencias: registrar obligaciones legales o constructivas, probabilidades, estimaciones, descuentos y revelaciones conforme a IAS 37.
-- RF-28. Impuestos: calcular impuesto corriente, impuesto diferido, diferencias temporarias, pérdidas fiscales y tratamientos tributarios inciertos conforme a IAS 12 e IFRIC 23.
-- RF-29. Moneda extranjera: administrar moneda funcional, tasas históricas, tasas de cierre, diferencias cambiarias y conversión de operaciones extranjeras según IAS 21.
-- RF-30. Consolidación: manejar eliminaciones intercompañía, participaciones no controladoras, asociadas, negocios conjuntos y revelaciones según IFRS 10, IFRS 11, IFRS 12 e IAS 28.
-IFRS 15 utiliza un modelo de cinco pasos para el reconocimiento de ingresos; IFRS 16 requiere reconocer, en general, un activo por derecho de uso y un pasivo por arrendamiento; IAS 12 regula 
-impuestos corrientes y diferidos; IAS 21 regula moneda funcional y conversión. (IFRS 15, IFRS 16, IAS 12, IAS 21)
+Contabilidad de Costos
+- RF-15. Administrar el catálogo de videojuegos por medio de Activos Intangibles (según NIC38 y ASC 985-20), calculando su amortización automaticamente
+- RF-16. Centros de Costo: definir áreas de programación, arte, diseño y QA, asi como gastos de administración.
+- RF-17. Clasificar automáticamente cada costo como directo o indirecto.
+- RF-18. Calcular el costo total de cada videojuego en base al método de Ordenes de trabajo
+- RF-19. Generación de Reportes: Consultar costes por proyecto, por centro de costo y por periodo.
+- RF-20. Videojuegos en desarrollo: acumular los costos de cada juego en cualquier momento y presentar su coste.
 
-Requerimiento Global:
-Auditoría y reporte digital
-- RF-31. Trazabilidad completa: permitir navegar desde una cifra reportada hasta el saldo contable, comprobante, documento fuente, usuario y regla aplicada.
-- RF-32. Bitácora de auditoría: registrar creación, aprobación, modificación, reversa, eliminación lógica, exportación y acceso a información sensible.
-- RF-33. Conciliaciones: bancos, cuentas por cobrar, cuentas por pagar, inventarios, activos, impuestos e intercompañías.
-- RF-34. Paquete de cierre: generar saldos, movimientos, conciliaciones, excepciones, aprobaciones, soportes y versión normativa.
-- RF-35. Reporte XBRL/iXBRL: exportar estados y notas con etiquetas, unidades, períodos, dimensiones, referencias y validaciones de la Taxonomía IFRS.
-La Taxonomía IFRS transforma los requerimientos de presentación y revelación en conceptos legibles por máquinas; XBRL permite definir, validar, intercambiar y publicar información financiera estructurada. (IFRS Accounting Taxonomy, XBRL International)
+Catálogo de Videojuegos y licencias
+- RF-21. Registrar cada videojuego y llevar trazabilidad en su ciclo de desarrollo y fecha de lanzamiento.
+- RF-22. Registrar datos acerca de cada compra de una copia de videojuego y generar comprobantes.
+- RF-23. Automatizar la creación de la amortización por cada videojuego y calcular su vida útil.
+- RF-24. Devoluciones y reembolsos: Revertir la venta y reingresar la licencia cuando corresponda.
+
+Estados Financieros y control
+- RF-25. Estados Financieros: Generar los estados financieros obligatorios según la NIIF, aplicando integridad y coherencia
+- RF-26. Creación de otros estados: Crear estados de comprobación y hoja de trabajo, para apoyar al contador en su trabajo.
+- RF-27. Cierre Contable: Cerrar con éxito un periodo contable, bloqueando su edicion luego del cierre.
+- RF-28. Trazabilidad y bitácora: Ofrecer una experiencia de usuario de calidad, mostrando una correcta gestión desde saldos, hasta el cierre contable.
