@@ -1,5 +1,3 @@
-# Sistema_Contable_Proyecto_SIC115
-## Aplicación de los conceptos de la cátedra de SIC115 en la Universidad de El Salvador
 # 📊 Sistema Contable SunGames S.A de C.V.
 
 Sistema de contabilidad general y de costos para una empresa desarrolladora de videojuegos que comercializa sus productos mediante licencias. Desarrollado bajo la normativa contable y mercantil de El Salvador.
