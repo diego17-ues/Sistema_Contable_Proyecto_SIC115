@@ -1,16 +1,8 @@
 # Sistema_Contable_Proyecto_SIC115
 ## Aplicación de los conceptos de la cátedra de SIC115 en la Universidad de El Salvador
-# 📊 Sistema Contable SunGames
+# 📊 Sistema Contable SunGames S.A de C.V.
 
 Sistema de contabilidad general y de costos para una empresa desarrolladora de videojuegos que comercializa sus productos mediante licencias. Desarrollado bajo la normativa contable y mercantil de El Salvador.
-
-> Proyecto académico — Curso **SIC115 · Sistemas Contables**, Universidad de El Salvador (UES).
-
-![Laravel](https://img.shields.io/badge/Laravel-11%2F12-FF2D20?logo=laravel&logoColor=white)
-![Filament](https://img.shields.io/badge/Filament-v3-FDAE4B)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-4169E1?logo=postgresql&logoColor=white)
-![Estado](https://img.shields.io/badge/estado-en%20desarrollo-yellow)
-
 ---
 
 ## 📌 Tabla de contenido
@@ -19,13 +11,8 @@ Sistema de contabilidad general y de costos para una empresa desarrolladora de v
 - [Características](#-características)
 - [Tecnologías](#-tecnologías)
 - [Requisitos previos](#-requisitos-previos)
-- [Instalación](#-instalación)
-- [Configuración](#-configuración)
-- [Uso](#-uso)
-- [Estructura del proyecto](#-estructura-del-proyecto)
 - [Equipo](#-equipo)
 - [Licencia](#-licencia)
-
 ---
 
 ## 📖 Descripción
@@ -67,7 +54,7 @@ El alcance se centra en **contabilidad general** y **contabilidad de costos**, i
 
 ## 🗂️ Estructura del proyecto
 
-```
+```text
 ├── app/
 │   ├── Filament/        # Recursos, páginas y widgets del panel
 │   ├── Models/          # Modelos Eloquent
@@ -89,5 +76,4 @@ El alcance se centra en **contabilidad general** y **contabilidad de costos**, i
 | Josué Nehemias Renderos Hernández | Desarrollo |
 
 ## 📄 Licencia
-
-Proyecto con fines académicos. SunGames S.A. de C.V. es una empresa ficticia y todas sus operaciones son simuladas.
+Proyecto elaborado con fines académicos. SunGames S.A de C.V. es una empresa ficticia y todas sus operaciones son simuladas.
