@@ -43,3 +43,9 @@ Estados Financieros y control
 - RF-26. Creación de otros estados: Crear estados de comprobación y hoja de trabajo, para apoyar al contador en su trabajo.
 - RF-27. Cierre Contable: Cerrar con éxito un periodo contable, bloqueando su edicion luego del cierre.
 - RF-28. Trazabilidad y bitácora: Ofrecer una experiencia de usuario de calidad, mostrando una correcta gestión desde saldos, hasta el cierre contable.
+
+Continuidad del producto 
+- RF-29. El sistema puede evolucionar con el tiempo, logrando implementar otras ramas de contabilidad, como contabilidad financiera, auditoria forense, etc. La aplicación de estas ramas benefician la contabilidad de la empresa a presentar mejores resultados y toma de decisiones.
+- RF-30. Implementar las diversas prácticas y políticas contables como buenas prácticas para la presentación de estados financieros, manteniendo la fidelidad, pertinencia, y seguridad de cada documento contable.
+- RF-31. Crear hojas de trabajo para gestionar cierres contables en cualquier momento de manera automática.
+
