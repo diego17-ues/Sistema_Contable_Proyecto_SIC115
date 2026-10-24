@@ -42,15 +42,15 @@ En el entorno económico actual, signado por la acelerada transformación digita
 
 El presente documento constituye la caracterización de SunGames S.A de C.V., una entidad clasificada como pequeña empresa que cuenta con un equipo multidisciplinario de 18 colaboradores dedicado al diseño, programación y distribución de licencias de software. El propósito fundamental de este trabajo es establecer las bases organizativas, contables y normativas que rigen las operaciones financieras de la sociedad, alineando su práctica contable a las Normas Internacionales de Información Financiera para Pequeñas y Medianas Entidades (NIIF para Pymes) y a la legislación fiscal, mercantil y laboral de El Salvador. 
 
-A lo largo del documento se aborda de forma integral la filosofía corporativa y la caracterización de la empresa, detallando su modelo de comercialización basado en pago único a través de tiendas digitales. Asimismo, se desarrolla el tratamiento contable especializado para la capitalización de los costos de desarrollo de videojuegos y su posterior recuperación en estricto apego al límite legal del 25% anual estipulado en el Art. 30-A de la Ley de Impuesto sobre la Renta. De igual manera, se norma el registro explícito de las ventas con descuento y reembolsos, la exención de sistemas de inventario comercial físico para productos digitales y el cumplimiento de las obligaciones laborales pertinentes, tales como el Reglamento Interno de Trabajo (RIT) y el Comité de Seguridad y Salud Ocupacional (CSSO). 
+A lo largo del documento se aborda la filosofía corporativa y la caracterización de la empresa, detallando su modelo de comercialización basado en el pago único a través de la tienda digital Steam. Asimismo, se desarrolla el tratamiento contable de la capitalización de los costos de desarrollo de videojuegos y su amortización en línea recta durante cuatro años, en concordancia con el límite del 25% anual establecido en el Art. 30-A de la Ley de Impuesto sobre la Renta. De igual manera, se define el registro de las ventas con descuento y de los reembolsos, la inexistencia de inventario comercial para productos digitales, el método de costeo por órdenes de trabajo y las obligaciones laborales de la empresa. 
 
-Con la estructuración de este manual, se proporciona a la gerencia, contadores y auditores una herramienta técnica clara que garantiza la transparencia de la información financiera, la adecuada toma de decisiones estratégicas y el estricto cumplimiento normativo ante los organismos de control del país. 
+Con este documento se proporciona a la gerencia, a los contadores y a los auditores una herramienta clara que favorece la transparencia de la información financiera, la adecuada toma de decisiones estratégicas y el cumplimiento normativo ante los organismos de control del país. 
 
 ## **RESUMEN** 
 
 SunGames, S.A. de C.V. es una empresa dedicada al desarrollo, mantenimiento y comercialización de videojuegos. Su modelo comercial son videojuegos desarrollados por cuenta propia, cuyos ingresos provienen de licencia. 
 
-El presente documento se centra en el diseño, estructuración y caracterización del Sistema Contable y Método de Comercialización de la empresa. Los manuales descriptivos de puestos secundarios y flujogramas operativos detallados quedan fuera del alcance del entregable, enfocándose el estudio en la arquitectura del catálogo de cuentas, la política de activos intangibles y el ciclo de amortización y comercialización del software. 
+El presente documento caracteriza a la empresa y define las bases de su sistema contable y de su método de comercialización. La arquitectura detallada del catálogo de cuentas se desarrolla en el Manual de Aplicación del Catálogo de Cuentas, documento complementario. Los manuales descriptivos de puestos y los flujogramas operativos quedan fuera del alcance de este entregable. 
 
 ## **_CAPITULO I_** 
 
@@ -58,89 +58,85 @@ El presente documento se centra en el diseño, estructuración y caracterizació
 
 ## **MARCO CONCEPTUAL** 
 
-En esta sección, se presentan los conceptos teóricos relacionados al contexto planeado en la problemática referente a la contabilidad general y de costos, además de conceptos clave en la caracterización de una empresa. 
+En esta sección se presentan los conceptos relacionados con la contabilidad general y de costos, además de los conceptos clave para la caracterización de una empresa. 
 
 La caracterización empresarial es el proceso de describir de forma ordenada los elementos que identifican a una organización: su actividad económica, forma jurídica, recursos, estructura, clientes, proveedores, procesos y entorno. En este proyecto permite convertir la realidad operativa de SunGames en requisitos para el sistema contable. 
 
 Una empresa de software desarrolla activos intangibles mediante actividades de análisis, diseño, programación, pruebas, implementación y mantenimiento. En SunGames, el videojuego integra código fuente, arte digital, audio, narrativa y documentación; por ello, cada proyecto debe contar con evidencia de horas trabajadas, costos de licencias, compras a terceros y entregables aprobados. 
 
-El licenciamiento es la autorización contractual para usar o distribuir un producto sin que necesariamente se transfiera la titularidad de los derechos patrimoniales. Mediante intermediarios comerciales, se comercializa cada videojuego generando ingresos por sus descargas. 
+El licenciamiento es la autorización contractual para usar o distribuir un producto sin que necesariamente se transfiera la titularidad de los derechos patrimoniales. En SunGames, el jugador adquiere una licencia de uso del videojuego a través de la plataforma de distribución, sin que se le transfieran los derechos sobre la obra. 
 
 Un sistema contable automatizado es un conjunto de procedimientos, registros, documentos fuente, controles y reportes apoyados por software. Su finalidad es capturar las transacciones, clasificarlas en el catálogo de cuentas, procesarlas con oportunidad y producir información financiera confiable para la toma de decisiones. 
 
-Los costos directos se identifican con un proyecto específico, por ejemplo, horas de programación contratadas para un cliente, arte digital comprado para un juego o una licencia utilizada exclusivamente en ese proyecto. Los costos indirectos, como alquiler, internet, administración y servicios compartidos, benefician a varios proyectos y requieren una base de distribución razonable. El costo unitario de un servicio se obtiene al relacionar los costos acumulados con la unidad elegida, como hora de desarrollo, hito entregable o proyecto terminado. 
+Los costos directos se identifican con un proyecto específico, por ejemplo, las horas de programación del equipo asignadas a un videojuego, el arte digital comprado para un juego o una licencia utilizada exclusivamente en ese proyecto. Los costos indirectos, como alquiler, internet, 
 
-Los documentos fuente son los comprobantes que respaldan cada registro: contratos, cotizaciones aceptadas, facturas, comprobantes de crédito fiscal, recibos, órdenes de compra, planillas, reportes de horas y actas de aceptación. La trazabilidad entre estos documentos y los asientos contables es indispensable para el control interno. 
+administración y servicios compartidos, benefician a varios proyectos y requieren una base de distribución razonable. El costo de un videojuego se obtiene al acumular todos los costos de su orden de trabajo, y su costo por hora de desarrollo, al relacionar esos costos con las horas trabajadas. 
+
+Los documentos fuente son los comprobantes que respaldan cada registro: contratos, facturas, comprobantes de crédito fiscal, recibos, órdenes de compra, planillas, reportes de horas, reportes de ventas de la plataforma y actas de lanzamiento. La trazabilidad entre estos documentos y los asientos contables es indispensable para el control interno. 
 
 # **MARCO TEÓRICO** 
 
-La contabilidad general proporciona información sobre la situación financiera, el rendimiento y los flujos de efectivo de una entidad. Para una empresa de software, esta información debe reflejar los ingresos obtenidos por servicios de desarrollo, mantenimiento y licencias, así como los costos y gastos necesarios para generar esos ingresos. La NIIF para las PYMES ofrece un marco de referencia adecuado para entidades que no tienen obligación pública de rendir cuentas. 
+La contabilidad general proporciona información sobre la situación financiera, el rendimiento y los flujos de efectivo de una entidad. Para una empresa de software, esta información debe reflejar los ingresos obtenidos por licencias, así como los costos y gastos necesarios para generar esos ingresos. La NIIF para las PYMES ofrece un marco de referencia adecuado para entidades que no tienen obligación pública de rendir cuentas. 
 
-El reconocimiento contable debe basarse en el fondo económico de las operaciones y en evidencia verificable. En SunGames, los contratos de encargos deben especificar el videojuego solicitado, el alcance, los desembolsos, los hitos y las obligaciones de cada parte; las facturas y actas de aceptación respaldan el reconocimiento de los ingresos del proyecto. Los anticipos y desembolsos recibidos antes de cumplir la obligación acordada deben controlarse separadamente hasta su aplicación. Para los videojuegos propios, los ingresos por licencias deben relacionarse con el contrato; asimismo de contar con fondos de amortización para el período de licenciamiento acordado. 
+El reconocimiento contable debe basarse en el fondo económico de las operaciones y en evidencia verificable. En SunGames, el ingreso por la venta de licencias se reconoce cuando el jugador adquiere el juego en la plataforma, con base en el reporte de ventas de esta. Los cobros por adelantado de productos que aún no se entregan, como una preventa, se controlan por separado hasta su entrega. 
 
-Haciendo uso de un catálogo de activos intangibles, como modelo de “inventario” de videojuegos, cada videojuego se desarrolla siguiendo un ciclo de vida desde su diseño, hasta su construcción final. Su comercialización se puede realizar por medios propios o por servicios de intermediarios, como Steam, que publica cada videojuego, cobrando un 30% de comisión por compra. 
+Mediante un registro de activos intangibles, cada videojuego se sigue desde su diseño hasta su construcción final. Su comercialización se realiza por medio de intermediarios como Steam, que publica cada videojuego y cobra una comisión del 30% por cada compra en el tramo inicial de ventas. 
 
-La contabilidad de costos permite medir los recursos consumidos para prestar un servicio o producir un bien digital. Dado que SunGames presta servicios diferenciados y desarrolla videojuegos con requerimientos particulares, el costeo por órdenes de trabajo resulta pertinente: cada proyecto acumula materiales o licencias directas, mano de obra directa y una porción justificada de costos indirectos. Esta información facilita cotizar, evaluar rentabilidad y corregir desviaciones. 
+La contabilidad de costos permite medir los recursos consumidos para producir un bien digital. Dado que cada videojuego tiene requerimientos particulares, el costeo por órdenes de trabajo resulta pertinente: cada juego acumula licencias y servicios directos, mano de obra directa 
 
-El control interno comprende políticas y procedimientos para proteger recursos, prevenir errores y producir información confiable. Entre los controles relevantes para SunGames están la aprobación de cotizaciones y contratos, asignación de códigos a cada proyecto, registro de horas por colaborador, conciliación de cobros, revisión de facturas de proveedores, respaldo del código fuente y separación entre quien autoriza, registra y revisa transacciones. 
+y una porción justificada de costos indirectos. Esta información facilita fijar el precio, evaluar la rentabilidad y corregir desviaciones. 
 
-Los activos intangibles son recursos identificables sin sustancia física, tales como software, licencias y derechos de autor. La empresa debe distinguir entre gastos ordinarios de operación y desembolsos que, conforme a la política contable y la norma aplicable, cumplan los criterios para reconocerse como activo. Esta evaluación debe documentarse por proyecto y no debe basarse únicamente en la expectativa de generar ventas futuras. 
+El control interno comprende políticas y procedimientos para proteger recursos, prevenir errores y producir información confiable. Entre los controles relevantes para SunGames están la aprobación de compras y de contratos con proveedores, la asignación de un código a cada videojuego, el registro de horas por colaborador, la conciliación de los pagos de la plataforma, la revisión de facturas de proveedores, el respaldo del código fuente y la separación entre quien autoriza, registra y revisa las transacciones. 
+
+Los activos intangibles son recursos identificables sin sustancia física, tales como software, licencias y derechos de autor. La empresa debe distinguir entre gastos ordinarios de operación y desembolsos que, conforme a la política contable y a la norma aplicable, cumplan los criterios para reconocerse como activo. La posibilidad de reconocer como activo los costos de desarrollo depende de la versión de las NIIF para las PYMES que se aplique. SunGames adopta como política capitalizarlos cuando cumplen esos criterios, y esta evaluación se documenta por proyecto y no se basa únicamente en la expectativa de ventas futuras. 
 
 ## **_MARCO LEGAL_** 
 
-A continuación se presenta la base legal para la creación y mantenimiento de una empresa en general en El Salvador, asimismo las diferentes normativas internacionales para la creación de un sistema contable. 
+A continuación se presenta la base legal para la creación y el mantenimiento de una empresa en El Salvador, así como las normas aplicables a su sistema contable. 
 
-## **_Clasificación de empresas en El Salvador._** 
+## _1.3.1 Clasificación de empresas en El Salvador_ 
 
-La Ley de Fomento, Protección y Desarrollo para la Micro y Pequeña Empresa (Ley MIPE) en el Art. 3 clasifica las empresas de la siguiente manera: 
+La Ley de Fomento, Protección y Desarrollo para la Micro y Pequeña Empresa (Ley MIPE), en su Art. 3, clasifica las empresas de la siguiente manera: 
 
-- _Microempresa:_ Clasificación por ventas de hasta 500 salarios mínimos mensuales ($204,400) y hasta una planta de 10 trabajadores. 
+ _Microempresa:_ ventas de hasta 500 salarios mínimos mensuales ($204,400) y hasta 10 trabajadores. 
 
-- _Pequeña Empresa:_ Con ventas desde más de $204,400 hasta $2,044,00 (5000 salarios mínimos). Con una planta de al menos 50 trabajadores. 
+ _Pequeña empresa:_ ventas desde más de $204,400 hasta $2,044,000 (5,000 salarios mínimos) y hasta 50 trabajadores. 
 
-Esta clasificación no incluye las medianas empresas, sin embargo la Comisión Nacional de la Micro y Pequeña Empresa (CONAMYPE) agrega una clasificación más; la mediana empresa. 
+La ley no incluye a las medianas empresas. La Comisión Nacional de la Micro y Pequeña Empresa (CONAMYPE) agrega la categoría de mediana empresa, con ingresos de hasta $7 millones y hasta 100 trabajadores según su definición vigente hasta 2018; al no estar contemplada en la Ley MIPE, esta categoría se menciona solo como referencia. 
 
-_Mediana Empresa:_ Según la definición de la CONAMYPE, esta empresa se caracteriza por contar con ingresos de $7 millones y 100 trabajadores, hasta 2018. Esta clasificación no está correctamente fundamentada. 
+Por tener 18 trabajadores, SunGames se ubica en la categoría de pequeña empresa según el criterio del número de trabajadores. Como la empresa es una simulación sin operaciones reales, esta clasificación es referencial y deberá sustentarse con datos de ventas cuando existan. 
 
-Además de esta clasificación, existe la del Código de Comercio en el Art. 18, que divide a las sociedades en personas y capitales, en nuestra empresa nos interesa el Art. 191, que define la sociedad anónima. 
+Además de esta clasificación, el Código de Comercio, en su Art. 18, divide las sociedades en sociedades de personas y sociedades de capitales. A SunGames le interesa la sociedad anónima, definida en el Art. 191. La sociedad anónima es una sociedad de capitales cuyo capital se divide en partes alícuotas representadas por títulos valores llamados acciones (Art. 126), y en la que los accionistas limitan su responsabilidad al valor de sus acciones (Art. 127). Se constituye bajo una denominación seguida de “Sociedad Anónima” o de su abreviatura “S.A.”. 
 
-La sociedad anónima (Art. 18, sociedades de capital, ord I y Art. 191), es una sociedad de capitales cuyo capital se divide en partes alícuotas representadas por títulos valores llamados _acciones_ (Art.126), y en la que los accionistas limitan su responsabilidad al valor de sus acciones (Art. 127). Se constituye bajo una denominación seguida de “Sociedad Anónima” o en sus siglas “S.A”. 
+Se constituye por escritura pública, por fundación simultánea o, si el capital se forma por suscripción sucesiva o pública, tras cumplir las formalidades que la ley establece. El Código de Comercio exige un capital social mínimo de $2,000 (Art. 192), íntegramente suscrito y pagado en el porcentaje mínimo que la ley señala. Este marco permite ubicar a SunGames en la clasificación jurídica y administrativa correspondiente ante el Estado. 
 
-Su forma de constitución es por escritura pública, por fundación simultánea o, si el capital se forma por suscripción sucesiva o pública, tras cumplir las formalidades de la lección. Los requisitos mínimos de fundación según el Art.192  del Código de Comercio, son un capital social no menor de $2,000, integrantemente suscrito y un pago en efectivo de al menos el 5% de cada acción pagadera en numerarlo. 
+## _1.3.2 Registro y constitución de la empresa_ 
 
-Esta ley es fundamental en el desarrollo de nuestra empresa, ya que se logra ubicar dentro de la clasificación para efectos legales y administrativos con el estado. 
+La empresa se constituye mediante una escritura pública de constitución, elaborada por un notario público salvadoreño, con un capital social mínimo de $2,000. El registro se completa en el Registro de Comercio del Centro Nacional de Registros (CNR), con el testimonio de la escritura, el pago de los aranceles y la obtención de la matrícula de empresa, que debe renovarse cada año. También se registran los locales y establecimientos, si existen. 
 
-## **_Sobre el registro y caracterización de la empresa._** 
+Al establecerse, la empresa debe inscribirse como sujeto pasivo en el registro de contribuyentes, conforme a los artículos 86 y 87 del Código Tributario, lo que implica el registro como contribuyente del IVA. Además, debe cumplir con los impuestos municipales de la alcaldía 
 
-Según el Código de Comercio en el Art. 22, la empresa debe constituirse mediante una Escritura Pública de Constitución, elaborada por un notario público salvadoreño; con un capital social mínimo de $2,000 (Art. 192)  para sociedades anónimas de capital variable. El registro debe completarse en el Registro de Comercio (CNR) con el testimonio de escritura pública, pago de aranceles y la obtención de la matrícula de la empresa (Art. 45), asimismo del registro de locales y establecimientos si es que existen. 
+correspondiente, inscribirse en el registro estadístico de la Dirección General de Estadística y Censos (DIGESTYC) y afiliar a la empresa y a sus trabajadores al Instituto Salvadoreño del Seguro Social (ISSS) y al sistema de pensiones, conforme a la Ley del Seguro Social y a la Ley del Sistema de Ahorro para Pensiones. 
 
-Al establecerse la empresa, debe registrarse como entidad tributaria según los artículos 86 y 87 del Código Tributario, que dictan que “ _Todos los sujetos pasivos que de conformidad a este Código…están obligados a inscribirse en el registro de contribuyentes…”_ esto significa el registro pleno para ser contribuyente del IVA. 
+## _1.3.3 Aspectos legales del sistema contable_ 
 
-En su caracterización, deben incluirse el pago de los impuestos e incomers solicitados por la alcaldía municipal, la obtención del certificado de registro/solvencia estadística por parte de DYGESTIC y la inscripción obligatoria al seguro social y al fondo de pensiones (Art. 7, 12 y 13 del Código Tributario). 
+En El Salvador, por acuerdo del Consejo de Vigilancia de la Profesión de Contaduría Pública y Auditoría (CVPCPA), el marco contable para la presentación de la información financiera es la NIIF para las PYMES. 
 
-## **_Aspectos legales para un sistema contable de calidad_** 
+El Código de Comercio (Art. 435) establece que toda empresa debe llevar un sistema contable formal, conforme a principios generalmente aceptados, desde su fundación; es decir, debe crear los instrumentos contables que muestren fielmente su realidad económica. El catálogo de cuentas es la base para elaborar los asientos contables, el libro diario, el libro mayor y los estados financieros. 
 
-En El Salvador, por acuerdo del Consejo de Vigilancia de la Profesión de Contaduría Pública y Auditoría (CVPCPA); el marco contable de presentación de la información financiera es la NIIF (Normas Internacionales de Información Financiera) para las PYMES. 
+Las NIIF para las PYMES establecen, en las secciones 3 a 8, la presentación de los estados financieros: situación financiera, resultados, cambios en el patrimonio y flujos de efectivo. La sección 13 regula la valoración de inventarios y la sección 18 trata los activos intangibles distintos de la plusvalía, que es la sección aplicable a los videojuegos desarrollados por SunGames. SunGames se compromete a conocer y cumplir la normativa que le sea aplicable. 
 
-De acuerdo al Código de Comercio (Art. 435) establece que toda empresa debe contar con un sistema contable formal conforme a sistemas generalmente aceptados desde su fundación, es decir; se deben crear todos los instrumentos contables que permita mostrar fielmente su realidad económica. El catálogo de cuentas como base fundamental para elaborar los diferentes asientos contables como libro diario, libro mayor y demás estados financieros. 
+## _1.3.4 Aspectos laborales y de seguridad social_ 
 
-Asimismo, las NIIF establecen en las secciones 3 a la 8, la presentación de estados financieros: situación financiera, estado de resultados, cambios en el patrimonio y flujos de efectivo. Es de crucial importancia que toda empresa presente estos informes como parte de sus operaciones. La sección 13, establece el método de valoración de inventarios y la sección 18 el tratamiento de los costos de desarrollo de videojuegos, que indica el método de costeo que debe utilizarse. 
-
-Toda esta base legal es fundamental para una correcta ejecución de las actividades de la empresa y SunGames no se delimita a ignorancia ante la ley. 
+Con 18 trabajadores, SunGames cumple con las obligaciones del Código de Trabajo, de la Ley del Seguro Social y de la Ley del Sistema de Ahorro para Pensiones. De acuerdo con su tamaño, la empresa elabora su Reglamento Interno de Trabajo (RIT) y conforma su Comité de Seguridad y Salud Ocupacional (CSSO), en los términos que exija la normativa laboral vigente. 
 
 ## **MARCO CONTEXTUAL** 
 
-SunGames es una empresa salvadoreña con domicilio propuesto en el Distrito de San Salvador, Municipio de San Salvador Centro, Departamento de San Salvador. Se ha definido como una sociedad anónima de capital variable, con tres accionistas en partes iguales y un capital inicial de $30,000.00. 
+SunGames es una empresa salvadoreña con domicilio en el Distrito de San Salvador, municipio de San Salvador Centro, departamento de San Salvador. Está constituida como sociedad anónima de capital variable, con tres accionistas en partes iguales y un capital inicial de $30,000.00.Su giro principal consiste en el desarrollo, mantenimiento y comercialización de videojuegos. Sus líneas de operación son: a) videojuegos desarrollados por cuenta propia, comercializados mediante licencias de uso a través de plataformas de distribución digital; y b) mantenimiento y soporte técnico de sus propios videojuegos. El sistema contable debe identificar por separado los ingresos por licencias, los descuentos y reembolsos, y los costos acumulados de cada videojuego. 
 
-El giro principal consiste en el desarrollo, mantenimiento y comercialización de videojuegos. Sus líneas de operación previstas son: a) videojuegos desarrollados por cuenta propia, comercializados mediante licencias de uso o distribución; b) videojuegos y aplicaciones creados por encargo, remunerados con los desembolsos pactados por el cliente; y c) mantenimiento y soporte técnico. El sistema debe identificar por separado los ingresos por licencias, los anticipos, 
+La estructura administrativa es una Junta Directiva de tres miembros: director presidente y representante legal, director secretario y director vocal. Para fines operativos se distinguen las funciones de dirección, desarrollo, diseño y arte digital, pruebas de calidad, administración y contabilidad, y comercialización. Aunque una misma persona pueda desempeñar más de una función al inicio, deben conservarse autorizaciones y revisiones independientes sobre pagos, cobros y registros contables. 
 
-pagos por hito y saldos pendientes de cada encargo, además de los costos acumulados por línea de negocio y proyecto. 
-
-La estructura administrativa propuesta es una Junta Directiva de tres miembros: director presidente y representante legal simulado, director secretario y director vocal. Para fines operativos, se recomienda distinguir las funciones de dirección, desarrollo, diseño y arte digital, pruebas de calidad, administración-contabilidad y comercialización. Aunque una misma persona pueda desempeñar más de una función al inicio, deben conservarse autorizaciones y revisiones independientes sobre pagos, cobros y registros contables. 
-
-La clasificación como micro, pequeña o mediana empresa debe sustentarse en el criterio normativo o institucional que el grupo adopte y en datos verificables de personal, ventas o activos. Mientras SunGames sea una simulación sin operaciones reales, es más preciso describirla como emprendimiento tecnológico de escala inicial, en lugar de atribuir una clasificación al Ministerio de Hacienda sin evidencia documental. 
-
-Los clientes potenciales incluyen empresas que requieren videojuegos a medida, instituciones educativas, distribuidores digitales y usuarios finales. Los proveedores potenciales incluyen profesionales independientes, servicios de nube, plataformas de distribución, motores de videojuegos, licencias de software, pasarelas de pago y proveedores de arte, audio o pruebas. En los encargos, las operaciones comienzan con la cotización y el contrato, continúan con los desembolsos y la ejecución por hitos, y terminan con la aceptación, facturación, cobro y soporte. En los productos propios, el ciclo comprende el desarrollo, la publicación, el licenciamiento y el control de los ingresos reportados por las plataformas o licenciatarios. 
+Los clientes de SunGames son los jugadores, que adquieren sus videojuegos a través de Steam. Los proveedores potenciales incluyen profesionales independientes, servicios de nube, plataformas de distribución, motores de videojuegos, licencias de software y proveedores de arte, audio o pruebas. El ciclo de cada producto comprende el desarrollo, la publicación, el licenciamiento a los jugadores y el control de los ingresos reportados por la plataforma. 
 
 ## **_CAPITULO II_** 
 
@@ -170,7 +166,9 @@ La empresa tendrá su domicilio principal en Avenida La Revolución, Colonia San
 |**NRC:**|765432-1|
 |**Fecha de Constitución:**|11 de septiembre de 2026|
 |**Matrícula de la Empresa:**|2009001001 (renovación anual obligatoria,<br>según Art. 411 del Código de Comercio)|
-|**Capital Social:**|$30,000.00 dividido en acciones de $1.00 cada<br>una|
+|**Capital Social:**|$30,000.00 dividido en acciones de $1,000.00<br>cada una|
+|**Modelo de Comercialización:**|Pago único, mediante plataforma Steam|
+|**Moneda**|Dólar de los Estados Unidos|
 
 
 
@@ -262,6 +260,8 @@ En nuestra empresa, buscamos fomentar un ambiente laboral positivo y respetuoso.
 
 • Los empleados pueden establecer su propio horario dentro del rango laboral, asegurando disponibilidad para reuniones y entregas de proyectos. Se seguirá una metodología ágil para la gestión de proyectos, con reuniones semanales de seguimiento 
 
+## **CAPITULO III.** 
+
 ## **ASPECTOS OPERATIVOS Y MODELO DE NEGOCIO** 
 
 ## _3.1 Método de Comercialización_ 
@@ -272,21 +272,25 @@ A diferencia del método SaaS (Software as a Service), este método ofrece venta
 
 Algunas ventajas del método de pago único: 
 
-- _Ajuste del producto y modelo de negocio_ : los pagos únicos tienen sentido cuando el 
+ _Ajuste al producto:_ los pagos únicos tienen sentido cuando el valor se entrega de una sola vez, como en el software descargable. 
 
-valor se entrega todo de una vez. Piensa en bienes físicos, software descargable, entradas o servicios facturados por proyecto. 
+- _Gestión interna:_ son más fáciles de gestionar, porque una vez cobrado el pago la 
 
-- _Gestión interna:_ los pagos únicos son más fáciles de gestionar. Una vez que se captura 
+transacción se cierra. 
 
-- y cumple el pago, la transacción se cierra. 
+ _Flujo de caja_ : los ingresos llegan en una suma global, lo que ayuda a los ciclos de efectivo cortos, aunque son menos predecibles y obligan a seguir captando jugadores. 
 
-- _Patrones de ingresos y flujo de caja_ : los ingresos llegan en una suma global. Recibes 
+La empresa no gestiona la distribución de sus videojuegos: se encarga del desarrollo y los comercializa mediante Steam, plataforma en línea que distribuye videojuegos y habilita las licencias. Por cada juego publicado se paga a la plataforma una tarifa de publicación de $100, y por cada venta, una comisión del 30% en el tramo inicial de ventas. La plataforma liquida el resto a SunGames según su calendario de pagos. 
 
-la totalidad de los pagos de inmediato, lo que puede ser útil para ciclos de efectivo cortos o negocios intensivos en capital. Pero es menos predecible, y necesitas seguir adquiriendo clientes para mantener el impulso. 
+## _3.2 Descuentos y reembolsos_ 
 
-La empresa no se encarga de gestionar la distribución de cada videojuego, solo se encarga del desarrollo y se comercializa haciendo uso de los servicios de Steam, plataforma en línea que distribuye videojuegos y se encarga de la transferencia de bienes y habilitación de licencias. 
+SunGames puede aplicar descuentos al precio de sus videojuegos con las herramientas de la plataforma y dentro de las reglas que esta establece, como el descuento de lanzamiento, los 
 
-- _3.2 Manejo de inventario y mecanismo de amortización_ 
+descuentos personalizados de duración limitada y los periodos de espera entre una oferta y otra. Como el descuento se aplica antes de la venta, esta se registra al precio que el jugador pagó efectivamente, sin una cuenta aparte, y la comisión de la plataforma se calcula sobre ese precio. 
+
+Los descuentos posteriores a la venta y los reembolsos se registran en la cuenta Descuentos y devoluciones sobre ventas, y se revierten la parte proporcional de la comisión y de la cuenta por cobrar a la plataforma. 
+
+## _3.3 Manejo de inventario y mecanismo de amortización_ 
 
 Al ser una empresa desarrolladora de videojuegos, estos se clasifican como activos intangibles que no poseen una valuación de inventario comercial físico (sin PEPS ni valor Promedio), lo que significa que no se cuenta con un inventario tradicional como que de productos se tratase. 
 
@@ -294,11 +298,29 @@ Al contrario, los montos de desarrollo, arte subcontratado, herramientas utiliza
 
 Al ser activos intangibles, estos deben amortizarse con el tiempo, para recuperar el costo de desarrollo. El método de depreciación utilizado es el de línea recta, basándose en un tiempo mínimo de 4 años o una pérdida del 25% anual, de acuerdo al Art. 30-A de la Ley de Impuesto sobre la Renta de El Salvador. 
 
-- _3.3 Método de costeo de videojuegos_ 
+## _3.4 Método de costeo de videojuegos_ 
 
-_//Por definir//_ 
+SunGames utiliza el costeo por órdenes de trabajo. Cada videojuego es una orden con código propio, que acumula sus costos desde el inicio del desarrollo hasta el lanzamiento. Los elementos del costo son: 
 
-**ESTRUCTURA ORGANIZATIVA** 
+- _Mano de obra directa_ **:** sueldos del personal que trabaja directamente en el juego 
+
+- (programación, arte y diseño), según el reporte de horas. 
+
+- _Servicios directos:_ arte, música, efectos de sonido, locución y otros servicios 
+
+- subcontratados para un juego específico. 
+
+ _Costos indirectos:_ herramientas, servidores, licencias de motor y otros costos comunes, que se asignan a cada orden en proporción a las horas de desarrollo registradas. 
+
+Los gastos de administración y de venta, y los costos de investigación previos a la decisión de desarrollar un juego, no forman parte de la orden y se llevan directamente a gasto. 
+
+Al cierre de cada periodo, los costos de la orden se trasladan a Videojuegos en desarrollo. Al lanzarse el juego, el saldo pasa a Videojuegos terminados y comienza su amortización en cuatro años. 
+
+## **CAPITULO IV.** 
+
+## **ESTRUCTURA ORGANIZATIVA** 
+
+## **CAPITULO V.** 
 
 ## **ASPECTOS OPERATIVOS Y PROPIEDAD PLANTA Y EQUIPO** 
 
@@ -308,41 +330,41 @@ Al momento de constituir la empresa, se realizaron las siguientes adquisiciones 
 
 _Activos Intangibles y Licencias Iniciales_ 
 
-- **Compras de Insumos y Servicios Directos (Costo de Desarrollo - MOD/CIF):** 
+##  **Compras de Insumos y Servicios Directos (Costo de Desarrollo - MOD/CIF):** 
 
-   - **Licencias de Software y Herramientas:** Motores de videojuegos (Unity, Unreal Engine), licencias de software de diseño/animación (Adobe Creative Cloud, Blender, Maya) y herramientas de desarrollo. 
+- _Licencias de Software y Herramientas_ **:** Motores de videojuegos (Unity, Unreal Engine), licencias de software de diseño/animación (Adobe Creative Cloud, Blender, Maya) y herramientas de desarrollo. 
 
-   - **Servicios Subcontratados:** Arte 2D/3D especializado, música, efectos de sonido y locución (voice acting) contratados por honorarios profesionales (4102). 
+- _Servicios Subcontratados_ **:** Arte 2D/3D especializado, música, efectos de sonido y locución (voice acting) contratados por honorarios profesionales. 
 
-   - **Infraestructura Tecnológica:** Servidores en la nube (AWS, Azure), bases de datos y dominios para pruebas y alojamiento. 
+- _Infraestructura Tecnológica_ **:** Servidores en la nube (AWS, Azure), bases de datos y dominios para pruebas y alojamiento. 
 
-- **Compras Administrativas y de Operación (Gastos Operativos - OPEX):** 
+##  **Compras Administrativas y de Operación (Gastos Operativos - OPEX):** 
 
-   - Equipo de cómputo y estaciones de trabajo de alto rendimiento. 
+- Equipo de cómputo y estaciones de trabajo de alto rendimiento. 
 
-   - Servicios básicos, internet de alta velocidad, alquiler de oficina y papelería 
+- Servicios básicos, internet de alta velocidad, alquiler de oficina y papelería 
 
 _Propiedad, planta y equipo_ 
 
 Comprende los activos físicos adquiridos para la operación administrativa, legal y técnica del estudio, los cuales se despreciarán conforme a los porcentajes máximos legales del Art. 30 de la Ley de Impuesto sobre la Renta: 
 
-- **Equipo de Cómputo e Informático :** Estaciones de trabajo de alto rendimiento, servidores de desarrollo local y monitores especializados para programación y diseño digital. 
+- _Equipo de Cómputo e Informático_ **:** Estaciones de trabajo de alto rendimiento, servidores de desarrollo local y monitores especializados para programación y diseño digital. 
 
-- **Mobiliario y Equipo de Oficina:** Escritorios ergonómicos, sillas ejecutivas, mesas de reuniones y mobiliario administrativo. 
+- _Mobiliario y Equipo de Oficina:_ Escritorios ergonómicos, sillas ejecutivas, mesas de reuniones y mobiliario administrativo. 
 
-- **Equipo de Comunicación y Varios:** Conmutadores, routers de alta velocidad, pantallas de proyección y sistemas de respaldo de energía (UPS). 
+- _Equipo de Comunicación y Varios:_ Conmutadores, routers de alta velocidad, pantallas de proyección y sistemas de respaldo de energía (UPS). 
 
-- **Edificio de Operaciones:** Adquisición de un edificio para las operaciones de la empresa, logrando integrar todos los departamentos de la empresa. 
+- _Edificio de Operaciones:_ Adquisición de un edificio para las operaciones de la empresa, logrando integrar todos los departamentos de la empresa. 
 
-- **Vehículo para uso oficial:** Adquisición de un vehículo para transporte oficial de directivos 
+- _Vehículo para uso oficial:_ Adquisición de un vehículo para transporte oficial de directivos 
 
 - de la empresa. 
 
 _Disponibilidades y Capital de Trabajo Inicial_ 
 
-- **Efectivo en Bancos:** Fondo de cuenta corriente para cubrir costos operativos, además de adquisiciones a lo largo del período contable. 
+- _Efectivo en Bancos_ **:** Fondo de cuenta corriente para cubrir costos operativos, además de adquisiciones a lo largo del período contable. 
 
-- **Caja Chica:** Efectivo para compras pequeñas dentro de la empresa que no son de alto volumen. 
+- _Caja Chica_ **:** Efectivo para compras pequeñas dentro de la empresa que no son de alto volumen. 
 
 ## **DEPRECIACIÓN Y AMORTIZACIÓN DE ACTIVOS** 
 
@@ -378,7 +400,9 @@ A diferencia de los activos tangibles, estos no pierden valor físico por el tie
 
 `o` Método: Amortización en Línea Recta. 
 
-`o` Tasa Legal / Plazo (Art. 30-A LISR): Máximo 25% anual (Vida útil fija de 4 años). 
+- Tasa Legal / Plazo (Art. 30-A LISR): Máximo 25% anual (Vida útil fija de 
+
+4 años). 
 
 _Cuadro Resumen de Inversión Inicial_ 
 
@@ -388,7 +412,7 @@ _Cuadro Resumen de Inversión Inicial_
 |1201|Mobiliario y Equipo de<br>Oficina|Activo No Corriente|Depreciación<br>anual|10%|
 |1202|Equipo de Cómputo|Activo No Corriente|Depreciación<br>anual|20%|
 |1204|Videojuegos<br>en<br>Desarrollo|Activo Intangible|Capitalización<br>el lanzamiento|hasta|
-|1205|Videojuegos<br>Terminados|Activo Intangible|Amortización<br>anual|25%|
+|1205|Videojuegos Terminados|Activo Intangible|Amortización<br>anual|25%|
 
 
 
