@@ -1,0 +1,514 @@
+{
+ "requerimientos": [
+  {
+   "nombre": "Disponibilidad mensual del sistema",
+   "descripcion": "El sistema deberá mantener disponible la consulta y el registro contable durante al menos el 99.5 % del tiempo de cada mes calendario, excluyendo las ventanas de mantenimiento anunciadas.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general",
+    "Contador de costos",
+    "Administrador",
+    "Sistema"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Intervalos de disponibilidad del servicio (marcas de tiempo, fecha y hora)"
+   ],
+   "validacion_entradas": [
+    "Cada intervalo debe incluir inicio, fin y estado del servicio",
+    "Los intervalos no pueden tener duración negativa ni traslaparse"
+   ],
+   "validacion_salidas": [
+    "Disponibilidad mensual = (minutos del mes − minutos de indisponibilidad no planificada) ÷ minutos del mes × 100",
+    "El resultado debe ser igual o superior al objetivo configurado"
+   ],
+   "secuencia": [
+    "El sistema registra continuamente el estado del servicio",
+    "Al cierre de cada mes calcula el porcentaje de disponibilidad",
+    "El sistema presenta el resultado y los intervalos de indisponibilidad"
+   ],
+   "situaciones_anormales": [
+    "Si no hay datos suficientes para calcular el indicador, el sistema muestra «No se pudo calcular la disponibilidad: faltan datos de monitoreo» y marca el período como incompleto"
+   ],
+   "parametros": [
+    "Disponibilidad objetivo por defecto: 99.5 % mensual; configurable por el administrador"
+   ],
+   "salidas": [
+    "Indicador mensual de disponibilidad",
+    "Detalle de intervalos disponibles e indisponibles"
+   ],
+   "almacenamiento_bd": [
+    "No aplica; los datos de monitoreo pueden conservarse en el registro técnico de disponibilidad"
+   ]
+  },
+  {
+   "nombre": "Ventanas de mantenimiento programado",
+   "descripcion": "El sistema deberá permitir programar ventanas de mantenimiento y comunicar su horario a los usuarios con al menos 24 horas de anticipación.",
+   "prioridad": "Media",
+   "actores": [
+    "Administrador",
+    "Sistema",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Inicio de mantenimiento (fecha y hora)",
+    "Fin de mantenimiento (fecha y hora)",
+    "Aviso de mantenimiento (texto, máximo 500 caracteres)"
+   ],
+   "validacion_entradas": [
+    "Inicio y fin son obligatorios",
+    "El fin debe ser posterior al inicio",
+    "La programación debe registrarse con al menos 24 horas de anticipación"
+   ],
+   "validacion_salidas": [
+    "El aviso debe mostrar el inicio y fin programados",
+    "El aviso debe estar disponible para los usuarios antes del comienzo de la ventana"
+   ],
+   "secuencia": [
+    "El administrador registra el horario y el aviso",
+    "El sistema valida fechas y anticipación",
+    "El sistema publica el aviso a los usuarios",
+    "Al iniciar la ventana, el sistema presenta el estado de mantenimiento"
+   ],
+   "situaciones_anormales": [
+    "Si el aviso se registra con menos de 24 horas de anticipación, el sistema rechaza la programación y muestra «La ventana de mantenimiento debe anunciarse con al menos 24 horas de anticipación»"
+   ],
+   "parametros": [
+    "Anticipación mínima del aviso: 24 horas; configurable por el administrador"
+   ],
+   "salidas": [
+    "Aviso de mantenimiento programado",
+    "Estado de mantenimiento durante la ventana"
+   ],
+   "almacenamiento_bd": [
+    "mantenimientos: id (clave primaria), inicio (timestamp), fin (timestamp), aviso (texto), estado (texto), created_at (timestamp)",
+    "Restricción: fin > inicio"
+   ]
+  },
+  {
+   "nombre": "Ejecución diaria de respaldos",
+   "descripcion": "El sistema deberá generar automáticamente un respaldo completo de los datos contables y de costos al menos una vez cada 24 horas.",
+   "prioridad": "Alta",
+   "actores": [
+    "Sistema",
+    "Administrador"
+   ],
+   "fuente": "Decisión de diseño del equipo (parámetros por defecto)",
+   "entradas": [
+    "Frecuencia de respaldo (duración, horas)",
+    "Fecha y hora de la última ejecución (timestamp)"
+   ],
+   "validacion_entradas": [
+    "La frecuencia debe ser mayor que cero",
+    "La fecha de la última ejecución debe ser válida"
+   ],
+   "validacion_salidas": [
+    "Debe existir un respaldo completo con antigüedad no superior a 24 horas",
+    "El registro de ejecución debe indicar inicio, fin y resultado"
+   ],
+   "secuencia": [
+    "El sistema inicia el proceso de respaldo según la frecuencia configurada",
+    "Copia los datos contables y de costos",
+    "Registra el resultado y la marca de tiempo de finalización"
+   ],
+   "situaciones_anormales": [
+    "Si el respaldo falla, el sistema registra el fallo y notifica al administrador con el mensaje «Falló el respaldo programado; revise el estado del servicio de respaldo»"
+   ],
+   "parametros": [
+    "Frecuencia por defecto: diaria; pérdida máxima tolerable de datos: 24 horas; configurable por el administrador"
+   ],
+   "salidas": [
+    "Archivo de respaldo",
+    "Registro del resultado de la ejecución",
+    "Notificación de fallo, si corresponde"
+   ],
+   "almacenamiento_bd": [
+    "ejecuciones_respaldo: id (clave primaria), inicio (timestamp), fin (timestamp), resultado (texto), ubicacion (texto), tamano_bytes (entero)",
+    "Índice por inicio y resultado"
+   ]
+  },
+  {
+   "nombre": "Retención de respaldos",
+   "descripcion": "El sistema deberá conservar los respaldos diarios durante al menos 30 días antes de permitir su eliminación automática.",
+   "prioridad": "Alta",
+   "actores": [
+    "Sistema",
+    "Administrador"
+   ],
+   "fuente": "Decisión de diseño del equipo (parámetros por defecto)",
+   "entradas": [
+    "Fecha de creación del respaldo (timestamp)",
+    "Plazo de retención (días, entero)"
+   ],
+   "validacion_entradas": [
+    "La fecha debe ser válida",
+    "El plazo de retención debe ser mayor que cero"
+   ],
+   "validacion_salidas": [
+    "Ningún respaldo con antigüedad igual o menor al plazo configurado debe eliminarse por la purga automática"
+   ],
+   "secuencia": [
+    "El sistema identifica respaldos vencidos según su fecha de creación",
+    "Conserva los respaldos dentro del plazo",
+    "Elimina únicamente los que superan el plazo de retención"
+   ],
+   "situaciones_anormales": [
+    "Si la purga no puede determinar la fecha de un respaldo, el sistema conserva ese respaldo y registra «No se eliminó el respaldo: fecha de creación no válida»"
+   ],
+   "parametros": [
+    "Retención por defecto: 30 días; configurable por el administrador"
+   ],
+   "salidas": [
+    "Respaldos conservados dentro del plazo",
+    "Registro de respaldos purgados y de errores de purga"
+   ],
+   "almacenamiento_bd": [
+    "ejecuciones_respaldo: id (clave primaria), inicio (timestamp), ubicacion (texto), resultado (texto)",
+    "La eliminación automática debe respetar el plazo de retención configurado"
+   ]
+  },
+  {
+   "nombre": "Verificación de integridad de respaldos",
+   "descripcion": "El sistema deberá verificar la integridad de cada respaldo generado antes de marcarlo como disponible para restauración.",
+   "prioridad": "Alta",
+   "actores": [
+    "Sistema",
+    "Administrador"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Archivo de respaldo (binario)",
+    "Resultado de verificación (estado)",
+    "Huella de integridad (texto)"
+   ],
+   "validacion_entradas": [
+    "El archivo debe existir y poder leerse",
+    "La huella calculada debe corresponder con la registrada para el respaldo"
+   ],
+   "validacion_salidas": [
+    "El respaldo se marca disponible solo si la verificación concluye sin errores",
+    "El resultado de verificación debe quedar asociado al respaldo correspondiente"
+   ],
+   "secuencia": [
+    "El sistema completa el archivo de respaldo",
+    "Calcula y comprueba su huella de integridad",
+    "Marca el respaldo como disponible o fallido",
+    "Notifica al administrador si la verificación falla"
+   ],
+   "situaciones_anormales": [
+    "Si la huella no coincide o el archivo no puede leerse, el sistema marca el respaldo como no disponible y muestra «El respaldo no superó la verificación de integridad»"
+   ],
+   "parametros": [
+    "Porcentaje de respaldos que deben verificarse antes de habilitarlos para restauración: 100 %"
+   ],
+   "salidas": [
+    "Estado de integridad del respaldo",
+    "Notificación de respaldo no disponible, si corresponde"
+   ],
+   "almacenamiento_bd": [
+    "ejecuciones_respaldo: id (clave primaria), resultado (texto), huella_integridad (texto), verificado_en (timestamp), disponible_restauracion (booleano)"
+   ]
+  },
+  {
+   "nombre": "Almacenamiento independiente de respaldos",
+   "descripcion": "El sistema deberá conservar una copia de cada respaldo en un almacenamiento distinto del utilizado por la base de datos operativa.",
+   "prioridad": "Alta",
+   "actores": [
+    "Sistema",
+    "Administrador"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Ubicación del respaldo operativo (texto)",
+    "Ubicación del respaldo independiente (texto)"
+   ],
+   "validacion_entradas": [
+    "Ambas ubicaciones deben estar identificadas",
+    "La ubicación independiente no puede coincidir con la ubicación operativa"
+   ],
+   "validacion_salidas": [
+    "Cada respaldo válido debe tener una copia en la ubicación independiente",
+    "El resultado debe registrar la ubicación de ambas copias"
+   ],
+   "secuencia": [
+    "El sistema genera el respaldo",
+    "Copia el archivo al almacenamiento independiente",
+    "Comprueba la presencia de la copia",
+    "Registra el resultado"
+   ],
+   "situaciones_anormales": [
+    "Si no se puede crear la copia independiente, el sistema registra el fallo y muestra «No se completó la copia independiente del respaldo»"
+   ],
+   "parametros": [
+    "Copias en almacenamiento independiente requeridas: al menos 1 por cada respaldo"
+   ],
+   "salidas": [
+    "Copia independiente del respaldo",
+    "Registro de ubicación y estado de ambas copias"
+   ],
+   "almacenamiento_bd": [
+    "ejecuciones_respaldo: id (clave primaria), ubicacion_operativa (texto), ubicacion_independiente (texto), resultado_copia (texto), created_at (timestamp)"
+   ]
+  },
+  {
+   "nombre": "Tiempo de restauración del servicio",
+   "descripcion": "El sistema deberá permitir restaurar el servicio contable desde un respaldo válido en un máximo de cuatro horas desde la autorización de la restauración.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Sistema"
+   ],
+   "fuente": "Decisión de diseño del equipo (parámetros por defecto)",
+   "entradas": [
+    "Respaldo seleccionado (identificador)",
+    "Fecha y hora de autorización (timestamp)",
+    "Fecha y hora de disponibilidad del servicio (timestamp)"
+   ],
+   "validacion_entradas": [
+    "El respaldo seleccionado debe existir y estar verificado",
+    "Las marcas de tiempo deben ser válidas y estar ordenadas cronológicamente"
+   ],
+   "validacion_salidas": [
+    "Duración de restauración = hora de disponibilidad del servicio − hora de autorización",
+    "La duración no debe superar cuatro horas"
+   ],
+   "secuencia": [
+    "El administrador selecciona un respaldo válido y autoriza la restauración",
+    "El sistema restaura los datos",
+    "El sistema verifica el resultado",
+    "El sistema registra cuándo el servicio vuelve a estar disponible"
+   ],
+   "situaciones_anormales": [
+    "Si la restauración supera cuatro horas o falla, el sistema notifica al administrador con «No se completó la restauración dentro del objetivo de tiempo» y registra el tiempo transcurrido"
+   ],
+   "parametros": [
+    "Tiempo objetivo de restauración por defecto: 4 horas; configurable por el administrador"
+   ],
+   "salidas": [
+    "Servicio restaurado o estado de restauración fallida",
+    "Duración de la restauración",
+    "Notificación del resultado"
+   ],
+   "almacenamiento_bd": [
+    "restauraciones: id (clave primaria), respaldo_id (clave foránea), autorizada_en (timestamp), disponible_en (timestamp, nullable), resultado (texto), duracion_segundos (entero, nullable)"
+   ]
+  },
+  {
+   "nombre": "Prueba periódica de restauración",
+   "descripcion": "El sistema deberá permitir ejecutar una restauración de prueba sin sustituir los datos operativos y registrar el resultado verificable de la prueba.",
+   "prioridad": "Media",
+   "actores": [
+    "Administrador",
+    "Sistema"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Respaldo seleccionado (identificador)",
+    "Entorno de prueba (texto)",
+    "Inicio y fin de la prueba (timestamp)"
+   ],
+   "validacion_entradas": [
+    "El respaldo debe estar verificado",
+    "El entorno de prueba debe estar identificado y separado del entorno operativo"
+   ],
+   "validacion_salidas": [
+    "La prueba debe confirmar que el respaldo puede leerse y restaurarse en el entorno de prueba",
+    "El resultado debe incluir respaldo, entorno, duración y estado"
+   ],
+   "secuencia": [
+    "El administrador selecciona el respaldo y el entorno de prueba",
+    "El sistema restaura los datos en dicho entorno",
+    "El sistema comprueba la disponibilidad de los datos restaurados",
+    "El sistema registra el resultado sin modificar los datos operativos"
+   ],
+   "situaciones_anormales": [
+    "Si el entorno de prueba coincide con el entorno operativo, el sistema cancela la operación y muestra «La restauración de prueba requiere un entorno separado»"
+   ],
+   "parametros": [
+    "Frecuencia mínima de prueba: una vez por trimestre; configurable por el administrador"
+   ],
+   "salidas": [
+    "Resultado de la prueba de restauración",
+    "Registro de duración y errores detectados"
+   ],
+   "almacenamiento_bd": [
+    "pruebas_restauracion: id (clave primaria), respaldo_id (clave foránea), entorno (texto), inicio (timestamp), fin (timestamp), resultado (texto), detalle_error (texto, nullable)"
+   ]
+  },
+  {
+   "nombre": "Detección y notificación de fallos de respaldo",
+   "descripcion": "El sistema deberá notificar al administrador dentro de los cinco minutos siguientes a la detección de un fallo de respaldo.",
+   "prioridad": "Alta",
+   "actores": [
+    "Sistema",
+    "Administrador"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Fecha y hora de detección del fallo (timestamp)",
+    "Fecha y hora de notificación (timestamp)",
+    "Identificador de ejecución de respaldo"
+   ],
+   "validacion_entradas": [
+    "El identificador debe corresponder a una ejecución registrada",
+    "Las marcas de tiempo deben ser válidas"
+   ],
+   "validacion_salidas": [
+    "Tiempo de notificación = hora de notificación − hora de detección",
+    "El tiempo no debe superar cinco minutos"
+   ],
+   "secuencia": [
+    "El sistema detecta un fallo de respaldo",
+    "Registra el incidente",
+    "Envía la notificación al administrador",
+    "Registra la hora de envío y el resultado"
+   ],
+   "situaciones_anormales": [
+    "Si no se puede enviar la notificación, el sistema registra el fallo de entrega y reintenta durante cinco minutos; al persistir, muestra el incidente en la pantalla de alertas"
+   ],
+   "parametros": [
+    "Plazo máximo de notificación: 5 minutos; ventana de reintento: 5 minutos"
+   ],
+   "salidas": [
+    "Notificación del fallo",
+    "Alerta visible para el administrador si la notificación no se entrega"
+   ],
+   "almacenamiento_bd": [
+    "incidentes_respaldo: id (clave primaria), ejecucion_respaldo_id (clave foránea), detectado_en (timestamp), notificado_en (timestamp, nullable), estado_notificacion (texto), detalle (texto)"
+   ]
+  },
+  {
+   "nombre": "Recuperación ante caída del servicio de aplicación",
+   "descripcion": "El sistema deberá restablecer el servicio de aplicación tras una caída no planificada en un máximo de diez minutos desde que se detecte la interrupción.",
+   "prioridad": "Alta",
+   "actores": [
+    "Sistema",
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Hora de detección de interrupción (timestamp)",
+    "Hora de restablecimiento (timestamp)",
+    "Estado del servicio (texto)"
+   ],
+   "validacion_entradas": [
+    "Las marcas de tiempo deben ser válidas",
+    "El restablecimiento debe confirmarse mediante una comprobación de disponibilidad del servicio"
+   ],
+   "validacion_salidas": [
+    "Tiempo de recuperación = hora de restablecimiento − hora de detección",
+    "El tiempo no debe superar diez minutos"
+   ],
+   "secuencia": [
+    "El sistema detecta la interrupción",
+    "Inicia el procedimiento de recuperación del servicio",
+    "Comprueba la disponibilidad",
+    "Registra el tiempo y el resultado"
+   ],
+   "situaciones_anormales": [
+    "Si el servicio no se restablece dentro de diez minutos, el sistema notifica al administrador con «El servicio no se recuperó dentro del objetivo de tiempo» y mantiene la alerta activa"
+   ],
+   "parametros": [
+    "Tiempo objetivo de recuperación de la aplicación: 10 minutos"
+   ],
+   "salidas": [
+    "Estado de recuperación del servicio",
+    "Alerta al administrador cuando se exceda el objetivo"
+   ],
+   "almacenamiento_bd": [
+    "eventos_disponibilidad: id (clave primaria), detectado_en (timestamp), restablecido_en (timestamp, nullable), estado (texto), duracion_segundos (entero, nullable)"
+   ]
+  },
+  {
+   "nombre": "Respuesta segura ante errores no previstos",
+   "descripcion": "El sistema deberá presentar un mensaje comprensible y un código de seguimiento ante todo error no previsto, sin mostrar detalles técnicos internos al usuario.",
+   "prioridad": "Alta",
+   "actores": [
+    "Sistema",
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Error detectado (código interno)",
+    "Contexto de operación (texto)",
+    "Usuario afectado (identificador)"
+   ],
+   "validacion_entradas": [
+    "El error debe generar un código de seguimiento único",
+    "El contexto registrado no debe incluir credenciales ni secretos"
+   ],
+   "validacion_salidas": [
+    "El mensaje visible debe incluir el código de seguimiento y una indicación de que la operación no pudo completarse",
+    "El detalle técnico debe permanecer en el registro interno y no aparecer en la pantalla del usuario"
+   ],
+   "secuencia": [
+    "El sistema detecta un error no previsto",
+    "Genera un código de seguimiento",
+    "Registra el detalle técnico en el registro interno",
+    "Muestra al usuario un mensaje seguro"
+   ],
+   "situaciones_anormales": [
+    "Ante un error no previsto, el sistema muestra «No se pudo completar la operación. Código de seguimiento: {código}» y registra el detalle técnico para diagnóstico"
+   ],
+   "parametros": [
+    "Generación de código de seguimiento: obligatoria para el 100 % de errores no previstos"
+   ],
+   "salidas": [
+    "Mensaje seguro con código de seguimiento",
+    "Registro técnico del error"
+   ],
+   "almacenamiento_bd": [
+    "errores_sistema: id (clave primaria), codigo_seguimiento (texto, único), detectado_en (timestamp), contexto (texto), detalle_tecnico (texto), usuario_id (texto, nullable)"
+   ]
+  },
+  {
+   "nombre": "Conservación de la operación ante interrupción de conexión",
+   "descripcion": "El sistema deberá informar de la interrupción de conexión y conservar los datos capturados que todavía no hayan sido enviados para evitar que el usuario tenga que volver a introducirlos.",
+   "prioridad": "Alta",
+   "actores": [
+    "Sistema",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Datos capturados no enviados (estructura de formulario)",
+    "Estado de conexión (booleano)"
+   ],
+   "validacion_entradas": [
+    "Los datos conservados deben pertenecer a la sesión activa",
+    "El sistema no debe enviar ni contabilizar datos mientras no confirme la conexión"
+   ],
+   "validacion_salidas": [
+    "Tras recuperar la conexión, los datos capturados deben seguir disponibles para revisión del usuario",
+    "El sistema debe indicar que los datos no se han guardado ni contabilizado"
+   ],
+   "secuencia": [
+    "El sistema detecta la pérdida de conexión",
+    "Conserva temporalmente los datos capturados en el cliente",
+    "Muestra el estado de desconexión",
+    "Al recuperar la conexión, permite revisar y reenviar los datos por acción del usuario"
+   ],
+   "situaciones_anormales": [
+    "Si no se pueden conservar los datos temporalmente, el sistema muestra «Conexión interrumpida; los datos capturados podrían perderse» y no simula una confirmación de guardado"
+   ],
+   "parametros": [
+    "Conservación temporal de datos no enviados: obligatoria durante la sesión activa"
+   ],
+   "salidas": [
+    "Aviso de interrupción o recuperación de conexión",
+    "Datos capturados disponibles para revisión, sin confirmación de guardado"
+   ],
+   "almacenamiento_bd": [
+    "No aplica; la conservación temporal ocurre en el cliente y no crea registros contables en la base de datos"
+   ]
+  }
+ ],
+ "vacios": []
+}

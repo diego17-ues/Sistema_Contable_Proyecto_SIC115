@@ -1,0 +1,342 @@
+{
+ "requerimientos": [
+  {
+   "nombre": "Importación del reporte de ventas Steam",
+   "descripcion": "El sistema deberá importar el reporte de ventas de Steam y conservar sus datos por período, moneda y título para su procesamiento contable.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Política 6: Comisiones y cuentas por cobrar de Steam; Modelo_de_Negocio_SunGames.docx, Comercialización por medio de Steam",
+   "entradas": [
+    "archivo_reporte (archivo digital; formato [PENDIENTE DE VERIFICAR])",
+    "periodo (rango de fechas)",
+    "lineas_reporte (registros con título, moneda, ventas, devoluciones, impuestos, descuentos, reservas, comisión y liquidación, según datos disponibles en el reporte)"
+   ],
+   "validacion_entradas": [
+    "El archivo y el período son obligatorios.",
+    "Cada línea debe identificar período, moneda y título.",
+    "Los importes deben ser numéricos y no negativos; devoluciones, descuentos y ajustes pueden conservar su signo si así aparecen en el reporte.",
+    "El reporte debe corresponder a Steam y no haberse importado previamente; el sistema detectará duplicados mediante la huella del archivo y sus líneas.",
+    "El formato y los campos exactos del archivo se deben verificar antes de habilitar la importación."
+   ],
+   "validacion_salidas": [
+    "Los totales importados por período, moneda y título coinciden con los totales del reporte original.",
+    "Se conservan los componentes informados por Steam sin sustituir importes faltantes por valores estimados.",
+    "La importación no crea partidas contables por sí sola."
+   ],
+   "secuencia": [
+    "El contador selecciona el archivo y especifica el período.",
+    "El sistema valida el formato, los campos y la duplicidad.",
+    "El sistema muestra un resumen de líneas e importes agrupados por período, moneda y título.",
+    "El contador confirma la importación y el sistema guarda el lote y sus líneas."
+   ],
+   "situaciones_anormales": [
+    "Formato no reconocido: el sistema rechaza el archivo e indica que el formato debe verificarse; no guarda el lote.",
+    "Faltan período, moneda o título en una línea: el sistema rechaza la línea e informa su número y el campo faltante.",
+    "El archivo ya fue importado: el sistema bloquea la duplicación e identifica el lote existente.",
+    "Falla al guardar el lote: el sistema revierte la importación completa e informa que no se guardaron datos."
+   ],
+   "parametros": [
+    "Formato de archivo admitido: [PENDIENTE DE VERIFICAR].",
+    "Regla de detección de duplicados: huella del archivo y de sus líneas; no requiere valor numérico configurable.",
+    "Decimales y monedas admitidos: según el reporte recibido; reglas de conversión a moneda contable: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Lote de ventas importado con período, moneda y líneas por título.",
+    "Resumen de importes por componente y errores de validación, si los hubiera.",
+    "Mensaje de resultado de la importación."
+   ],
+   "almacenamiento_bd": [
+    "lotes_steam: id (PK), periodo_inicio (date), periodo_fin (date), nombre_archivo (texto), huella_archivo (texto, único), estado (texto), usuario_id (FK), created_at (timestamp).",
+    "lote_steam_lineas: id (PK), lote_id (FK a lotes_steam.id), titulo (texto), moneda (texto), ventas (decimal(18,4)), devoluciones (decimal(18,4)), impuestos (decimal(18,4)), descuentos (decimal(18,4)), reservas (decimal(18,4)), comision (decimal(18,4)), liquidacion_reportada (decimal(18,4)), datos_origen (texto o JSON genérico); índice por lote_id, período, moneda y título.",
+    "La importación de lote y líneas se guarda en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Determinación de presentación principal o agente",
+   "descripcion": "El sistema deberá aplicar a las ventas de cada título la presentación bruta o neta registrada según la determinación contractual de si SunGames controla la licencia antes de transferirla o si Steam actúa como vendedor de una licencia que controla.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Política 6: Comisiones y cuentas por cobrar de Steam",
+   "entradas": [
+    "titulo (texto, identificador del videojuego)",
+    "clasificacion (enumeración: principal o agente)",
+    "referencia_contrato (texto)",
+    "fecha_determinacion (date)",
+    "documento_respaldo (archivo o referencia documental)"
+   ],
+   "validacion_entradas": [
+    "El título debe existir en el catálogo auxiliar de títulos.",
+    "La clasificación, referencia contractual, fecha y respaldo son obligatorios.",
+    "La clasificación debe ser principal o agente.",
+    "El contador registra la determinación documentada por Finanzas; el sistema no infiere la clasificación a partir del porcentaje de comisión."
+   ],
+   "validacion_salidas": [
+    "Para principal, la presentación habilitada refleja el ingreso bruto de la venta y la comisión como gasto separado.",
+    "Para agente, la presentación habilitada reconoce como ingreso únicamente la comisión o remuneración neta a la que SunGames tiene derecho.",
+    "La determinación aplicada a cada lote queda identificada y vinculada con su respaldo contractual."
+   ],
+   "secuencia": [
+    "El contador selecciona el título e ingresa la determinación documentada por Finanzas.",
+    "El sistema valida los datos y el documento de respaldo.",
+    "El sistema guarda la clasificación y la utiliza al preparar el procesamiento contable de los lotes del título."
+   ],
+   "situaciones_anormales": [
+    "No existe respaldo contractual: el sistema impide guardar la determinación e indica «Adjunte la referencia contractual que sustenta la clasificación».",
+    "Hay una clasificación contradictoria vigente para el título y período: el sistema bloquea el procesamiento contable del lote e informa que se requiere una determinación documentada.",
+    "El contrato no permite establecer si SunGames es principal o agente: el sistema solicita revisión de Finanzas y no selecciona automáticamente una presentación."
+   ],
+   "parametros": [
+    "Clasificaciones permitidas: principal y agente.",
+    "Criterio de decisión: determinación contractual documentada por Finanzas; no hay valor predeterminado."
+   ],
+   "salidas": [
+    "Clasificación principal/agente vigente por título y su referencia documental.",
+    "Resultado de validación y aviso de bloqueo cuando la clasificación no esté sustentada."
+   ],
+   "almacenamiento_bd": [
+    "clasificaciones_steam: id (PK), titulo (texto), clasificacion (texto, CHECK en principal/agente), referencia_contrato (texto), fecha_determinacion (date), documento_respaldo (texto), usuario_id (FK), created_at (timestamp), vigente (boolean).",
+    "Índice por titulo y fecha_determinacion; restricción para impedir más de una clasificación vigente por título.",
+    "Cada cambio conserva el registro anterior y se almacena en una transacción."
+   ]
+  },
+  {
+   "nombre": "Registro de comisiones de Steam",
+   "descripcion": "El sistema deberá registrar la comisión informada por Steam como gasto de comisión de plataforma cuando SunGames esté clasificada como principal, y excluirla como gasto separado cuando esté clasificada como agente.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuenta 4302 Comisiones por plataformas (Steam) y Política 6: Comisiones y cuentas por cobrar de Steam",
+   "entradas": [
+    "lote_id (identificador del lote importado)",
+    "titulo (texto)",
+    "periodo (rango de fechas)",
+    "moneda (código de moneda informado por Steam)",
+    "comision_reportada (decimal)",
+    "clasificacion (principal o agente, referenciada desde la determinación vigente)"
+   ],
+   "validacion_entradas": [
+    "El lote debe existir y estar importado.",
+    "La comisión debe estar informada en el reporte y ser numérica.",
+    "El período, moneda y título deben coincidir con la línea de venta importada.",
+    "Debe existir una clasificación contractual vigente para el título.",
+    "No se acepta una tasa fija supuesta: el importe se toma del reporte y la comisión porcentual solo se calcula si Steam la informa o si sus términos vigentes están documentados."
+   ],
+   "validacion_salidas": [
+    "Para principal, el importe reconocido como gasto en 4302 coincide con la comisión reportada para el período, moneda y título.",
+    "Para agente, el sistema no genera gasto separado en 4302 y utiliza la clasificación neta al preparar el reconocimiento de ingresos.",
+    "La comisión registrada se vincula con la línea fuente del reporte y no se cuenta dos veces."
+   ],
+   "secuencia": [
+    "El sistema obtiene la comisión de cada línea del lote y consulta la clasificación contractual vigente.",
+    "Si la clasificación es principal, prepara el importe para registro en 4302 y su contrapartida en 1104.",
+    "Si la clasificación es agente, marca la comisión como componente de la remuneración neta y no como gasto separado.",
+    "El sistema presenta el resultado al contador para su procesamiento contable."
+   ],
+   "situaciones_anormales": [
+    "No existe clasificación vigente: el sistema bloquea el tratamiento contable de la comisión e indica «Registre la clasificación contractual principal/agente del título».",
+    "La comisión del reporte no es numérica o no coincide con período, moneda y título: el sistema marca la línea con error y no la incorpora al resultado contable.",
+    "La moneda del reporte no coincide con la moneda contable requerida y no existe regla de conversión: el sistema bloquea el asiento e informa que la conversión está pendiente de verificación."
+   ],
+   "parametros": [
+    "Cuenta de gasto para comisión de principal: 4302.",
+    "Cuenta por cobrar a la plataforma: 1104.",
+    "Tasa de comisión predeterminada: ninguna; se utiliza el importe reportado por Steam."
+   ],
+   "salidas": [
+    "Detalle del tratamiento de comisiones por título, período y moneda.",
+    "Importe preparado para 4302 cuando SunGames es principal, o marcado como componente neto cuando es agente.",
+    "Avisos de líneas bloqueadas o no conciliables."
+   ],
+   "almacenamiento_bd": [
+    "comisiones_steam: id (PK), lote_linea_id (FK a lote_steam_lineas.id), cuenta_gasto_id (FK a cuentas.id, nullable cuando agente), importe (decimal(18,4)), moneda (texto), tratamiento (texto, CHECK en gasto_separado/componente_neto), estado (texto), created_at (timestamp).",
+    "Restricción única por lote_linea_id y tratamiento para impedir contabilizar dos veces la comisión de una misma línea.",
+    "El importe y el tratamiento se guardan junto con la referencia a la clasificación aplicada."
+   ]
+  },
+  {
+   "nombre": "Tratamiento del impuesto de las ventas Steam",
+   "descripcion": "El sistema deberá calcular y registrar el IVA débito fiscal de las ventas utilizando la tasa y los parámetros fiscales previamente configurados, sin incorporar como ingreso los impuestos recaudados por cuenta de terceros.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuentas 2103 IVA débito fiscal y 5101 Ingresos por licencias de videojuegos; Política 1: Reconocimiento de ingresos y comercialización; Política 6: Comisiones y cuentas por cobrar de Steam",
+   "entradas": [
+    "lote_linea_id (identificador de línea del reporte)",
+    "base_imponible (decimal)",
+    "tasa_iva (decimal, obtenida de la configuración fiscal vigente)",
+    "impuesto_reportado (decimal, si lo informa Steam)",
+    "moneda (código de moneda)"
+   ],
+   "validacion_entradas": [
+    "La línea debe pertenecer a un lote importado y no estar contabilizada previamente.",
+    "La tasa debe existir en la configuración fiscal vigente; este requerimiento no define una tasa.",
+    "La base imponible y el impuesto reportado, cuando exista, deben ser numéricos y corresponder al período y moneda de la línea.",
+    "El tratamiento de impuestos de terceros debe estar identificado para no incluirlos como ingreso de SunGames."
+   ],
+   "validacion_salidas": [
+    "El cálculo utiliza la fórmula impuesto = base imponible × tasa configurada, sujeto a los criterios de redondeo definidos en la configuración fiscal.",
+    "El importe se asigna a 2103 cuando corresponda a IVA débito fiscal de SunGames.",
+    "Los impuestos recaudados por cuenta de terceros se excluyen del ingreso y no se clasifican como IVA de SunGames sin sustento en la configuración fiscal.",
+    "Si Steam informa el impuesto, el sistema presenta la diferencia entre el importe reportado y el calculado para revisión; no altera silenciosamente el dato fuente."
+   ],
+   "secuencia": [
+    "El sistema obtiene la base, la moneda y el impuesto de la línea importada.",
+    "El sistema consulta los parámetros fiscales vigentes para el período.",
+    "El sistema calcula el importe aplicable o marca la línea para revisión si no puede determinarse el tratamiento.",
+    "El sistema presenta el impuesto calculado, el reportado y la diferencia, cuando ambos estén disponibles."
+   ],
+   "situaciones_anormales": [
+    "No existe tasa o tratamiento fiscal configurado: el sistema bloquea el asiento de la línea e indica «Configure o verifique el tratamiento fiscal antes de contabilizar».",
+    "El impuesto reportado difiere del calculado: el sistema marca la diferencia para revisión y no modifica el reporte original.",
+    "No se puede distinguir el IVA de SunGames de impuestos recaudados por cuenta de terceros: el sistema bloquea la contabilización del impuesto e informa que el tratamiento está pendiente de verificación."
+   ],
+   "parametros": [
+    "Cuenta de IVA débito fiscal: 2103.",
+    "Tasa y reglas fiscales: provienen de la configuración fiscal existente; valores y reglas aplicables a ventas de Steam: [PENDIENTE DE VERIFICAR].",
+    "Regla de redondeo: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Importe de IVA calculado y cuenta de destino cuando corresponda.",
+    "Comparación entre impuesto reportado y calculado.",
+    "Líneas bloqueadas por falta de configuración o tratamiento fiscal no determinado."
+   ],
+   "almacenamiento_bd": [
+    "impuestos_ventas_steam: id (PK), lote_linea_id (FK a lote_steam_lineas.id), base_imponible (decimal(18,4)), tasa_aplicada (decimal(9,6)), impuesto_calculado (decimal(18,4)), impuesto_reportado (decimal(18,4), nullable), moneda (texto), cuenta_id (FK a cuentas.id), estado (texto), created_at (timestamp).",
+    "Restricción única por lote_linea_id y tipo de impuesto; índice por período, moneda y estado.",
+    "El cálculo conserva la tasa y los parámetros vigentes usados para reproducir el resultado."
+   ]
+  },
+  {
+   "nombre": "Conciliación de liquidaciones Steam",
+   "descripcion": "El sistema deberá conciliar las liquidaciones informadas por Steam con los depósitos bancarios recibidos, agrupando las diferencias por período, moneda y título.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuentas 1103 Bancos y 1104 Cuentas por cobrar a plataformas (Steam); Política 6: Comisiones y cuentas por cobrar de Steam; Sobre el cierre contable",
+   "entradas": [
+    "periodo (rango de fechas)",
+    "moneda (código de moneda)",
+    "titulo (texto)",
+    "liquidacion_reportada (decimal, procedente del reporte Steam)",
+    "depositos_bancarios (lista de movimientos con fecha, importe, moneda y referencia de estado de cuenta o boleta)"
+   ],
+   "validacion_entradas": [
+    "El período, la moneda y el título son obligatorios para agrupar los importes del reporte.",
+    "Cada depósito debe contar con fecha, importe, moneda y referencia bancaria.",
+    "El depósito y la liquidación deben estar expresados en la misma moneda; no se convierten automáticamente.",
+    "La liquidación debe proceder de un lote importado y los depósitos deben provenir de documentación bancaria."
+   ],
+   "validacion_salidas": [
+    "La diferencia se calcula como diferencia = liquidación reportada − depósitos bancarios asociados.",
+    "El sistema presenta los depósitos no asociados, liquidaciones sin depósito y diferencias por período, moneda y título.",
+    "Los saldos pendientes se relacionan con la cuenta 1104 y los depósitos recibidos con la cuenta 1103, sin alterar automáticamente los importes fuente."
+   ],
+   "secuencia": [
+    "El contador selecciona período, moneda y título.",
+    "El sistema reúne las liquidaciones del reporte y los depósitos bancarios candidatos.",
+    "El contador confirma las asociaciones entre liquidaciones y depósitos.",
+    "El sistema calcula la diferencia, registra el resultado de la conciliación y muestra las partidas pendientes."
+   ],
+   "situaciones_anormales": [
+    "Moneda distinta entre liquidación y depósito: el sistema impide conciliarlos e informa «La moneda no coincide; revise la conversión fuera de la conciliación».",
+    "Un depósito se asocia a más de una liquidación incompatible: el sistema bloquea la asociación duplicada y solicita revisar las referencias.",
+    "Existe diferencia distinta de cero: el sistema marca la conciliación como pendiente y muestra el importe y sentido de la diferencia.",
+    "Falla al guardar la conciliación: el sistema revierte la operación completa e informa que no se guardó."
+   ],
+   "parametros": [
+    "Tolerancia de conciliación: 0.00 en la moneda de la operación, salvo que la empresa defina otra en su configuración.",
+    "Agrupación obligatoria: período, moneda y título.",
+    "Conversión entre monedas: no automática; reglas y tasas: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Estado de conciliación por período, moneda y título.",
+    "Diferencias, liquidaciones pendientes y depósitos no asociados.",
+    "Detalle de las asociaciones confirmadas con referencias a los documentos fuente."
+   ],
+   "almacenamiento_bd": [
+    "conciliaciones_steam: id (PK), periodo_inicio (date), periodo_fin (date), moneda (texto), titulo (texto), liquidacion_total (decimal(18,4)), deposito_total (decimal(18,4)), diferencia (decimal(18,4)), estado (texto), usuario_id (FK), created_at (timestamp).",
+    "conciliacion_steam_detalles: id (PK), conciliacion_id (FK a conciliaciones_steam.id), lote_linea_id (FK a lote_steam_lineas.id), referencia_bancaria (texto), fecha_deposito (date), importe_deposito (decimal(18,4)), moneda (texto).",
+    "Índices por período, moneda, título y referencia bancaria; restricciones para impedir la asociación duplicada del mismo depósito.",
+    "El encabezado y sus asociaciones se guardan en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Generación automática de partidas por ventas Steam",
+   "descripcion": "El sistema deberá generar una partida de diario en borrador por las ventas, descuentos, reembolsos, comisiones, impuestos y liquidaciones Steam validados, aplicando el momento de reconocimiento y las cuentas establecidos en el manual.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Libro diario; cuentas 1103, 1104, 2103, 2108, 4302, 5101 y 5103; Políticas 1, 2, 3 y 6; Sobre el cierre contable",
+   "entradas": [
+    "lote_id (identificador del lote Steam validado)",
+    "fecha_operacion (date)",
+    "titulo (texto)",
+    "tipo_evento (enumeración: venta_entregada, preventa_cobrada, descuento, reembolso, comision, liquidacion)",
+    "clasificacion (principal o agente, referencia a la determinación vigente)",
+    "importes_por_componente (decimal por moneda: venta, descuento, reembolso, comisión, impuesto y liquidación, según corresponda)",
+    "referencias_documentales (identificadores del reporte, comprobante de pago o estado de cuenta)"
+   ],
+   "validacion_entradas": [
+    "El lote debe estar importado y sus líneas no deben tener errores pendientes.",
+    "Debe existir una clasificación principal/agente vigente y una configuración fiscal aplicable cuando el evento incluya impuesto.",
+    "Una venta se reconoce al transferir el derecho de uso mediante activación o descarga; un cobro anterior a la disponibilidad se registra como ingreso diferido en 2108.",
+    "Los importes deben corresponder al reporte y conservar período y moneda; si se requiere conversión no configurada, se bloquea la generación.",
+    "Cada evento del lote solo puede originar una partida automática."
+   ],
+   "validacion_salidas": [
+    "La partida queda en borrador y sus débitos son iguales a sus créditos.",
+    "Venta entregada: se debita 1104 por el importe por cobrar y se acredita 5101 por el ingreso que corresponda; el impuesto aplicable se acredita a 2103.",
+    "Preventa cobrada antes de la disponibilidad: se debita 1103 y se acredita 2108; al transferir el derecho de uso, se revierte el ingreso diferido y se reconoce el ingreso correspondiente.",
+    "Descuento: se debita 5103 y se refleja en la cuenta por cobrar conforme al importe neto reportado; reembolso: se debita 5103 y se acredita 1104 o 1103 según corresponda.",
+    "Comisión cuando SunGames es principal: se debita 4302 y se acredita 1104; cuando es agente, no se registra la comisión como gasto separado y se reconoce el ingreso neto determinado.",
+    "Liquidación recibida: se debita 1103 y se acredita 1104 por el importe liquidado.",
+    "El sistema no incluye impuestos recaudados por cuenta de terceros como ingreso de SunGames."
+   ],
+   "secuencia": [
+    "El contador solicita generar partidas para el lote validado.",
+    "El sistema verifica período, clasificación, configuración fiscal, documentos y ausencia de partidas previas.",
+    "El sistema construye las líneas contables según el tipo de evento y la clasificación contractual.",
+    "El sistema calcula debe y haber y rechaza la generación si no cuadran.",
+    "El sistema guarda la partida en borrador con referencia al lote y al documento soporte."
+   ],
+   "situaciones_anormales": [
+    "Partida descuadrada: el sistema no la guarda e informa los totales de debe, haber y la diferencia.",
+    "Evento ya contabilizado en borrador o en una partida existente: el sistema impide duplicarlo e identifica la partida previa.",
+    "Falta la clasificación principal/agente o el tratamiento fiscal: el sistema bloquea la generación de la partida afectada e indica el dato pendiente.",
+    "Fecha dentro de un período cerrado: el sistema bloquea la generación e informa que el período no admite registros.",
+    "Falla al guardar las líneas: el sistema revierte la partida completa y avisa que no se generó."
+   ],
+   "parametros": [
+    "Tolerancia de cuadre: 0.00.",
+    "Decimales: los definidos para la moneda contable configurada; reglas de conversión y redondeo: [PENDIENTE DE VERIFICAR].",
+    "Partidas generadas en estado borrador; su validación, mayorización y correlativo siguen las funciones contables existentes."
+   ],
+   "salidas": [
+    "Partida de diario en borrador con líneas, cuentas, fecha, concepto y referencia al lote y documentos fuente.",
+    "Resultado del cuadre y mensaje de confirmación o bloqueo.",
+    "Relación entre cada evento del reporte y la partida generada."
+   ],
+   "almacenamiento_bd": [
+    "partidas_steam: id (PK), lote_id (FK a lotes_steam.id), fecha (date), concepto (texto), moneda (texto), estado (texto), referencia_documental (texto), partida_id (FK a partidas.id), created_at (timestamp).",
+    "partidas_steam_eventos: id (PK), partida_steam_id (FK a partidas_steam.id), lote_linea_id (FK a lote_steam_lineas.id), tipo_evento (texto), importe (decimal(18,4)), moneda (texto), evento_clave (texto, único).",
+    "La partida contable y su vínculo con el evento Steam se generan en una transacción atómica; el sistema reutiliza las tablas y restricciones existentes del libro diario."
+   ]
+  }
+ ],
+ "vacios": [
+  "Formato y campos técnicos exactos de los reportes de Steam: [PENDIENTE DE VERIFICAR].",
+  "Monedas y reglas de conversión a la moneda contable, incluidas las tasas y fechas de cambio: [PENDIENTE DE VERIFICAR].",
+  "Tasa de IVA, base imponible, reglas de redondeo y tratamiento fiscal aplicable a cada tipo de venta digital Steam: [PENDIENTE DE VERIFICAR].",
+  "La clasificación de impuestos recaudados por Steam por cuenta de terceros y su tratamiento contable específico: [PENDIENTE DE VERIFICAR].",
+  "Criterio contractual y evidencia necesaria para determinar si SunGames actúa como principal o agente en cada acuerdo: requiere determinación documentada de Finanzas.",
+  "Reglas para distribuir descuentos, devoluciones, reservas, impuestos y otros ajustes cuando el reporte no los vincule directamente con una venta o título: [PENDIENTE DE VERIFICAR]."
+ ]
+}

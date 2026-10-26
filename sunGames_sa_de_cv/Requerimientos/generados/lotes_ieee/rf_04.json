@@ -1,0 +1,364 @@
+{
+ "requerimientos": [
+  {
+   "nombre": "Registro de partidas en borrador",
+   "descripcion": "El sistema deberá registrar una partida de diario en estado borrador con sus datos generales, líneas contables y referencia al documento soporte.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, sección 5.1 Libros y registros contables, Libro diario; alcance solicitado para el submódulo",
+   "entradas": [
+    "fecha (date, AAAA-MM-DD)",
+    "concepto (texto)",
+    "documento_soporte (texto)",
+    "lineas (lista de cuenta_codigo (texto), debe (decimal), haber (decimal), orden (entero))"
+   ],
+   "validacion_entradas": [
+    "Fecha, concepto y referencia del documento soporte son obligatorios.",
+    "Cada código de cuenta debe existir en el catálogo.",
+    "Cada línea debe tener un importe numérico no negativo en debe o haber; la validación de cuadre se realiza antes de mayorizar.",
+    "El usuario debe tener permiso de registro."
+   ],
+   "validacion_salidas": [
+    "La partida guardada conserva la fecha, el concepto, la referencia documental y el orden de las líneas ingresadas.",
+    "La partida recibe un correlativo único y queda en estado borrador."
+   ],
+   "secuencia": [
+    "El contador ingresa los datos generales y las líneas de la partida.",
+    "El sistema valida los campos requeridos y la existencia de las cuentas.",
+    "El sistema asigna el correlativo y guarda la partida y sus líneas en una transacción atómica.",
+    "El sistema muestra el correlativo y el estado de la partida."
+   ],
+   "situaciones_anormales": [
+    "Falta un dato requerido: el sistema no guarda y muestra «Complete los campos obligatorios».",
+    "Una cuenta no existe: el sistema no guarda y muestra «La cuenta indicada no existe en el catálogo».",
+    "Falla el guardado: el sistema revierte la transacción y muestra «No se pudo guardar la partida; no se registraron cambios»."
+   ],
+   "parametros": [
+    "Formato de fecha: AAAA-MM-DD.",
+    "Precisión monetaria: [PENDIENTE DE VERIFICAR].",
+    "El correlativo debe ser único y no reutilizarse."
+   ],
+   "salidas": [
+    "Partida de diario en estado borrador con correlativo y líneas ordenadas.",
+    "Mensaje de confirmación o error."
+   ],
+   "almacenamiento_bd": [
+    "partidas: id (PK), correlativo (texto, único), fecha (date), concepto (texto), documento_soporte (texto), estado (texto), usuario_id (FK), created_at (timestamp), updated_at (timestamp).",
+    "partida_lineas: id (PK), partida_id (FK a partidas), cuenta_id (FK a cuentas), orden (entero), debe (decimal), haber (decimal).",
+    "Índice por partidas(correlativo) y partida_lineas(partida_id, orden).",
+    "Guardar partida y líneas en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Validación de partida doble",
+   "descripcion": "El sistema deberá impedir la mayorización de una partida cuyo total del debe no sea igual al total del haber.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, sección 5.1 Libros y registros contables, Libro diario",
+   "entradas": [
+    "partida_id (identificador)",
+    "lineas (lista de debe y haber, decimal)"
+   ],
+   "validacion_entradas": [
+    "La partida debe existir y estar en estado borrador.",
+    "Debe haber al menos dos líneas.",
+    "Cada línea debe tener un importe mayor o igual a cero y un importe positivo únicamente en debe o en haber, nunca en ambos.",
+    "Las cuentas de las líneas deben existir en el catálogo."
+   ],
+   "validacion_salidas": [
+    "La suma del debe debe ser exactamente igual a la suma del haber: Σ debe = Σ haber.",
+    "Una partida que no cumpla el cuadre no cambia a estado mayorizada.",
+    "La partida que cumple las validaciones puede continuar al proceso de mayorización."
+   ],
+   "secuencia": [
+    "El contador solicita validar y mayorizar la partida.",
+    "El sistema suma los importes del debe y del haber.",
+    "El sistema verifica el número de líneas, la exclusividad del lado contable por línea y la igualdad de totales.",
+    "Si todas las reglas se cumplen, el sistema permite continuar la mayorización; si no, conserva la partida en borrador."
+   ],
+   "situaciones_anormales": [
+    "Debe distinto de haber: el sistema bloquea la mayorización y muestra «Partida descuadrada. Debe: {total_debe}; Haber: {total_haber}; Diferencia: {diferencia}».",
+    "Menos de dos líneas: el sistema bloquea la operación y muestra «La partida debe contener al menos dos líneas».",
+    "Una línea tiene importes en ambos lados o importes negativos: el sistema bloquea la operación y muestra «Cada línea debe registrar un importe no negativo en un solo lado: debe o haber»."
+   ],
+   "parametros": [
+    "Tolerancia de cuadre: 0.00, conforme a la regla de igualdad de debe y haber del manual.",
+    "Precisión monetaria: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Resultado de validación con totales de debe, haber y diferencia.",
+    "Autorización o bloqueo de la mayorización."
+   ],
+   "almacenamiento_bd": [
+    "partidas: id (PK), estado (texto).",
+    "partida_lineas: partida_id (FK), debe (decimal), haber (decimal), con CHECK (debe >= 0 AND haber >= 0 AND ((debe > 0 AND haber = 0) OR (haber > 0 AND debe = 0))).",
+    "La validación de los totales y el cambio de estado deben ejecutarse atómicamente."
+   ]
+  },
+  {
+   "nombre": "Edición previa a la mayorización",
+   "descripcion": "El sistema deberá permitir al contador modificar los datos y las líneas de una partida únicamente mientras esta permanezca sin mayorizar.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Alcance solicitado para el submódulo; Manual_aplicación_catálogo_SunGames.docx, sección 5.1 Libros y registros contables, Libro diario",
+   "entradas": [
+    "partida_id (identificador)",
+    "fecha (date, AAAA-MM-DD)",
+    "concepto (texto)",
+    "documento_soporte (texto)",
+    "lineas (lista de cuenta_codigo (texto), debe (decimal), haber (decimal), orden (entero))"
+   ],
+   "validacion_entradas": [
+    "La partida debe existir y estar en estado borrador.",
+    "El usuario debe tener permiso de edición.",
+    "La fecha, el concepto, la referencia documental y las cuentas deben cumplir las validaciones de registro.",
+    "La partida editada debe superar la validación de partida doble antes de ser mayorizada."
+   ],
+   "validacion_salidas": [
+    "Los cambios guardados reemplazan los datos anteriores de la partida sin alterar su correlativo.",
+    "La partida mantiene el estado borrador hasta que sea mayorizada.",
+    "La modificación queda asociada al usuario y al momento de edición."
+   ],
+   "secuencia": [
+    "El contador abre una partida borrador.",
+    "El contador modifica los campos o las líneas.",
+    "El sistema valida la autorización y el estado de la partida.",
+    "El sistema guarda los cambios en una transacción y registra el evento en la bitácora."
+   ],
+   "situaciones_anormales": [
+    "La partida no existe: el sistema muestra «La partida indicada no existe» y no realiza cambios.",
+    "La partida ya fue mayorizada o anulada: el sistema bloquea la edición y muestra «Solo se pueden editar partidas sin mayorizar».",
+    "Falla el guardado: el sistema revierte los cambios y muestra «No se pudo actualizar la partida; se conservaron los datos anteriores»."
+   ],
+   "parametros": [
+    "Solo el estado borrador habilita la edición.",
+    "La edición conserva el correlativo original."
+   ],
+   "salidas": [
+    "Partida actualizada y bitácora de modificación.",
+    "Mensaje de confirmación o error."
+   ],
+   "almacenamiento_bd": [
+    "partidas: id (PK), correlativo (único), estado (texto), updated_at (timestamp), usuario_actualizacion_id (FK).",
+    "partida_lineas: id (PK), partida_id (FK), cuenta_id (FK), orden (entero), debe (decimal), haber (decimal).",
+    "bitacora_eventos: id (PK), usuario_id (FK), entidad (texto), entidad_id (identificador), accion (texto), fecha_hora (timestamp), detalle (texto).",
+    "Actualizar partida y líneas en una transacción atómica; restringir la modificación si estado <> 'borrador'."
+   ]
+  },
+  {
+   "nombre": "Anulación de partidas sin mayorizar",
+   "descripcion": "El sistema deberá anular una partida sin mayorizar conservando su registro y evitando que afecte los saldos del libro mayor.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Alcance solicitado para el submódulo; Manual_aplicación_catálogo_SunGames.docx, sección 5.1 Libros y registros contables, Libro diario",
+   "entradas": [
+    "partida_id (identificador)",
+    "motivo_anulacion (texto)"
+   ],
+   "validacion_entradas": [
+    "La partida debe existir y estar en estado borrador.",
+    "El motivo de anulación es obligatorio.",
+    "El usuario debe tener permiso de anulación."
+   ],
+   "validacion_salidas": [
+    "La partida conserva su correlativo y sus datos, y cambia a estado anulada.",
+    "Una partida anulada no puede mayorizarse ni modificar saldos del libro mayor.",
+    "La anulación queda registrada en la bitácora."
+   ],
+   "secuencia": [
+    "El contador selecciona la partida borrador e ingresa el motivo.",
+    "El sistema verifica el estado y la autorización.",
+    "El sistema cambia el estado a anulada y registra usuario, fecha y motivo en una transacción.",
+    "El sistema confirma la anulación."
+   ],
+   "situaciones_anormales": [
+    "La partida no existe: el sistema muestra «La partida indicada no existe».",
+    "La partida ya está mayorizada: el sistema bloquea la anulación y muestra «La partida mayorizada no puede anularse; registre una reversión».",
+    "La partida ya está anulada: el sistema muestra «La partida ya está anulada» y no crea otro evento."
+   ],
+   "parametros": [
+    "Solo se permite anular partidas sin mayorizar.",
+    "La partida anulada se conserva; no se elimina físicamente."
+   ],
+   "salidas": [
+    "Partida con estado anulada y motivo asociado.",
+    "Evento de anulación en la bitácora y mensaje de resultado."
+   ],
+   "almacenamiento_bd": [
+    "partidas: id (PK), estado (texto), motivo_anulacion (texto, nullable), anulada_por (FK a usuarios), anulada_en (timestamp).",
+    "bitacora_eventos: id (PK), usuario_id (FK), entidad (texto), entidad_id (identificador), accion (texto), fecha_hora (timestamp), detalle (texto).",
+    "Cambio de estado y registro de bitácora en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Reversión de partidas mayorizadas",
+   "descripcion": "El sistema deberá crear una partida de reversión que contrarreste los importes de una partida ya mayorizada y conserve el vínculo entre ambas.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, sección Especificación de cada cuenta del catálogo, reglas de corrección de registros; alcance solicitado para el submódulo",
+   "entradas": [
+    "partida_original_id (identificador)",
+    "fecha_reversion (date, AAAA-MM-DD)",
+    "motivo_reversion (texto)"
+   ],
+   "validacion_entradas": [
+    "La partida original debe existir y estar mayorizada.",
+    "La partida original no debe tener una reversión previa, salvo que la política de reversión múltiple sea aprobada [PENDIENTE DE VERIFICAR].",
+    "La fecha y el motivo de reversión son obligatorios.",
+    "El usuario debe tener permiso para registrar reversiones."
+   ],
+   "validacion_salidas": [
+    "La nueva partida invierte cada línea de la original: el debe de la reversión es igual al haber original y el haber de la reversión es igual al debe original.",
+    "La suma del debe y la suma del haber de la reversión deben ser iguales.",
+    "La partida original no se elimina ni se modifica; ambas partidas quedan vinculadas y la reversión sigue el proceso de mayorización."
+   ],
+   "secuencia": [
+    "El contador selecciona la partida mayorizada e ingresa fecha y motivo.",
+    "El sistema copia las líneas de la original intercambiando debe y haber.",
+    "El sistema valida el cuadre y crea una partida nueva referenciada a la original.",
+    "El sistema presenta la reversión para su mayorización y registra el evento en bitácora."
+   ],
+   "situaciones_anormales": [
+    "La partida original no existe o no está mayorizada: el sistema bloquea la operación y muestra «Solo se pueden revertir partidas mayorizadas existentes».",
+    "La reversión no cuadra: el sistema revierte el guardado y muestra «La reversión no está cuadrada; no se registraron cambios».",
+    "Falla la creación de la reversión: el sistema conserva intacta la partida original y muestra «No se pudo crear la reversión; la partida original no fue modificada»."
+   ],
+   "parametros": [
+    "La inversión de debe y haber es exacta, sin tolerancia distinta de cero.",
+    "El método para permitir más de una reversión de una misma partida: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Nueva partida de reversión en borrador, vinculada a la partida original.",
+    "Mensaje de confirmación o error y evento en bitácora."
+   ],
+   "almacenamiento_bd": [
+    "partidas: id (PK), correlativo (texto, único), partida_original_id (FK a partidas, nullable), fecha (date), concepto (texto), estado (texto), usuario_id (FK).",
+    "partida_lineas: id (PK), partida_id (FK), cuenta_id (FK), orden (entero), debe (decimal), haber (decimal).",
+    "bitacora_eventos: id (PK), usuario_id (FK), entidad (texto), entidad_id (identificador), accion (texto), fecha_hora (timestamp), detalle (texto).",
+    "Crear partida, líneas y vínculo en una transacción atómica; mantener inalterada la partida original."
+   ]
+  },
+  {
+   "nombre": "Partidas modelo",
+   "descripcion": "El sistema deberá permitir guardar una partida como modelo reutilizable para iniciar el registro de partidas posteriores.",
+   "prioridad": "Media",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Alcance solicitado para el submódulo; Manual_aplicación_catálogo_SunGames.docx, sección 5.1 Libros y registros contables, formato y datos del Libro diario",
+   "entradas": [
+    "nombre_modelo (texto)",
+    "concepto (texto)",
+    "lineas_modelo (lista de cuenta_codigo (texto), lado (debe|haber), importe (decimal, opcional), orden (entero))"
+   ],
+   "validacion_entradas": [
+    "El nombre del modelo es obligatorio y único entre los modelos activos.",
+    "Cada código de cuenta debe existir en el catálogo.",
+    "Si se especifica un importe, debe ser no negativo.",
+    "El modelo no asigna correlativo ni fecha a la partida que se cree a partir de él."
+   ],
+   "validacion_salidas": [
+    "El modelo conserva el concepto y las líneas en el orden definido.",
+    "Al usar un modelo se inicia una partida nueva en estado borrador, sin alterar el modelo ni partidas anteriores."
+   ],
+   "secuencia": [
+    "El contador ingresa el nombre, concepto y líneas del modelo.",
+    "El sistema valida nombre y cuentas y guarda el modelo.",
+    "Al seleccionar el modelo, el sistema copia su contenido a una nueva partida borrador.",
+    "El contador completa los datos variables y valida el cuadre antes de mayorizar."
+   ],
+   "situaciones_anormales": [
+    "Nombre duplicado: el sistema no guarda y muestra «Ya existe un modelo activo con ese nombre».",
+    "Cuenta inexistente: el sistema no guarda y muestra «La cuenta indicada no existe en el catálogo».",
+    "El modelo contiene datos incompletos para una partida: el sistema crea un borrador y muestra «Complete los datos y valide el cuadre antes de mayorizar»."
+   ],
+   "parametros": [
+    "La reutilización del modelo crea una partida nueva; no reutiliza el correlativo del modelo ni el de otra partida.",
+    "La política de permisos para crear, editar o desactivar modelos: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Modelo guardado o partida borrador iniciada desde un modelo.",
+    "Mensaje de confirmación o error."
+   ],
+   "almacenamiento_bd": [
+    "partidas_modelo: id (PK), nombre (texto), concepto (texto), activo (boolean), creado_por (FK a usuarios), created_at (timestamp).",
+    "partidas_modelo_lineas: id (PK), modelo_id (FK a partidas_modelo), cuenta_id (FK a cuentas), lado (texto), importe (decimal, nullable), orden (entero).",
+    "Restricción única sobre partidas_modelo(nombre) para modelos activos; índice por partidas_modelo_lineas(modelo_id, orden).",
+    "Guardar el modelo y sus líneas en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Consulta filtrada del libro diario",
+   "descripcion": "El sistema deberá presentar las partidas del libro diario en orden cronológico y permitir filtrar los resultados por los datos registrados.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador",
+    "Administrador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, sección 5.1 Libros y registros contables, Libro diario; alcance solicitado para el submódulo",
+   "entradas": [
+    "fecha_desde (date, opcional)",
+    "fecha_hasta (date, opcional)",
+    "correlativo (texto, opcional)",
+    "cuenta_codigo (texto, opcional)",
+    "concepto (texto, opcional)",
+    "estado (texto, opcional)"
+   ],
+   "validacion_entradas": [
+    "Si se ingresan ambas fechas, fecha_desde debe ser menor o igual a fecha_hasta.",
+    "El código de cuenta debe existir cuando se use como filtro.",
+    "El estado debe pertenecer a los estados configurados para las partidas.",
+    "El usuario debe tener permiso de consulta."
+   ],
+   "validacion_salidas": [
+    "Cada resultado muestra correlativo, fecha, cuentas y nombres, concepto, importes de debe y haber, documento soporte y estado.",
+    "Los resultados cumplen todos los filtros informados y se ordenan por fecha y correlativo.",
+    "Por cada partida mostrada, el total del debe y el total del haber se presentan por separado."
+   ],
+   "secuencia": [
+    "El usuario ingresa uno o más filtros.",
+    "El sistema valida los filtros y consulta las partidas que coinciden.",
+    "El sistema presenta las partidas en orden cronológico y permite abrir el detalle de sus líneas.",
+    "El sistema muestra los totales de debe y haber del conjunto consultado."
+   ],
+   "situaciones_anormales": [
+    "Rango de fechas inválido: el sistema no ejecuta la consulta y muestra «La fecha inicial debe ser menor o igual a la fecha final».",
+    "Cuenta inexistente: el sistema no ejecuta la consulta y muestra «La cuenta indicada no existe en el catálogo».",
+    "No hay coincidencias: el sistema muestra «No se encontraron partidas con los filtros indicados» y totales de cero."
+   ],
+   "parametros": [
+    "Orden predeterminado: fecha ascendente y correlativo ascendente.",
+    "Paginación y límite de resultados: [PENDIENTE DE VERIFICAR].",
+    "Permisos de consulta por rol: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Listado filtrado del libro diario con detalle y totales de debe y haber.",
+    "Mensajes de validación o ausencia de resultados."
+   ],
+   "almacenamiento_bd": [
+    "partidas: id (PK), correlativo (texto, único), fecha (date), concepto (texto), documento_soporte (texto), estado (texto).",
+    "partida_lineas: id (PK), partida_id (FK a partidas), cuenta_id (FK a cuentas), debe (decimal), haber (decimal), orden (entero).",
+    "Índices sobre partidas(fecha, correlativo), partidas(estado) y partida_lineas(cuenta_id, partida_id).",
+    "La consulta es de solo lectura y no altera partidas ni líneas."
+   ]
+  }
+ ],
+ "vacios": [
+  "El manual no define la precisión monetaria, la moneda funcional del sistema ni una tolerancia de redondeo; deben confirmarse antes de configurar importes. La igualdad de debe y haber sí se exige expresamente.",
+  "El manual no especifica el ciclo de estados ni el procedimiento operativo de mayorización, anulación y reversión; se propone aquí conservar las partidas anuladas y revertir partidas ya mayorizadas mediante una partida inversa vinculada.",
+  "El manual no determina si se permiten varias reversiones de una partida, ni las reglas para anular una reversión.",
+  "El manual no describe partidas modelo; su inclusión deriva del alcance solicitado y deben aprobarse sus reglas de creación, modificación y desactivación.",
+  "El manual identifica contabilidad general y de costos, pero no establece permisos de sistema para los roles Administrador y Contador. Deben aprobarse la matriz de permisos y la autorización para crear, modificar y consultar partidas modelo.",
+  "El manual no establece paginación ni límites de consulta del libro diario."
+ ]
+}

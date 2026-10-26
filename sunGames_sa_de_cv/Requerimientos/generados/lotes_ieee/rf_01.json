@@ -1,0 +1,218 @@
+{
+ "requerimientos": [
+  {
+   "nombre": "Alta y cambio de estado de usuario",
+   "descripcion": "El sistema deberá permitir al administrador crear usuarios y cambiar su estado entre activo, bloqueado e inactivo.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador"
+   ],
+   "fuente": "Práctica general de sistemas contables; Manual_aplicación_catálogo_SunGames.docx, alcance y roles del área de Contabilidad General y de Costos",
+   "entradas": [
+    "nombre_usuario (texto)",
+    "nombre_completo (texto)",
+    "rol (valor del catálogo de roles)",
+    "acción (enum: crear, bloquear, desactivar, reactivar)"
+   ],
+   "validacion_entradas": [
+    "Nombre de usuario y nombre completo obligatorios al crear.",
+    "El nombre de usuario no debe existir previamente.",
+    "El rol debe corresponder a un rol permitido en el sistema.",
+    "La acción debe ser válida para el estado actual del usuario.",
+    "Solo un administrador autenticado puede crear usuarios o modificar su estado."
+   ],
+   "validacion_salidas": [
+    "La creación produce un usuario activo con el rol indicado.",
+    "Bloquear o desactivar impide iniciar sesiones nuevas.",
+    "Reactivar cambia el estado a activo sin modificar el historial de actividad."
+   ],
+   "secuencia": [
+    "El administrador captura los datos requeridos y la acción.",
+    "El sistema valida permisos, unicidad y compatibilidad de la acción con el estado actual.",
+    "El sistema guarda el usuario o actualiza su estado y registra la operación en la bitácora."
+   ],
+   "situaciones_anormales": [
+    "Nombre de usuario duplicado: rechaza la operación y muestra «El nombre de usuario ya existe».",
+    "Datos obligatorios incompletos: rechaza la operación y muestra «Complete los campos obligatorios».",
+    "Acción incompatible con el estado actual: rechaza la operación y muestra «No se puede aplicar la acción al estado actual del usuario».",
+    "Usuario sin permiso: bloquea la operación, muestra «No tiene permiso para realizar esta acción» y registra el intento en la bitácora.",
+    "Falla al guardar: revierte la transacción y muestra «No se pudo guardar el usuario; no se realizaron cambios»."
+   ],
+   "parametros": [
+    "Estados permitidos: activo, bloqueado e inactivo.",
+    "El formato y longitud máximos del nombre de usuario: [PENDIENTE DE DEFINIR]."
+   ],
+   "salidas": [
+    "Confirmación de usuario creado o estado actualizado.",
+    "Ficha del usuario con nombre, rol y estado.",
+    "Registro de la operación en la bitácora."
+   ],
+   "almacenamiento_bd": [
+    "usuarios: usuario_id (identificador, PK), nombre_usuario (texto, UNIQUE, NOT NULL), nombre_completo (texto, NOT NULL), rol_id (identificador, FK a roles), estado (enum, NOT NULL), creado_en (fecha_hora), actualizado_en (fecha_hora).",
+    "bitacora_accesos: evento_id (identificador, PK), actor_usuario_id (identificador, FK a usuarios), usuario_afectado_id (identificador, FK a usuarios), accion (texto), fecha_hora (fecha_hora), resultado (texto).",
+    "Índice único sobre usuarios.nombre_usuario; cambios de usuario y bitácora en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Asignación de rol contable",
+   "descripcion": "El sistema deberá permitir al administrador asignar a cada usuario activo un único rol entre Administrador, Contador general y Contador de costos.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, sección «¿Cómo Utilizar este Manual?» y alcance del área de Contabilidad General y de Costos",
+   "entradas": [
+    "usuario_id (identificador)",
+    "rol (enum: Administrador, Contador general, Contador de costos)"
+   ],
+   "validacion_entradas": [
+    "El usuario debe existir y estar activo.",
+    "El rol debe ser uno de los valores permitidos.",
+    "Solo un administrador autenticado puede asignar o modificar roles."
+   ],
+   "validacion_salidas": [
+    "El usuario queda asociado a un único rol vigente.",
+    "La asignación guardada coincide con el usuario y el rol recibidos."
+   ],
+   "secuencia": [
+    "El administrador selecciona un usuario activo y un rol.",
+    "El sistema valida la existencia del usuario, el rol y el permiso del actor.",
+    "El sistema guarda la asignación y registra el cambio en la bitácora."
+   ],
+   "situaciones_anormales": [
+    "Usuario inexistente o inactivo: rechaza la operación y muestra «El usuario no existe o no está activo».",
+    "Rol no permitido: rechaza la operación y muestra «Seleccione un rol válido».",
+    "Actor sin permiso: bloquea la operación, muestra «No tiene permiso para asignar roles» y registra el intento en la bitácora.",
+    "Falla al guardar: revierte la transacción y muestra «No se pudo asignar el rol; no se realizaron cambios»."
+   ],
+   "parametros": [
+    "Roles permitidos: Administrador, Contador general y Contador de costos.",
+    "La matriz detallada de permisos por rol: [PENDIENTE DE DEFINIR]."
+   ],
+   "salidas": [
+    "Confirmación de asignación o cambio de rol.",
+    "Rol vigente asociado al usuario.",
+    "Registro del cambio de rol en la bitácora."
+   ],
+   "almacenamiento_bd": [
+    "roles: rol_id (identificador, PK), nombre (texto, UNIQUE, NOT NULL).",
+    "usuarios.rol_id referencia roles.rol_id mediante clave foránea; no se admite más de un rol vigente por usuario.",
+    "bitacora_accesos: evento_id (identificador, PK), actor_usuario_id (identificador, FK a usuarios), usuario_afectado_id (identificador, FK a usuarios), accion (texto), valor_anterior (texto), valor_nuevo (texto), fecha_hora (fecha_hora), resultado (texto).",
+    "Actualización del rol y escritura de bitácora en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Inicio y cierre de sesión",
+   "descripcion": "El sistema deberá autenticar las credenciales de un usuario activo al iniciar sesión y permitirle cerrar su sesión autenticada.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables; Manual_aplicación_catálogo_SunGames.docx, alcance del área de Contabilidad General y de Costos",
+   "entradas": [
+    "nombre_usuario (texto)",
+    "contraseña (texto)",
+    "sesión_id (identificador, para cierre de sesión)"
+   ],
+   "validacion_entradas": [
+    "El nombre de usuario y la contraseña son obligatorios para iniciar sesión.",
+    "El usuario debe existir, estar activo y tener credenciales válidas.",
+    "Para cerrar sesión, la sesión debe pertenecer al usuario autenticado."
+   ],
+   "validacion_salidas": [
+    "El inicio de sesión válido crea una sesión asociada al usuario autenticado.",
+    "El cierre invalida la sesión indicada y evita su reutilización.",
+    "Los eventos de inicio, cierre e intento fallido quedan registrados en la bitácora."
+   ],
+   "secuencia": [
+    "El usuario ingresa nombre de usuario y contraseña.",
+    "El sistema verifica las credenciales y el estado de la cuenta.",
+    "Si la autenticación es válida, crea la sesión; si el usuario solicita salir, invalida su sesión activa.",
+    "El sistema registra el resultado de la operación."
+   ],
+   "situaciones_anormales": [
+    "Credenciales incorrectas: rechaza el acceso y muestra «Nombre de usuario o contraseña incorrectos» sin revelar cuál dato falló.",
+    "Cuenta bloqueada o inactiva: rechaza el acceso y muestra «La cuenta no está habilitada para iniciar sesión».",
+    "Sesión inexistente o ya cerrada: informa «La sesión ya no está activa».",
+    "Falla del servicio de autenticación: no crea una sesión y muestra «No se pudo iniciar sesión; intente nuevamente»."
+   ],
+   "parametros": [
+    "Duración de sesión y umbral de intentos fallidos: [PENDIENTE DE DEFINIR].",
+    "El detalle de expiración de sesiones: [PENDIENTE DE DEFINIR]."
+   ],
+   "salidas": [
+    "Sesión autenticada o mensaje de rechazo.",
+    "Confirmación de cierre de sesión.",
+    "Eventos de autenticación registrados en bitácora."
+   ],
+   "almacenamiento_bd": [
+    "sesiones: sesion_id (identificador, PK), usuario_id (identificador, FK a usuarios), token_hash (texto), iniciada_en (fecha_hora), finalizada_en (fecha_hora, nullable), estado (enum), indice por usuario_id y estado.",
+    "bitacora_accesos: evento_id (identificador, PK), usuario_id (identificador, FK a usuarios, nullable para intentos no autenticados), nombre_usuario_intentado (texto), accion (texto), fecha_hora (fecha_hora), resultado (texto).",
+    "Guardar sesión y evento de inicio de forma atómica; invalidar sesión y registrar cierre de forma atómica."
+   ]
+  },
+  {
+   "nombre": "Cambio de contraseña",
+   "descripcion": "El sistema deberá permitir al usuario autenticado reemplazar su contraseña después de verificar la contraseña vigente.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables; Manual_aplicación_catálogo_SunGames.docx, alcance del área de Contabilidad General y de Costos",
+   "entradas": [
+    "sesión_id (identificador)",
+    "contraseña_actual (texto)",
+    "contraseña_nueva (texto)",
+    "confirmación_contraseña_nueva (texto)"
+   ],
+   "validacion_entradas": [
+    "La sesión debe estar autenticada y activa.",
+    "La contraseña actual debe coincidir con la credencial vigente.",
+    "La contraseña nueva y su confirmación deben ser iguales.",
+    "La contraseña nueva no debe coincidir con la contraseña actual.",
+    "Los requisitos de longitud y complejidad se aplican conforme a la política configurada."
+   ],
+   "validacion_salidas": [
+    "La credencial almacenada corresponde a la nueva contraseña sin almacenar la contraseña en texto claro.",
+    "Una autenticación posterior acepta la nueva contraseña y rechaza la anterior.",
+    "El cambio queda registrado en la bitácora sin incluir contraseñas ni hashes de credenciales en el evento."
+   ],
+   "secuencia": [
+    "El usuario autenticado introduce la contraseña vigente y la nueva contraseña dos veces.",
+    "El sistema verifica sesión, contraseña actual y coincidencia de los campos nuevos.",
+    "El sistema valida la política de contraseñas, actualiza la credencial y registra el evento."
+   ],
+   "situaciones_anormales": [
+    "Contraseña actual incorrecta: rechaza el cambio y muestra «La contraseña actual es incorrecta».",
+    "Las contraseñas nuevas no coinciden: rechaza el cambio y muestra «La nueva contraseña y su confirmación no coinciden».",
+    "La nueva contraseña incumple la política: rechaza el cambio y muestra «La nueva contraseña no cumple los requisitos establecidos».",
+    "Sesión inactiva: rechaza el cambio y muestra «La sesión ya no está activa».",
+    "Falla al guardar: revierte la transacción y muestra «No se pudo cambiar la contraseña; la credencial anterior sigue vigente»."
+   ],
+   "parametros": [
+    "Longitud mínima, reglas de complejidad y reutilización de contraseñas: [PENDIENTE DE DEFINIR].",
+    "La contraseña se almacena mediante un mecanismo de hash seguro; nunca se almacena en texto claro."
+   ],
+   "salidas": [
+    "Confirmación de cambio de contraseña o mensaje de error.",
+    "Evento de cambio registrado en bitácora sin datos secretos."
+   ],
+   "almacenamiento_bd": [
+    "credenciales: usuario_id (identificador, PK y FK a usuarios), contraseña_hash (texto, NOT NULL), actualizada_en (fecha_hora, NOT NULL).",
+    "bitacora_accesos: evento_id (identificador, PK), actor_usuario_id (identificador, FK a usuarios), accion (texto), fecha_hora (fecha_hora), resultado (texto); no almacenar contraseñas, hashes ni valores secretos.",
+    "Actualización de credenciales y registro en bitácora en una transacción atómica."
+   ]
+  }
+ ],
+ "vacios": [
+  "La matriz de permisos específicos de Administrador, Contador general y Contador de costos no está definida en los manuales.",
+  "No se especifican el formato y longitud del nombre de usuario ni la política de longitud, complejidad y reutilización de contraseñas.",
+  "No se especifican el umbral de intentos fallidos, la duración de bloqueo ni la duración o expiración de sesiones."
+ ]
+}

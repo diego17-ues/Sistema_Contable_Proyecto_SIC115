@@ -1,0 +1,307 @@
+{
+ "requerimientos": [
+  {
+   "nombre": "Registro de proveedores",
+   "descripcion": "El sistema deberá registrar los datos identificativos de cada proveedor o prestador de servicios profesionales para asociarlos con compras, gastos y pagos.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador",
+    "Contador de costos"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuentas 2101 y 1108; Modelo_de_Negocio_SunGames.docx, Socios Clave",
+   "entradas": [
+    "nombre (texto, hasta 200 caracteres)",
+    "tipo_proveedor (enumeración: proveedor de bienes, servicios profesionales, otro)",
+    "contacto (texto, opcional)",
+    "estado (enumeración: activo, inactivo)"
+   ],
+   "validacion_entradas": [
+    "El nombre es obligatorio y no puede quedar vacío después de quitar espacios iniciales y finales.",
+    "El tipo_proveedor debe pertenecer a los valores permitidos.",
+    "El estado debe ser activo o inactivo.",
+    "Solo un usuario con rol Contador o Contador de costos puede registrar un proveedor."
+   ],
+   "validacion_salidas": [
+    "El registro conserva los datos capturados y recibe un identificador interno único.",
+    "El proveedor aparece disponible para asociarlo a nuevas compras mientras su estado sea activo."
+   ],
+   "secuencia": [
+    "El contador captura los datos del proveedor.",
+    "El sistema valida obligatoriedad y formato.",
+    "El sistema guarda el proveedor y muestra su identificador interno."
+   ],
+   "situaciones_anormales": [
+    "Nombre vacío: muestra «El nombre del proveedor es obligatorio» y no guarda el registro.",
+    "Tipo o estado no permitido: muestra «El valor seleccionado no es válido» y no guarda el registro.",
+    "Usuario sin rol autorizado: muestra «No tiene permiso para registrar proveedores» y no guarda el registro.",
+    "Falla al guardar: revierte la operación y muestra «No fue posible guardar el proveedor; inténtelo nuevamente»."
+   ],
+   "parametros": [
+    "Longitud máxima del nombre: 200 caracteres.",
+    "No se configura un valor predeterminado para el tipo de proveedor."
+   ],
+   "salidas": [
+    "Registro de proveedor con identificador interno.",
+    "Mensaje de confirmación o error."
+   ],
+   "almacenamiento_bd": [
+    "proveedores: proveedor_id UUID PK, nombre VARCHAR(200) NOT NULL, tipo_proveedor VARCHAR(40) NOT NULL, contacto VARCHAR(200) NULL, estado VARCHAR(10) NOT NULL CHECK (estado IN ('activo','inactivo')), created_at TIMESTAMP NOT NULL.",
+    "Índice por nombre y estado para localizar proveedores.",
+    "La creación del registro se ejecuta en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Registro de compras y gastos",
+   "descripcion": "El sistema deberá registrar cada documento de compra o gasto asociado a un proveedor, una cuenta contable y, cuando corresponda, una orden de trabajo de desarrollo.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador",
+    "Contador de costos"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuentas 1106, 1108, 1204, 2101 y 4102 a 4103; Modelo_de_Negocio_SunGames.docx, Estructura de Costos y Recursos para el desarrollo",
+   "entradas": [
+    "proveedor_id (UUID)",
+    "tipo_documento (enumeración: factura, contrato, recibo, otro documento soporte)",
+    "numero_documento (texto, hasta 100 caracteres)",
+    "fecha_documento (date, formato ISO 8601)",
+    "fecha_vencimiento (date, formato ISO 8601, opcional)",
+    "descripcion (texto, hasta 500 caracteres)",
+    "cuenta_contable_codigo (texto, código existente del catálogo)",
+    "orden_trabajo_id (UUID, opcional)",
+    "subtotal (decimal, moneda contable configurada)",
+    "iva (decimal, moneda contable configurada)",
+    "retencion (decimal, moneda contable configurada)",
+    "importe_total (decimal, moneda contable configurada)",
+    "tratamiento_desarrollo (enumeración: capitalizable, gasto del período, no aplica)"
+   ],
+   "validacion_entradas": [
+    "El proveedor debe existir y estar activo.",
+    "El tipo y número de documento, la fecha, la descripción, la cuenta contable, el subtotal y el importe total son obligatorios.",
+    "La cuenta debe existir y ser compatible con la naturaleza de la operación; para servicios directos e indirectos de desarrollo se utilizarán las cuentas que correspondan entre 4102 y 4103, según el catálogo.",
+    "Si se indica una orden de trabajo, esta debe existir y corresponder a un videojuego.",
+    "Subtotal, IVA, retención e importe total deben ser valores no negativos en la moneda contable configurada.",
+    "La fecha de vencimiento, cuando se informe, no puede ser anterior a la fecha del documento.",
+    "El importe total debe conciliar con subtotal, IVA y retención conforme al tratamiento fiscal configurado; las tasas no se fijan en este requerimiento.",
+    "El documento soporte debe identificarse con proveedor y número de documento para impedir su duplicación."
+   ],
+   "validacion_salidas": [
+    "El registro conserva los importes y referencias del documento soporte.",
+    "La obligación resultante, cuando exista saldo a crédito, corresponde al importe total menos los pagos aplicados.",
+    "Los costos de desarrollo quedan asociados a la orden de trabajo indicada.",
+    "La compra queda identificada como capturada o contabilizada, según se haya generado su partida automática."
+   ],
+   "secuencia": [
+    "El contador selecciona un proveedor y captura los datos del documento.",
+    "El contador asigna la cuenta contable y, para costos de desarrollo, la orden de trabajo.",
+    "El sistema valida proveedor, documento, cuenta, importes y referencias.",
+    "El sistema guarda la compra o gasto para su contabilización automática."
+   ],
+   "situaciones_anormales": [
+    "Proveedor inexistente o inactivo: muestra «El proveedor no existe o está inactivo» y no guarda la compra.",
+    "Documento duplicado: muestra «Ya existe un documento con este proveedor y número» y no guarda la compra.",
+    "Orden de trabajo inexistente: muestra «La orden de trabajo indicada no existe» y no guarda la compra.",
+    "Importes que no concilian: muestra «Los importes del documento no concilian con el total» y no guarda la compra.",
+    "Tratamiento de costos de desarrollo no definido: muestra «El tratamiento contable del desarrollo está pendiente de definición» y deja la compra sin contabilizar.",
+    "Falla de almacenamiento: revierte la operación y muestra «No fue posible guardar la compra o gasto; inténtelo nuevamente»."
+   ],
+   "parametros": [
+    "Moneda y decimales: los definidos en la configuración de moneda contable.",
+    "Tasas fiscales y retenciones: las definidas en los parámetros fiscales configurados; no se incluyen tasas predeterminadas en este requerimiento.",
+    "El tratamiento contable de los costos internos de desarrollo queda [PENDIENTE DE VERIFICAR] por la diferencia entre las políticas del manual."
+   ],
+   "salidas": [
+    "Registro de compra o gasto con proveedor, documento soporte, cuenta y orden de trabajo cuando corresponda.",
+    "Saldo pendiente de pago, si la operación genera una cuenta por pagar.",
+    "Mensaje de confirmación o error."
+   ],
+   "almacenamiento_bd": [
+    "compras_gastos: compra_gasto_id UUID PK, proveedor_id UUID NOT NULL FK proveedores(proveedor_id), tipo_documento VARCHAR(40) NOT NULL, numero_documento VARCHAR(100) NOT NULL, fecha_documento DATE NOT NULL, fecha_vencimiento DATE NULL, descripcion VARCHAR(500) NOT NULL, cuenta_contable_codigo VARCHAR(20) NOT NULL FK catalogo_cuentas(codigo), orden_trabajo_id UUID NULL FK ordenes_trabajo(orden_trabajo_id), subtotal DECIMAL(14,2) NOT NULL, iva DECIMAL(14,2) NOT NULL, retencion DECIMAL(14,2) NOT NULL, importe_total DECIMAL(14,2) NOT NULL, tratamiento_desarrollo VARCHAR(30) NOT NULL, estado VARCHAR(20) NOT NULL, created_at TIMESTAMP NOT NULL.",
+    "Restricción UNIQUE (proveedor_id, tipo_documento, numero_documento); CHECK para importes no negativos.",
+    "Índices por proveedor_id, fecha_documento, fecha_vencimiento y orden_trabajo_id.",
+    "El guardado de la compra y sus referencias se ejecuta en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Consulta de cuentas por pagar",
+   "descripcion": "El sistema deberá presentar las obligaciones pendientes con proveedores y el saldo pendiente de cada documento registrado.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador",
+    "Contador de costos"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuenta 2101 y Libro mayor; Modelo_de_Negocio_SunGames.docx, Estructura de Costos",
+   "entradas": [
+    "proveedor_id (UUID, opcional)",
+    "fecha_desde (date, formato ISO 8601, opcional)",
+    "fecha_hasta (date, formato ISO 8601, opcional)",
+    "estado_pago (enumeración: pendiente, pagado, todos)"
+   ],
+   "validacion_entradas": [
+    "El proveedor indicado debe existir.",
+    "Si se informa un rango de fechas, fecha_desde debe ser igual o anterior a fecha_hasta.",
+    "El estado_pago debe pertenecer a los valores permitidos.",
+    "Solo los roles Contador y Contador de costos pueden consultar la información."
+   ],
+   "validacion_salidas": [
+    "Por cada documento, el saldo pendiente es igual al importe reconocido como obligación menos los pagos aplicados.",
+    "Los documentos pagados presentan saldo pendiente igual a cero.",
+    "El total mostrado equivale a la suma de los saldos pendientes incluidos en los resultados.",
+    "Los documentos sin fecha de vencimiento informada se identifican como «Sin fecha de vencimiento»."
+   ],
+   "secuencia": [
+    "El usuario ingresa filtros opcionales.",
+    "El sistema valida proveedor, rango de fechas y estado.",
+    "El sistema consulta documentos y pagos aplicados.",
+    "El sistema calcula y presenta el saldo pendiente por documento y el total del resultado."
+   ],
+   "situaciones_anormales": [
+    "Proveedor inexistente: muestra «El proveedor indicado no existe» y no ejecuta la consulta.",
+    "Rango de fechas inválido: muestra «La fecha inicial no puede ser posterior a la fecha final» y no ejecuta la consulta.",
+    "Usuario sin rol autorizado: muestra «No tiene permiso para consultar cuentas por pagar» y bloquea el acceso.",
+    "No hay documentos que coincidan: muestra «No se encontraron cuentas por pagar para los filtros indicados»."
+   ],
+   "parametros": [
+    "Los filtros son opcionales; si se omiten, se consultan todos los documentos registrados.",
+    "Los importes se presentan en la moneda contable configurada."
+   ],
+   "salidas": [
+    "Listado de proveedor, documento, fechas, importe reconocido, pagos aplicados y saldo pendiente.",
+    "Total de saldos pendientes según los filtros."
+   ],
+   "almacenamiento_bd": [
+    "La consulta utiliza compras_gastos y pagos_proveedor mediante proveedor_id y compra_gasto_id; no crea ni modifica registros.",
+    "Índices de consulta requeridos: compras_gastos(proveedor_id, fecha_documento, fecha_vencimiento, estado) y pagos_proveedor(compra_gasto_id).",
+    "La lectura debe mostrar un conjunto coherente de documentos y pagos."
+   ]
+  },
+  {
+   "nombre": "Registro de pagos a proveedores",
+   "descripcion": "El sistema deberá registrar un pago a un proveedor y aplicarlo a una cuenta por pagar o identificarlo como anticipo a proveedor.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuentas 1103, 1108 y 2101; apartado Sobre el cierre contable",
+   "entradas": [
+    "proveedor_id (UUID)",
+    "compra_gasto_id (UUID, opcional)",
+    "fecha_pago (date, formato ISO 8601)",
+    "cuenta_origen_codigo (texto, código de cuenta de efectivo o bancos existente)",
+    "importe_pago (decimal, moneda contable configurada)",
+    "referencia_pago (texto, hasta 100 caracteres)",
+    "es_anticipo (boolean)"
+   ],
+   "validacion_entradas": [
+    "El proveedor debe existir y estar activo.",
+    "La fecha, la cuenta de origen, el importe y la referencia del pago son obligatorios.",
+    "El importe del pago debe ser mayor que cero.",
+    "La cuenta de origen debe ser una cuenta de efectivo o bancos permitida por el catálogo.",
+    "Si se indica compra_gasto_id, el documento debe existir, pertenecer al proveedor seleccionado y tener saldo pendiente suficiente.",
+    "Si el pago no se aplica a un documento, es_anticipo debe ser verdadero.",
+    "Solo el rol Contador puede registrar pagos."
+   ],
+   "validacion_salidas": [
+    "El saldo pendiente del documento se reduce por el importe efectivamente aplicado.",
+    "Un pago marcado como anticipo queda registrado contra anticipos a proveedores (1108) y no reduce una obligación de otro documento.",
+    "El total aplicado a una obligación no puede superar su saldo pendiente."
+   ],
+   "secuencia": [
+    "El contador selecciona el proveedor y el documento por pagar, o indica que se trata de un anticipo.",
+    "El contador captura fecha, cuenta de origen, importe y referencia.",
+    "El sistema valida el saldo pendiente o la condición de anticipo.",
+    "El sistema registra el pago y actualiza el saldo pendiente correspondiente."
+   ],
+   "situaciones_anormales": [
+    "Pago mayor que el saldo pendiente: muestra «El pago supera el saldo pendiente del documento» y no lo registra.",
+    "Documento de otro proveedor: muestra «El documento no pertenece al proveedor seleccionado» y no registra el pago.",
+    "Pago sin documento y sin condición de anticipo: muestra «Seleccione un documento por pagar o marque el pago como anticipo» y no lo registra.",
+    "Cuenta de origen no permitida: muestra «La cuenta seleccionada no es una cuenta de efectivo o bancos válida» y no registra el pago.",
+    "Usuario sin rol autorizado: muestra «No tiene permiso para registrar pagos a proveedores» y bloquea la operación.",
+    "Falla de almacenamiento: revierte el registro y muestra «No fue posible guardar el pago; inténtelo nuevamente»."
+   ],
+   "parametros": [
+    "Decimales e importe en la moneda contable configurada.",
+    "No se permite aplicar un pago por encima del saldo pendiente; tolerancia: 0.00."
+   ],
+   "salidas": [
+    "Registro de pago con proveedor, fecha, referencia, cuenta de origen e importe.",
+    "Saldo pendiente actualizado o anticipo registrado.",
+    "Mensaje de confirmación o error."
+   ],
+   "almacenamiento_bd": [
+    "pagos_proveedor: pago_id UUID PK, proveedor_id UUID NOT NULL FK proveedores(proveedor_id), compra_gasto_id UUID NULL FK compras_gastos(compra_gasto_id), fecha_pago DATE NOT NULL, cuenta_origen_codigo VARCHAR(20) NOT NULL FK catalogo_cuentas(codigo), importe_pago DECIMAL(14,2) NOT NULL CHECK (importe_pago > 0), referencia_pago VARCHAR(100) NOT NULL, es_anticipo BOOLEAN NOT NULL, created_at TIMESTAMP NOT NULL.",
+    "Restricción para exigir compra_gasto_id o es_anticipo = TRUE.",
+    "Índices por proveedor_id, compra_gasto_id y fecha_pago.",
+    "El pago y la actualización de su aplicación se ejecutan en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Generación automática de partidas de compras y pagos",
+   "descripcion": "El sistema deberá generar la partida contable correspondiente al registrar una compra o gasto contabilizable y al registrar un pago a proveedor, utilizando las cuentas y reglas aplicables del catálogo.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador",
+    "Contador de costos"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuentas 1103, 1106, 1108, 1204, 2101, 2104, 4102 y 4103; apartado Sobre el cierre contable; Modelo_de_Negocio_SunGames.docx, Estructura de Costos",
+   "entradas": [
+    "compra_gasto_id (UUID)",
+    "pago_id (UUID, opcional)",
+    "cuenta_contable_codigo (texto, código existente)",
+    "subtotal, iva, retencion e importe_total (decimal, moneda contable configurada)",
+    "tratamiento_desarrollo (enumeración: capitalizable, gasto del período, no aplica)",
+    "orden_trabajo_id (UUID, opcional)"
+   ],
+   "validacion_entradas": [
+    "La compra o el pago debe existir y no tener ya una partida automática asociada.",
+    "Las cuentas de débito y crédito deben existir y estar activas en el catálogo.",
+    "La partida debe cumplir la validación de partida doble ya definida para el libro diario.",
+    "Los servicios profesionales con retención deben utilizar el parámetro fiscal configurado; una tasa no verificada no se codifica como valor fijo.",
+    "Si el costo se asigna a desarrollo, debe conservar la referencia a la orden de trabajo.",
+    "Si el tratamiento contable del desarrollo no está definido, el sistema no contabiliza la compra."
+   ],
+   "validacion_salidas": [
+    "Para una obligación con proveedor, el débito refleja la cuenta de costo o activo aplicable y el crédito refleja 2101 por el importe neto adeudado, 2104 por la retención configurada y 1106 por el IVA crédito fiscal cuando sea aplicable y aprovechable.",
+    "Para un pago aplicado a una obligación, el débito reduce 2101 y el crédito afecta la cuenta de efectivo o bancos seleccionada.",
+    "Para un anticipo, el débito afecta 1108 y el crédito afecta la cuenta de efectivo o bancos seleccionada.",
+    "La suma del debe es igual a la suma del haber y la partida conserva la referencia al documento o pago que la originó.",
+    "El costo de desarrollo capitalizado se asigna a 1204; si se registra como gasto, se utiliza la cuenta de egreso aplicable, incluida 4102 para servicios directos de desarrollo."
+   ],
+   "secuencia": [
+    "El sistema recibe el evento de compra contabilizable o pago registrado.",
+    "El sistema determina las cuentas según el tipo de operación, la clasificación, el tratamiento de desarrollo y los parámetros fiscales configurados.",
+    "El sistema calcula los importes de las líneas y verifica el cuadre de la partida.",
+    "El sistema registra la partida en el libro diario y vincula su identificador con la compra o el pago.",
+    "El sistema marca el origen como contabilizado para impedir una segunda generación automática."
+   ],
+   "situaciones_anormales": [
+    "Partida automática ya existente: muestra «La operación ya tiene una partida contable asociada» y no crea otra.",
+    "Cuenta inexistente o inactiva: muestra «No se puede generar la partida: una cuenta contable no existe o está inactiva» y no contabiliza.",
+    "Tratamiento de costos de desarrollo pendiente: muestra «El tratamiento contable del desarrollo está pendiente de definición» y deja la compra sin partida.",
+    "Partida descuadrada: revierte la generación y muestra «No se generó la partida porque el debe y el haber no coinciden».",
+    "Falla al guardar partida o vínculo: revierte toda la transacción y muestra «No fue posible contabilizar la operación; inténtelo nuevamente»."
+   ],
+   "parametros": [
+    "Decimales y moneda: los definidos en la configuración de moneda contable.",
+    "Tasas y reglas fiscales: los parámetros fiscales configurados y vigentes; cualquier tasa o aplicabilidad pendiente se identifica como [PENDIENTE DE VERIFICAR].",
+    "Tolerancia de cuadre: 0.00."
+   ],
+   "salidas": [
+    "Partida de diario asociada a la compra o al pago.",
+    "Identificador y estado de contabilización de la operación de origen.",
+    "Mensaje de confirmación o error."
+   ],
+   "almacenamiento_bd": [
+    "partidas_diario: reutiliza el registro existente del libro diario; no crea un catálogo ni un libro paralelo.",
+    "partida_origen: origen_id UUID PK, partida_id UUID NOT NULL FK partidas_diario(partida_id), compra_gasto_id UUID NULL FK compras_gastos(compra_gasto_id), pago_id UUID NULL FK pagos_proveedor(pago_id), tipo_origen VARCHAR(20) NOT NULL, UNIQUE (compra_gasto_id), UNIQUE (pago_id), con restricción para asociar exactamente un origen.",
+    "Las líneas de la partida reutilizan la tabla existente de líneas del diario y guardan las cuentas, debe y haber conforme al modelo de ese submódulo.",
+    "La creación de la partida, sus líneas y el vínculo con la operación de origen se ejecuta en una transacción atómica."
+   ]
+  }
+ ],
+ "vacios": [
+  "El Manual_aplicación_catálogo_SunGames.docx presenta criterios incompatibles para el desarrollo interno: la política de capitalización dispone acumular costos en 1204 y trasladarlos a 1205, mientras que la política sobre NIIF para las PYMES indica que esos desembolsos se reconocen como gasto. Debe confirmarse el marco contable y el tratamiento que aplicará SunGames antes de automatizar su contabilización.",
+  "La tasa y la aplicabilidad vigentes de retenciones e IVA para cada tipo de compra o servicio deben confirmarse en los parámetros fiscales; el manual menciona una retención del 10% para ciertos servicios profesionales, pero también indica que las obligaciones y tasas deben verificarse.",
+  "Los manuales no definen los campos obligatorios de identificación legal de proveedores, el formato de sus códigos internos ni las reglas de vencimiento y condiciones de pago. La especificación limita el registro a los datos operativos necesarios y deja los datos legales no definidos pendientes de confirmación."
+ ]
+}

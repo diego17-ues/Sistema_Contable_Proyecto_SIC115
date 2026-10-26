@@ -1,0 +1,173 @@
+{
+ "requerimientos": [
+  {
+   "nombre": "Consulta de bitácora de operaciones",
+   "descripcion": "El sistema deberá presentar las operaciones registradas en la bitácora que coincidan con los filtros seleccionados por el usuario autorizado.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador"
+   ],
+   "fuente": "Práctica general de sistemas contables; alcance solicitado para SunGames. Los manuales no definen la bitácora ni sus campos.",
+   "entradas": [
+    "fecha_desde (date, formato AAAA-MM-DD)",
+    "fecha_hasta (date, formato AAAA-MM-DD)",
+    "usuario_id (identificador, opcional)",
+    "tipo_operacion (texto, opcional)",
+    "entidad_afectada (texto, opcional)",
+    "resultado (enumeración: correcto, fallido; opcional)"
+   ],
+   "validacion_entradas": [
+    "El usuario debe tener una sesión autenticada y permiso de consulta según su rol.",
+    "fecha_desde y fecha_hasta deben proporcionarse juntas o dejarse ambas vacías.",
+    "Si se proporcionan fechas, fecha_desde debe ser menor o igual que fecha_hasta.",
+    "usuario_id debe corresponder a un usuario existente si se especifica.",
+    "Los filtros opcionales deben corresponder a valores admitidos por el sistema."
+   ],
+   "validacion_salidas": [
+    "Cada fila muestra fecha y hora, usuario, operación, entidad afectada, resultado y detalle disponible.",
+    "Todas las filas cumplen los filtros ingresados y se presentan en orden cronológico descendente.",
+    "La consulta no modifica ni elimina registros de la bitácora."
+   ],
+   "secuencia": [
+    "El usuario autorizado abre la consulta de bitácora.",
+    "El usuario ingresa uno o más filtros y solicita la consulta.",
+    "El sistema valida los filtros y consulta los registros coincidentes.",
+    "El sistema presenta los resultados o informa que no hay coincidencias."
+   ],
+   "situaciones_anormales": [
+    "Filtros de fecha incompletos o rango inválido: muestra «Revise el rango de fechas ingresado» y no ejecuta la consulta.",
+    "Usuario inexistente: muestra «El usuario indicado no existe» y no ejecuta la consulta.",
+    "Usuario sin permiso: muestra «No tiene permiso para consultar la bitácora» y registra el intento fallido en la bitácora.",
+    "Falla al consultar los datos: muestra «No fue posible consultar la bitácora. Intente nuevamente» y conserva intactos los registros."
+   ],
+   "parametros": [
+    "Orden predeterminado: fecha y hora descendentes.",
+    "Cantidad máxima de filas por página: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Pantalla de resultados filtrados con los datos de cada operación.",
+    "Mensaje de consulta sin coincidencias cuando el resultado está vacío."
+   ],
+   "almacenamiento_bd": [
+    "bitacora_operaciones: id (entero, PK), fecha_hora (timestamp), usuario_id (entero, FK a usuarios.id, nullable para procesos del sistema), tipo_operacion (texto), entidad_afectada (texto), entidad_id (texto, nullable), resultado (texto), detalle (texto, nullable).",
+    "Índices sobre fecha_hora, usuario_id, tipo_operacion y entidad_afectada para consulta.",
+    "Los registros de bitácora no se modifican ni eliminan mediante esta consulta."
+   ]
+  },
+  {
+   "nombre": "Exportación de bitácora de operaciones",
+   "descripcion": "El sistema deberá exportar los registros de bitácora que coincidan con los filtros seleccionados por el usuario autorizado.",
+   "prioridad": "Media",
+   "actores": [
+    "Administrador",
+    "Contador"
+   ],
+   "fuente": "Práctica general de sistemas contables; alcance solicitado para SunGames. Los manuales no especifican formato ni procedimiento de exportación de bitácoras.",
+   "entradas": [
+    "filtros (criterios de consulta: fechas date AAAA-MM-DD, usuario_id entero, tipo_operacion texto, entidad_afectada texto y resultado enumerado; todos opcionales según las reglas de consulta)",
+    "formato_archivo (enumeración: CSV UTF-8)"
+   ],
+   "validacion_entradas": [
+    "El usuario debe tener una sesión autenticada y permiso de exportación según su rol.",
+    "Los filtros deben cumplir las mismas reglas de validez aplicadas a la consulta de bitácora.",
+    "formato_archivo debe ser CSV UTF-8.",
+    "La exportación debe incluir únicamente los registros que el usuario tenga permiso de consultar."
+   ],
+   "validacion_salidas": [
+    "El archivo contiene las columnas fecha_hora, usuario, tipo_operacion, entidad_afectada, entidad_id, resultado y detalle disponible.",
+    "El contenido del archivo coincide con los filtros aplicados y el número de filas exportadas coincide con los resultados de la consulta.",
+    "Los valores se codifican en UTF-8 y los campos se delimitan y escapan de forma válida para CSV.",
+    "La exportación no modifica ni elimina registros de la bitácora."
+   ],
+   "secuencia": [
+    "El usuario autorizado define los filtros de exportación.",
+    "El sistema valida los permisos, filtros y formato solicitado.",
+    "El sistema genera un archivo CSV UTF-8 con los registros coincidentes.",
+    "El sistema entrega el archivo para descarga e informa la cantidad de registros exportados."
+   ],
+   "situaciones_anormales": [
+    "Usuario sin permiso: muestra «No tiene permiso para exportar la bitácora» y registra el intento fallido en la bitácora.",
+    "Filtros inválidos: muestra «Revise los filtros ingresados» y no genera el archivo.",
+    "No hay registros coincidentes: muestra «No hay registros para exportar» y no genera un archivo vacío.",
+    "Falla durante la generación o entrega del archivo: muestra «No fue posible exportar la bitácora. Intente nuevamente» y descarta el archivo incompleto."
+   ],
+   "parametros": [
+    "Formato disponible: CSV UTF-8.",
+    "Límite máximo de filas o tamaño del archivo: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Archivo CSV UTF-8 descargable con los registros filtrados.",
+    "Mensaje con la cantidad de registros exportados o con la causa del rechazo."
+   ],
+   "almacenamiento_bd": [
+    "bitacora_exportaciones: id (entero, PK), usuario_id (entero, FK a usuarios.id), fecha_hora (timestamp), filtros (texto), formato_archivo (texto), cantidad_registros (entero), resultado (texto).",
+    "Índices sobre usuario_id y fecha_hora.",
+    "El registro de exportación se guarda en la misma base de datos sin modificar los registros exportados."
+   ]
+  },
+  {
+   "nombre": "Respaldo y restauración de datos contables",
+   "descripcion": "El sistema deberá permitir al administrador generar un respaldo íntegro de los datos contables y restaurar esos datos a partir de un respaldo validado.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador"
+   ],
+   "fuente": "Práctica general de sistemas contables; alcance solicitado para SunGames. Los manuales describen libros y documentos soporte, pero no establecen procedimientos de respaldo o restauración.",
+   "entradas": [
+    "accion (enumeración: generar_respaldo, restaurar_respaldo)",
+    "respaldo_id (entero, requerido para restaurar)",
+    "archivo_respaldo (archivo, requerido para restaurar)",
+    "confirmacion_restauracion (booleano, requerido para restaurar)"
+   ],
+   "validacion_entradas": [
+    "Solo un administrador autenticado puede generar o restaurar respaldos.",
+    "Para restaurar, el respaldo debe existir o ser proporcionado, superar las comprobaciones de integridad y corresponder a una estructura de datos compatible.",
+    "La restauración requiere confirmación explícita del administrador antes de iniciar.",
+    "El sistema debe verificar que el respaldo esté completo antes de aceptar su restauración."
+   ],
+   "validacion_salidas": [
+    "Un respaldo generado se identifica con un correlativo único, fecha y hora, estado y resultado de la validación de integridad.",
+    "La restauración concluye únicamente si se recuperan los datos del respaldo sin errores y se confirma la consistencia de la base de datos.",
+    "La restauración se ejecuta como una operación atómica: ante un fallo, no deja una restauración parcial y conserva el estado previo.",
+    "El sistema registra quién solicitó cada operación, cuándo se ejecutó, su resultado y el respaldo utilizado."
+   ],
+   "secuencia": [
+    "El administrador selecciona generar respaldo o restaurar respaldo.",
+    "Para generar, el sistema crea el respaldo, valida su integridad y registra el resultado.",
+    "Para restaurar, el administrador selecciona o proporciona el respaldo y confirma la operación.",
+    "El sistema valida el respaldo y la compatibilidad antes de restaurar.",
+    "El sistema restaura los datos en una operación atómica, verifica la consistencia y registra el resultado."
+   ],
+   "situaciones_anormales": [
+    "Usuario sin permiso: muestra «No tiene permiso para generar o restaurar respaldos» y registra el intento fallido.",
+    "Respaldo inexistente, incompleto, corrupto o incompatible: muestra «El respaldo no es válido o no es compatible; no se realizó la restauración» y conserva los datos actuales.",
+    "Falta de confirmación: muestra «Confirme la restauración para continuar» y no inicia el proceso.",
+    "Falla durante la creación: muestra «No fue posible completar el respaldo» y marca la operación como fallida.",
+    "Falla durante la restauración: revierte la operación completa, conserva los datos previos y muestra «La restauración falló; los datos actuales no fueron modificados»."
+   ],
+   "parametros": [
+    "Frecuencia de generación de respaldos: [PENDIENTE DE VERIFICAR].",
+    "Plazo de conservación: [PENDIENTE DE VERIFICAR].",
+    "Ubicación de almacenamiento y requisitos de protección del respaldo: [PENDIENTE DE VERIFICAR].",
+    "Tiempo máximo de restauración y pérdida máxima de datos tolerable: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Archivo de respaldo validado y su identificador, fecha, estado y resultado.",
+    "Confirmación de restauración completada o mensaje de error con constancia de que se conservó el estado previo.",
+    "Registro de auditoría de las operaciones de respaldo y restauración."
+   ],
+   "almacenamiento_bd": [
+    "respaldos: id (entero, PK), fecha_hora (timestamp), usuario_id (entero, FK a usuarios.id), ubicacion (texto), identificador_archivo (texto, único), estado (texto), resultado_integridad (texto).",
+    "restauraciones: id (entero, PK), respaldo_id (entero, FK a respaldos.id, nullable si el archivo se proporciona directamente), usuario_id (entero, FK a usuarios.id), fecha_hora_inicio (timestamp), fecha_hora_fin (timestamp, nullable), estado (texto), detalle_resultado (texto).",
+    "Índices sobre fecha_hora y estado en respaldos, y sobre respaldo_id y fecha_hora_inicio en restauraciones.",
+    "La creación y restauración de datos se registra en bitácora_operaciones; la restauración de la base de datos se ejecuta transaccionalmente o mediante mecanismo equivalente que evite aplicar cambios parciales."
+   ]
+  }
+ ],
+ "vacios": [
+  "Los manuales no especifican campos, retención, consulta, exportación, formatos ni permisos de la bitácora; los requerimientos proponen criterios funcionales generales.",
+  "Los manuales no especifican frecuencia, retención, ubicación, protección, límite de tamaño, tiempo de restauración ni pérdida máxima de datos tolerable para respaldos; deben definirse antes de implementación.",
+  "La especificación agrupa generación de respaldos y restauración en un requerimiento para respetar la cantidad exacta solicitada y cubrir el alcance indicado."
+ ]
+}

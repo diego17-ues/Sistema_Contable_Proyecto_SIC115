@@ -1,0 +1,334 @@
+{
+ "requerimientos": [
+  {
+   "nombre": "Carga inicial del catálogo",
+   "descripcion": "El sistema deberá cargar el catálogo inicial de cuentas con los códigos, denominaciones, rubros, naturaleza y reglas de uso especificados en el manual de SunGames, sin crear subcuentas.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador",
+    "Administrador autorizado"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Anexo 3 «Catálogo de Cuentas Resumido» y «Especificación de cada cuenta del catálogo»",
+   "entradas": [
+    "Registros de cuentas: código (texto), denominación (texto), rubro (texto), naturaleza (enum: deudora, acreedora), descripción y reglas de uso (texto), referencia de respaldo (texto)."
+   ],
+   "validacion_entradas": [
+    "Cada registro debe incluir código, denominación, rubro y naturaleza.",
+    "El código y la denominación no deben duplicarse dentro del lote ni respecto de cuentas ya cargadas.",
+    "Los códigos y denominaciones deben corresponder al catálogo del manual.",
+    "No se permiten registros de subcuentas."
+   ],
+   "validacion_salidas": [
+    "El número de cuentas cargadas debe coincidir con el número de registros válidos de entrada.",
+    "Cada cuenta queda asociada al rubro y la naturaleza especificados en el manual.",
+    "El resultado de la carga informa cuentas insertadas y registros rechazados, sin duplicar ni omitir registros válidos."
+   ],
+   "secuencia": [
+    "El contador o administrador autorizado inicia la carga del catálogo inicial.",
+    "El sistema valida la estructura, duplicados y correspondencia con el catálogo fuente.",
+    "El sistema carga las cuentas válidas en una única transacción.",
+    "El sistema presenta el resumen de la carga y registra la operación en la bitácora."
+   ],
+   "situaciones_anormales": [
+    "Si un registro carece de un campo obligatorio, el sistema lo rechaza y muestra «No se cargó la cuenta: faltan datos obligatorios».",
+    "Si existe un código duplicado, el sistema rechaza ese registro y muestra «No se cargó la cuenta: el código ya existe».",
+    "Si se detecta una subcuenta o una cuenta no presente en el catálogo inicial autorizado, el sistema rechaza el registro y muestra «No se cargó la cuenta: no corresponde al catálogo inicial autorizado».",
+    "Si ocurre un fallo durante la transacción, el sistema revierte la carga completa y muestra «No se cargó el catálogo; no se aplicaron cambios»."
+   ],
+   "parametros": [
+    "Fuente de carga inicial: catálogo incluido en el Manual_aplicación_catálogo_SunGames.docx.",
+    "Subcuentas permitidas: no.",
+    "Carga transaccional: atómica."
+   ],
+   "salidas": [
+    "Catálogo inicial cargado.",
+    "Resumen de cuentas insertadas y rechazadas con motivo.",
+    "Registro de auditoría de la carga."
+   ],
+   "almacenamiento_bd": [
+    "cuentas: cuenta_id (clave primaria), codigo (texto, único, no nulo), denominacion (texto, no nulo), rubro_codigo (texto, no nulo), naturaleza (enum, no nulo), descripcion (texto), reglas_uso (texto), estado (enum: activa, inactiva), origen (texto), created_at (timestamp), updated_at (timestamp).",
+    "bitacora_catalogo: bitacora_id (clave primaria), usuario_id (clave foránea), accion (texto), fecha_hora (timestamp), detalle (texto).",
+    "La carga de cuentas y su evento de bitácora se ejecutan en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Alta de cuenta",
+   "descripcion": "El sistema deberá registrar una cuenta nueva cuando exista una solicitud escrita justificada y la aprobación de la Junta Directiva, asignándole el siguiente código disponible del grupo correspondiente.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, «Procedimiento para crear, modificar o dar de baja una cuenta»",
+   "entradas": [
+    "Denominación propuesta (texto).",
+    "Rubro y grupo (texto o código).",
+    "Justificación de la solicitud (texto).",
+    "Documento de respaldo de la operación (referencia de archivo o texto).",
+    "Acuerdo de aprobación de Junta Directiva (texto, número y fecha).",
+    "Naturaleza (enum: deudora, acreedora).",
+    "Descripción y reglas de uso (texto)."
+   ],
+   "validacion_entradas": [
+    "Denominación, rubro, grupo, justificación, documento de respaldo y acuerdo de aprobación son obligatorios.",
+    "El rubro y grupo deben existir en el catálogo.",
+    "La denominación no debe duplicar una cuenta existente.",
+    "La nueva cuenta no debe duplicar la función de una cuenta existente; el contador debe aportar la justificación de esa verificación.",
+    "El código asignado debe ser el siguiente disponible del grupo y no debe haber sido utilizado previamente.",
+    "La naturaleza debe corresponder a la naturaleza definida para la cuenta."
+   ],
+   "validacion_salidas": [
+    "La cuenta queda vinculada al rubro y grupo indicados, con la naturaleza, descripción y reglas de uso capturadas.",
+    "El código asignado es único y no reutiliza códigos anteriores.",
+    "La cuenta se registra con estado activa solo después de comprobar la solicitud y el acuerdo de aprobación."
+   ],
+   "secuencia": [
+    "El contador captura la solicitud escrita y sus datos de respaldo.",
+    "El sistema verifica que no exista una cuenta equivalente y que el rubro y grupo sean válidos.",
+    "El contador registra la referencia del acuerdo de aprobación de Junta Directiva.",
+    "El sistema asigna el siguiente código disponible del grupo y registra la cuenta.",
+    "El sistema confirma el alta y escribe el evento en la bitácora."
+   ],
+   "situaciones_anormales": [
+    "Si falta la justificación, el respaldo o el acuerdo de aprobación, el sistema no registra la cuenta y muestra «No se registró la cuenta: falta documentación o aprobación».",
+    "Si se detecta una cuenta duplicada o equivalente, el sistema bloquea el alta y muestra «No se registró la cuenta: revise si una cuenta existente cubre esta operación».",
+    "Si no puede determinarse el siguiente código disponible, el sistema bloquea el alta y muestra «No se registró la cuenta: no se pudo determinar el siguiente código disponible»."
+   ],
+   "parametros": [
+    "Reutilización de códigos: no permitida.",
+    "Aprobación requerida: acuerdo de Junta Directiva, según el procedimiento del manual.",
+    "Formato definitivo de códigos para cuentas nuevas: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Cuenta nueva con código asignado y estado activa.",
+    "Confirmación o mensaje de validación.",
+    "Registro de la solicitud, aprobación y alta en la bitácora."
+   ],
+   "almacenamiento_bd": [
+    "cuentas: cuenta_id (clave primaria), codigo (texto, único, no nulo), denominacion (texto, no nulo), rubro_codigo (texto, no nulo), naturaleza (enum, no nulo), descripcion (texto), reglas_uso (texto), estado (enum: activa, inactiva), created_at (timestamp), updated_at (timestamp).",
+    "solicitudes_cambio_catalogo: solicitud_id (clave primaria), tipo (enum: alta, modificación, baja), cuenta_id (clave foránea nullable), denominacion_propuesta (texto), rubro_grupo (texto), justificacion (texto, no nulo), documento_respaldo (texto, no nulo), acuerdo_junta (texto, no nulo), usuario_id (clave foránea), estado_solicitud (enum), created_at (timestamp).",
+    "bitacora_catalogo: bitacora_id (clave primaria), usuario_id (clave foránea), accion (texto), cuenta_id (clave foránea), fecha_hora (timestamp), detalle (texto).",
+    "El registro de la cuenta, la solicitud y la bitácora se ejecutan en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Modificación de cuenta",
+   "descripcion": "El sistema deberá aplicar cambios aprobados a la denominación, rubro, naturaleza, descripción o reglas de uso de una cuenta, conservando su código asignado.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, «Procedimiento para crear, modificar o dar de baja una cuenta» y sección 2 «Estructura, codificación y denominación del catálogo de cuentas»",
+   "entradas": [
+    "Código de cuenta existente (texto).",
+    "Campos propuestos para modificación (texto o enum, según campo).",
+    "Justificación (texto).",
+    "Documento de respaldo (referencia de archivo o texto).",
+    "Acuerdo de aprobación de Junta Directiva (texto, número y fecha)."
+   ],
+   "validacion_entradas": [
+    "La cuenta debe existir.",
+    "La justificación, el documento de respaldo y el acuerdo de aprobación son obligatorios.",
+    "El código no se puede modificar ni reasignar una vez que está en uso.",
+    "La denominación propuesta no debe duplicar la de otra cuenta.",
+    "El rubro y la naturaleza propuestos deben ser válidos en el catálogo.",
+    "No se aceptan campos vacíos para denominación, rubro o naturaleza."
+   ],
+   "validacion_salidas": [
+    "Los campos modificados coinciden con la solicitud aprobada.",
+    "El código de cuenta permanece sin cambios.",
+    "La versión anterior y la nueva quedan identificables en el historial de cambios."
+   ],
+   "secuencia": [
+    "El contador selecciona la cuenta e ingresa los cambios solicitados y su justificación.",
+    "El sistema valida la existencia de la cuenta, la unicidad de la denominación y la inmutabilidad del código.",
+    "El contador ingresa la referencia del acuerdo de aprobación de Junta Directiva.",
+    "El sistema guarda los cambios y registra los valores anteriores y nuevos en la bitácora."
+   ],
+   "situaciones_anormales": [
+    "Si la cuenta no existe, el sistema cancela la operación y muestra «No se modificó la cuenta: el código no existe».",
+    "Si se intenta cambiar el código, el sistema bloquea la operación y muestra «No se modificó la cuenta: el código no puede cambiarse una vez asignado».",
+    "Si falta el acuerdo de aprobación o el respaldo, el sistema no aplica los cambios y muestra «No se modificó la cuenta: falta documentación o aprobación».",
+    "Si ocurre un fallo de almacenamiento, el sistema revierte la modificación y muestra «No se modificó la cuenta; no se aplicaron cambios»."
+   ],
+   "parametros": [
+    "Cambio de código: prohibido.",
+    "Aprobación requerida: acuerdo de Junta Directiva.",
+    "Historial de cambios: conservar valores anteriores y nuevos."
+   ],
+   "salidas": [
+    "Cuenta modificada con el mismo código.",
+    "Confirmación o mensaje de validación.",
+    "Historial de cambios y evento de bitácora."
+   ],
+   "almacenamiento_bd": [
+    "cuentas: cuenta_id (clave primaria), codigo (texto, único, no modificable), denominacion (texto, no nulo), rubro_codigo (texto, no nulo), naturaleza (enum, no nulo), descripcion (texto), reglas_uso (texto), estado (enum), updated_at (timestamp).",
+    "solicitudes_cambio_catalogo: solicitud_id (clave primaria), tipo (enum), cuenta_id (clave foránea), justificacion (texto, no nulo), documento_respaldo (texto, no nulo), acuerdo_junta (texto, no nulo), estado_solicitud (enum), created_at (timestamp).",
+    "historial_cuentas: historial_id (clave primaria), cuenta_id (clave foránea), version (entero), valores_anteriores (texto estructurado), valores_nuevos (texto estructurado), acuerdo_junta (texto), usuario_id (clave foránea), fecha_hora (timestamp).",
+    "La modificación de la cuenta, su historial y la bitácora se ejecutan en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Desactivación de cuenta",
+   "descripcion": "El sistema deberá desactivar una cuenta únicamente cuando su saldo sea cero, no tenga movimientos en el ejercicio y exista aprobación de Junta Directiva.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, «Procedimiento para crear, modificar o dar de baja una cuenta»",
+   "entradas": [
+    "Código de cuenta (texto).",
+    "Saldo contable actual (decimal, moneda del libro).",
+    "Indicador de movimientos en el ejercicio (booleano).",
+    "Justificación de la baja (texto).",
+    "Documento de respaldo (referencia de archivo o texto).",
+    "Acuerdo de aprobación de Junta Directiva (texto, número y fecha)."
+   ],
+   "validacion_entradas": [
+    "La cuenta debe existir y estar activa.",
+    "El saldo debe ser exactamente cero.",
+    "La cuenta no debe tener movimientos en el ejercicio en curso.",
+    "La justificación, el documento de respaldo y el acuerdo de aprobación son obligatorios."
+   ],
+   "validacion_salidas": [
+    "La cuenta cambia de activa a inactiva solo si se cumplen todas las condiciones.",
+    "La cuenta y sus movimientos históricos permanecen consultables.",
+    "La operación no elimina ni altera partidas contables anteriores."
+   ],
+   "secuencia": [
+    "El contador selecciona la cuenta y solicita su baja.",
+    "El sistema consulta el saldo y los movimientos del ejercicio en curso.",
+    "El contador registra la justificación y la referencia del acuerdo de aprobación.",
+    "Si las validaciones se cumplen, el sistema cambia el estado de la cuenta a inactiva y registra la operación en la bitácora."
+   ],
+   "situaciones_anormales": [
+    "Si el saldo no es cero, el sistema bloquea la baja y muestra «No se desactivó la cuenta: el saldo debe ser cero».",
+    "Si existen movimientos en el ejercicio en curso, el sistema bloquea la baja y muestra «No se desactivó la cuenta: tiene movimientos en el ejercicio actual».",
+    "Si falta el acuerdo de aprobación o la documentación, el sistema no cambia el estado y muestra «No se desactivó la cuenta: falta documentación o aprobación».",
+    "Si la cuenta no existe o ya está inactiva, el sistema muestra «No se desactivó la cuenta: la cuenta no existe o ya está inactiva»."
+   ],
+   "parametros": [
+    "Saldo requerido para baja: 0.00 en la moneda contable.",
+    "Movimientos permitidos en el ejercicio actual: ninguno.",
+    "Eliminación física de la cuenta: no permitida."
+   ],
+   "salidas": [
+    "Estado de cuenta actualizado a inactiva, cuando proceda.",
+    "Mensaje de confirmación o causa del bloqueo.",
+    "Evento de baja en la bitácora."
+   ],
+   "almacenamiento_bd": [
+    "cuentas: cuenta_id (clave primaria), codigo (texto, único), estado (enum: activa, inactiva), updated_at (timestamp).",
+    "solicitudes_cambio_catalogo: solicitud_id (clave primaria), tipo (enum), cuenta_id (clave foránea), justificacion (texto, no nulo), documento_respaldo (texto, no nulo), acuerdo_junta (texto, no nulo), estado_solicitud (enum), created_at (timestamp).",
+    "bitacora_catalogo: bitacora_id (clave primaria), usuario_id (clave foránea), accion (texto), cuenta_id (clave foránea), fecha_hora (timestamp), detalle (texto).",
+    "La validación del saldo y movimientos y el cambio de estado deben ser atómicos para evitar desactivar una cuenta que haya recibido movimientos concurrentes."
+   ]
+  },
+  {
+   "nombre": "Consulta del catálogo de cuentas",
+   "descripcion": "El sistema deberá presentar las cuentas del catálogo con su código, denominación, rubro, naturaleza, estado y reglas de uso, permitiendo localizar cuentas por esos datos.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador",
+    "Administrador autorizado"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, «Especificación del uso del catálogo de cuentas» y «Relación con los estados financieros»",
+   "entradas": [
+    "Código (texto, opcional).",
+    "Denominación (texto, opcional).",
+    "Elemento o rubro (texto o código, opcional).",
+    "Naturaleza (enum: deudora, acreedora, opcional).",
+    "Estado (enum: activa, inactiva, todas; opcional)."
+   ],
+   "validacion_entradas": [
+    "Los filtros son opcionales; si se ingresan, deben respetar el formato del campo correspondiente.",
+    "Los criterios combinados se aplican conjuntamente.",
+    "Una consulta sin filtros devuelve las cuentas según el orden del código."
+   ],
+   "validacion_salidas": [
+    "Cada resultado muestra los datos de la cuenta almacenados en el catálogo.",
+    "Los resultados respetan los filtros ingresados y no incluyen duplicados.",
+    "Las cuentas inactivas se identifican como tales y no se ocultan de una consulta que incluya ese estado."
+   ],
+   "secuencia": [
+    "El usuario ingresa uno o varios filtros.",
+    "El sistema valida los formatos y busca cuentas coincidentes.",
+    "El sistema presenta los resultados ordenados por código y permite consultar el detalle de una cuenta."
+   ],
+   "situaciones_anormales": [
+    "Si ningún registro coincide, el sistema muestra «No se encontraron cuentas para los criterios indicados».",
+    "Si un filtro tiene formato inválido, el sistema no ejecuta la consulta y muestra «No se realizó la consulta: revise el formato de los filtros».",
+    "Si ocurre un fallo de consulta, el sistema muestra «No fue posible consultar el catálogo; intente nuevamente»."
+   ],
+   "parametros": [
+    "Orden predeterminado: código ascendente.",
+    "Subcuentas mostradas: no aplica, el catálogo no las contempla."
+   ],
+   "salidas": [
+    "Listado filtrado de cuentas.",
+    "Detalle de cuenta con código, denominación, elemento o rubro, naturaleza, estado, descripción y reglas de uso.",
+    "Mensaje de resultado vacío o error."
+   ],
+   "almacenamiento_bd": [
+    "cuentas: cuenta_id (clave primaria), codigo (texto, índice único), denominacion (texto, índice), rubro_codigo (texto, índice), naturaleza (enum, índice), descripcion (texto), reglas_uso (texto), estado (enum, índice).",
+    "La consulta es de solo lectura y no modifica cuentas ni genera movimientos contables."
+   ]
+  },
+  {
+   "nombre": "Validación de estructura y naturaleza",
+   "descripcion": "El sistema deberá validar que cada cuenta pertenezca a un elemento y rubro del catálogo, conserve la naturaleza indicada por el manual y no se registre como subcuenta.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, sección 2 «Estructura, codificación y denominación del catálogo de cuentas», «Rubros de aplicación» y «Especificación de cada cuenta del catálogo»",
+   "entradas": [
+    "Código de cuenta (texto).",
+    "Elemento y rubro (códigos o textos).",
+    "Naturaleza (enum: deudora, acreedora).",
+    "Indicador de nivel de cuenta (enum: cuenta, subcuenta)."
+   ],
+   "validacion_entradas": [
+    "El elemento debe corresponder a uno de los rubros descritos en el manual: activo, pasivo, patrimonio, egresos, ingresos, cuentas de orden deudoras o cuentas de orden acreedoras.",
+    "El rubro debe estar asociado al elemento correspondiente en el catálogo.",
+    "La naturaleza debe coincidir con la especificación de la cuenta en el manual.",
+    "El nivel subcuenta no está permitido.",
+    "La generación de códigos nuevos debe seguir la regla de siguiente código disponible del grupo y no reutilizar códigos."
+   ],
+   "validacion_salidas": [
+    "El sistema acepta únicamente cuentas con elemento, rubro y naturaleza coherentes con la definición registrada.",
+    "El sistema rechaza todo intento de crear subcuentas o de asignar a una cuenta una naturaleza incompatible.",
+    "La validación no altera saldos ni movimientos contables."
+   ],
+   "secuencia": [
+    "El sistema obtiene la definición del código y la cuenta propuesta.",
+    "El sistema comprueba elemento, rubro, naturaleza y nivel contra el catálogo autorizado.",
+    "El sistema permite continuar si las reglas se cumplen; en caso contrario, bloquea el registro e informa la regla incumplida."
+   ],
+   "situaciones_anormales": [
+    "Si elemento y rubro no corresponden, el sistema bloquea el registro y muestra «Cuenta no válida: el rubro no corresponde al elemento».",
+    "Si la naturaleza difiere de la definida para la cuenta, el sistema bloquea el registro y muestra «Cuenta no válida: la naturaleza no coincide con el catálogo autorizado».",
+    "Si se intenta crear una subcuenta, el sistema bloquea el registro y muestra «Cuenta no válida: el catálogo no permite subcuentas».",
+    "Si no puede determinarse la longitud o segmentación del código para una cuenta nueva, el sistema bloquea su asignación y muestra «No se pudo validar el código: consulte la estructura aprobada del catálogo»."
+   ],
+   "parametros": [
+    "Subcuentas: no permitidas.",
+    "Reutilización o cambio de códigos ya asignados: no permitidos.",
+    "Longitud y segmentación de códigos nuevos: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Resultado de validación: aceptado o rechazado, con la regla incumplida.",
+    "Mensaje de validación visible en el alta o modificación de cuenta."
+   ],
+   "almacenamiento_bd": [
+    "catalogo_estructura: estructura_id (clave primaria), elemento_codigo (texto), elemento_nombre (texto), rubro_codigo (texto), rubro_nombre (texto), naturaleza_permitida (enum), permite_subcuentas (booleano).",
+    "cuentas: cuenta_id (clave primaria), codigo (texto, único), rubro_codigo (texto, clave foránea), naturaleza (enum), nivel (enum: cuenta), estado (enum).",
+    "Restricción: nivel debe ser cuenta; no se admiten registros de subcuenta."
+   ]
+  }
+ ],
+ "vacios": [
+  "El manual define los componentes como elemento en el primer dígito, rubro en los dos primeros y cuenta en los tres primeros, pero los códigos específicos del catálogo se presentan con cuatro dígitos. Se requiere confirmar la longitud y segmentación aplicable a cuentas nuevas antes de validar o asignar esos códigos.",
+  "El manual indica que las altas, modificaciones y bajas requieren aprobación de Junta Directiva, pero no especifica el formato del acuerdo ni un proceso electrónico de aprobación; el requerimiento solicita registrar su referencia documental.",
+  "El manual no define permisos del rol Administrador ni una matriz de permisos del sistema; se requiere confirmar si el Administrador puede cargar o consultar el catálogo."
+ ]
+}

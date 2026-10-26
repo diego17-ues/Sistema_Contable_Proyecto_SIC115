@@ -1,0 +1,257 @@
+{
+ "requerimientos": [
+  {
+   "nombre": "Clasificación de bienes inventariables",
+   "descripcion": "El sistema deberá permitir inventario de mercancías únicamente para bienes físicos tangibles y excluir del inventario comercial las licencias digitales de videojuegos.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador",
+    "Administrador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Política 5.1, Inexistencia de método de inventarios de mercancías; cuentas 1201 y 1202",
+   "entradas": [
+    "tipo_bien (enum: mercancia_fisica, licencia_digital, activo_fijo)",
+    "descripcion (texto, longitud máxima [PENDIENTE DE VERIFICAR])"
+   ],
+   "validacion_entradas": [
+    "tipo_bien es obligatorio y pertenece al catálogo permitido",
+    "Las licencias digitales no pueden clasificarse como mercancía inventariable",
+    "El mobiliario, equipo de oficina y equipo de cómputo se clasifican como activos fijos y no como mercancía para la venta"
+   ],
+   "validacion_salidas": [
+    "Las licencias digitales no generan existencia de mercancía",
+    "Los activos fijos quedan diferenciados de las mercancías inventariables"
+   ],
+   "secuencia": [
+    "El usuario selecciona el tipo de bien",
+    "El sistema valida su clasificación",
+    "El sistema permite continuar únicamente con los flujos correspondientes a la categoría del bien"
+   ],
+   "situaciones_anormales": [
+    "Si se intenta registrar una licencia digital como mercancía, el sistema rechaza la operación y muestra: «Las licencias digitales no se controlan como inventario de mercancías.»",
+    "Si se intenta clasificar mobiliario o equipo como mercancía, el sistema rechaza la operación y muestra: «Clasifique el bien como activo fijo.»"
+   ],
+   "parametros": [
+    "Longitud máxima de descripcion: [PENDIENTE DE VERIFICAR]"
+   ],
+   "salidas": [
+    "Clasificación del bien",
+    "Mensaje de aceptación o rechazo de clasificación"
+   ],
+   "almacenamiento_bd": [
+    "bienes: id (PK), tipo_bien (enum), descripcion (texto), activo (boolean), created_at (timestamp)",
+    "tipo_bien restringido a mercancia_fisica, licencia_digital o activo_fijo",
+    "No se crean movimientos de existencias para licencias_digitales ni activos_fijos"
+   ]
+  },
+  {
+   "nombre": "Registro de entrada de mercancía física",
+   "descripcion": "El sistema deberá registrar la entrada de unidades de mercancía física tangible y aumentar su existencia disponible.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador",
+    "Administrador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Política 5.1, Manejo Exclusivo de Inventario",
+   "entradas": [
+    "bien_id (identificador, entero)",
+    "fecha (date, formato AAAA-MM-DD)",
+    "cantidad (decimal, precisión y unidad de medida [PENDIENTE DE VERIFICAR])",
+    "documento_soporte (texto, tipo y formato [PENDIENTE DE VERIFICAR])",
+    "concepto (texto, longitud máxima [PENDIENTE DE VERIFICAR])"
+   ],
+   "validacion_entradas": [
+    "bien_id es obligatorio y debe corresponder a una mercancía física activa",
+    "fecha es obligatoria y debe pertenecer a un período abierto",
+    "cantidad es obligatoria y mayor que cero",
+    "documento_soporte es obligatorio; los tipos de documento admitidos están [PENDIENTE DE VERIFICAR]"
+   ],
+   "validacion_salidas": [
+    "La existencia resultante es igual a la existencia anterior más la cantidad recibida",
+    "El movimiento queda asociado al bien y a su documento de soporte"
+   ],
+   "secuencia": [
+    "El usuario selecciona la mercancía física e ingresa los datos de la entrada",
+    "El sistema valida el bien, la fecha y la cantidad",
+    "El sistema registra el movimiento de entrada",
+    "El sistema actualiza la existencia disponible"
+   ],
+   "situaciones_anormales": [
+    "Si el bien no está clasificado como mercancía física activa, el sistema rechaza la operación y muestra: «Seleccione una mercancía física activa.»",
+    "Si la cantidad es cero o negativa, el sistema rechaza la operación y muestra: «La cantidad de entrada debe ser mayor que cero.»",
+    "Si ocurre un error al guardar, el sistema revierte el movimiento y la actualización de existencia y muestra: «No se registró la entrada; vuelva a intentarlo.»"
+   ],
+   "parametros": [
+    "Precisión decimal y unidad de medida de las cantidades: [PENDIENTE DE VERIFICAR]",
+    "Tipos de documentos de soporte admitidos: [PENDIENTE DE VERIFICAR]"
+   ],
+   "salidas": [
+    "Movimiento de entrada registrado",
+    "Existencia disponible actualizada",
+    "Mensaje de confirmación o error"
+   ],
+   "almacenamiento_bd": [
+    "movimientos_inventario: id (PK), bien_id (FK a bienes.id), fecha (date), tipo_movimiento (enum), cantidad (decimal([PENDIENTE DE VERIFICAR])), documento_soporte (texto), concepto (texto), usuario_id (FK a usuarios.id), created_at (timestamp)",
+    "tipo_movimiento restringido a entrada o salida; para este requerimiento debe ser entrada",
+    "El registro del movimiento y la actualización de existencias se ejecutan en una transacción atómica"
+   ]
+  },
+  {
+   "nombre": "Registro de salida de mercancía física",
+   "descripcion": "El sistema deberá registrar la salida de unidades de mercancía física tangible y disminuir su existencia disponible sin permitir existencias negativas.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador",
+    "Administrador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Política 5.1, Manejo Exclusivo de Inventario; procedimiento de baja de las cuentas de orden 6103 y 6104, únicamente como referencia de documentación de movimientos de control",
+   "entradas": [
+    "bien_id (identificador, entero)",
+    "fecha (date, formato AAAA-MM-DD)",
+    "cantidad (decimal, precisión y unidad de medida [PENDIENTE DE VERIFICAR])",
+    "motivo_salida (texto, valores permitidos [PENDIENTE DE VERIFICAR])",
+    "documento_soporte (texto, tipo y formato [PENDIENTE DE VERIFICAR])"
+   ],
+   "validacion_entradas": [
+    "bien_id es obligatorio y debe corresponder a una mercancía física activa",
+    "fecha es obligatoria y debe pertenecer a un período abierto",
+    "cantidad es obligatoria, mayor que cero y no puede superar la existencia disponible",
+    "motivo_salida es obligatorio; los motivos admitidos están [PENDIENTE DE VERIFICAR]"
+   ],
+   "validacion_salidas": [
+    "La existencia resultante es igual a la existencia anterior menos la cantidad de salida",
+    "La existencia resultante no es negativa",
+    "El movimiento queda asociado al bien y a su documento de soporte"
+   ],
+   "secuencia": [
+    "El usuario selecciona la mercancía física e ingresa los datos de la salida",
+    "El sistema valida la cantidad solicitada contra la existencia disponible",
+    "Si hay unidades suficientes, el sistema registra la salida y actualiza la existencia",
+    "Si no hay unidades suficientes, el sistema no registra el movimiento"
+   ],
+   "situaciones_anormales": [
+    "Si la cantidad solicitada supera la existencia, el sistema rechaza la operación y muestra: «Existencia insuficiente. Disponible: [cantidad].»",
+    "Si la cantidad es cero o negativa, el sistema rechaza la operación y muestra: «La cantidad de salida debe ser mayor que cero.»",
+    "Si ocurre un error al guardar, el sistema revierte el movimiento y la actualización de existencia y muestra: «No se registró la salida; vuelva a intentarlo.»"
+   ],
+   "parametros": [
+    "Precisión decimal y unidad de medida de las cantidades: [PENDIENTE DE VERIFICAR]",
+    "Motivos y tipos de documentos de soporte admitidos: [PENDIENTE DE VERIFICAR]"
+   ],
+   "salidas": [
+    "Movimiento de salida registrado",
+    "Existencia disponible actualizada",
+    "Mensaje de confirmación o error con la cantidad disponible cuando corresponda"
+   ],
+   "almacenamiento_bd": [
+    "movimientos_inventario: id (PK), bien_id (FK a bienes.id), fecha (date), tipo_movimiento (enum), cantidad (decimal([PENDIENTE DE VERIFICAR])), motivo_salida (texto), documento_soporte (texto), usuario_id (FK a usuarios.id), created_at (timestamp)",
+    "tipo_movimiento restringido a entrada o salida; para este requerimiento debe ser salida",
+    "La validación de existencia, el registro del movimiento y la actualización de existencias se ejecutan en una transacción atómica"
+   ]
+  },
+  {
+   "nombre": "Bloqueo de valuación sin política aprobada",
+   "descripcion": "El sistema deberá impedir la valuación contable de mercancías físicas mientras SunGames no defina y apruebe el método de valuación aplicable.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador",
+    "Administrador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Política 5.1, Exención de Valuación de Inventarios Físicos (PEPS / Promedio) y Manejo Exclusivo de Inventario",
+   "entradas": [
+    "solicitud_valuacion (acción del usuario)",
+    "metodo_valuacion (enum, valores y método aprobado: [PENDIENTE DE VERIFICAR])",
+    "fecha_corte (date, formato AAAA-MM-DD)"
+   ],
+   "validacion_entradas": [
+    "La fecha de corte es obligatoria y válida",
+    "El sistema solo permite valuar si existe un método de valuación definido y aprobado por SunGames",
+    "No se permite aplicar PEPS, promedio u otro método por defecto sin aprobación documentada"
+   ],
+   "validacion_salidas": [
+    "Si no existe método aprobado, no se calcula ni registra valor contable de existencias",
+    "Si se define un método aprobado, la fórmula, criterios de costo y tratamiento contable deben corresponder a la política aprobada, actualmente [PENDIENTE DE VERIFICAR]"
+   ],
+   "secuencia": [
+    "El usuario solicita la valuación a una fecha de corte",
+    "El sistema verifica si hay un método de valuación aprobado",
+    "Si no existe, bloquea la operación y muestra el mensaje indicado",
+    "Si existe, aplica el método aprobado y presenta el resultado sin alterar movimientos ya registrados"
+   ],
+   "situaciones_anormales": [
+    "Si no existe método aprobado, el sistema bloquea la valuación y muestra: «Valuación no disponible: SunGames debe definir y aprobar el método de valuación de inventarios.»",
+    "Si falla la lectura de movimientos, el sistema no genera resultados parciales y muestra: «No se pudo completar la valuación; vuelva a intentarlo.»"
+   ],
+   "parametros": [
+    "Método, fórmula, componentes del costo y tratamiento contable: [PENDIENTE DE VERIFICAR]",
+    "Precisión monetaria: [PENDIENTE DE VERIFICAR]"
+   ],
+   "salidas": [
+    "Resultado de valuación únicamente cuando exista política aprobada",
+    "Mensaje de bloqueo cuando el método no esté definido"
+   ],
+   "almacenamiento_bd": [
+    "politica_inventario: id (PK), metodo_valuacion (texto), formula (texto), fecha_aprobacion (date), estado (enum), aprobado_por (FK a usuarios.id)",
+    "estado restringido a pendiente, aprobado o inactivo; los valores autorizados y el aprobador competente están [PENDIENTE DE VERIFICAR]",
+    "No se almacena ni publica una valuación como definitiva si no existe una política en estado aprobado"
+   ]
+  },
+  {
+   "nombre": "Consulta de existencias por mercancía",
+   "descripcion": "El sistema deberá mostrar la existencia disponible de cada mercancía física a una fecha de consulta, calculada a partir de sus entradas y salidas registradas.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador",
+    "Administrador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Política 5.1, Manejo Exclusivo de Inventario; no se establece en los manuales un reporte de existencias específico",
+   "entradas": [
+    "bien_id (identificador, entero, opcional)",
+    "fecha_corte (date, formato AAAA-MM-DD, obligatoria)",
+    "tipo_bien (enum: mercancia_fisica)"
+   ],
+   "validacion_entradas": [
+    "fecha_corte es obligatoria y válida",
+    "Si se proporciona bien_id, debe corresponder a una mercancía física activa",
+    "La consulta no incluye licencias digitales ni activos fijos como existencias de mercancía"
+   ],
+   "validacion_salidas": [
+    "Para cada mercancía, existencia disponible = suma de cantidades de entradas hasta fecha_corte − suma de cantidades de salidas hasta fecha_corte",
+    "El resultado muestra el bien, la unidad de medida y la cantidad disponible; la unidad de medida está [PENDIENTE DE VERIFICAR]",
+    "El resultado distingue la existencia cero de un bien sin movimientos"
+   ],
+   "secuencia": [
+    "El usuario indica la fecha de corte y, opcionalmente, una mercancía",
+    "El sistema consulta los movimientos de inventario hasta la fecha indicada",
+    "El sistema calcula la existencia por mercancía",
+    "El sistema presenta el resultado ordenado por descripción"
+   ],
+   "situaciones_anormales": [
+    "Si bien_id no corresponde a una mercancía física activa, el sistema no ejecuta la consulta y muestra: «La mercancía seleccionada no existe o no está activa.»",
+    "Si existen movimientos que producen una existencia negativa, el sistema muestra el bien afectado como inconsistencia y no presenta esa cantidad como existencia válida",
+    "Si ocurre un error de consulta, el sistema muestra: «No se pudieron consultar las existencias; vuelva a intentarlo.»"
+   ],
+   "parametros": [
+    "Orden de presentación predeterminado: descripción ascendente",
+    "Unidad de medida y precisión de cantidades: [PENDIENTE DE VERIFICAR]"
+   ],
+   "salidas": [
+    "Listado de mercancías físicas con existencias disponibles a la fecha de corte",
+    "Detalle de entradas y salidas que sustentan la existencia, si el usuario selecciona una mercancía"
+   ],
+   "almacenamiento_bd": [
+    "La consulta se calcula desde bienes y movimientos_inventario; no requiere almacenar saldos derivados",
+    "Índices recomendados: movimientos_inventario (bien_id, fecha) y bienes (tipo_bien, activo)",
+    "La consulta excluye bienes clasificados como licencia_digital o activo_fijo"
+   ]
+  }
+ ],
+ "vacios": [
+  "Los manuales establecen que el inventario comercial solo aplica si SunGames incorpora mercancías físicas tangibles; no identifican mercancías físicas actualmente comercializadas ni describen un flujo operativo aprobado de recepción o despacho.",
+  "No se define catálogo de productos o SKU, unidad de medida, precisión de cantidades, documentos de soporte admitidos, motivos de salida, tratamiento de devoluciones, ajustes, mermas ni autorización de movimientos.",
+  "No se define método de valuación para mercancías físicas ni componentes del costo; el manual únicamente descarta aplicar métodos comerciales de inventario a las licencias digitales. La valuación debe permanecer bloqueada hasta que SunGames apruebe una política.",
+  "No se especifica la cuenta contable que se utilizaría para mercancías físicas, su integración con compras y ventas, ni el asiento contable de las entradas y salidas.",
+  "No se define un registro auxiliar de detalle por bien para mobiliario, equipo de cómputo u otros activos fijos, ni sus campos de identificación. El manual solo establece las cuentas 1201 y 1202, su adquisición o baja y el control de activos totalmente depreciados o amortizados en uso mediante 6101 y 7101.",
+  "No se especifican permisos particulares del submódulo de inventario, aprobadores de políticas, plazos de conservación documental ni criterios de auditoría específicos."
+ ]
+}

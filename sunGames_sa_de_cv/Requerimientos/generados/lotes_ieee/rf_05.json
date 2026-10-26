@@ -1,0 +1,246 @@
+{
+ "requerimientos": [
+  {
+   "nombre": "Mayorización de partidas",
+   "descripcion": "El sistema deberá incorporar al libro mayor las líneas de las partidas contables validadas y aún no mayorizadas, conservando su vínculo con la partida de origen.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, sección 5.1 Libros y registros contables; sección Sobre el cierre contable",
+   "entradas": [
+    "partida_id (identificador, entero o UUID)"
+   ],
+   "validacion_entradas": [
+    "La partida existe y está validada.",
+    "La partida pertenece a un período abierto.",
+    "La partida no está anulada, revertida ni mayorizada."
+   ],
+   "validacion_salidas": [
+    "Cada línea de la partida aparece una sola vez en el mayor de su cuenta.",
+    "Los importes, la fecha y el concepto coinciden con la partida de origen.",
+    "La suma de débitos y créditos incorporados coincide con la partida."
+   ],
+   "secuencia": [
+    "El contador selecciona una o más partidas pendientes de mayorizar.",
+    "El sistema verifica la validez de cada partida y el estado de su período.",
+    "El sistema registra los movimientos asociados a cada cuenta y marca las partidas como mayorizadas.",
+    "El sistema confirma la operación y muestra las partidas procesadas."
+   ],
+   "situaciones_anormales": [
+    "Partida ya mayorizada: no duplica movimientos y muestra «La partida ya fue mayorizada».",
+    "Partida anulada, revertida o no validada: no la procesa y muestra «La partida no está disponible para mayorización».",
+    "Período cerrado: no procesa la partida y muestra «El período está cerrado».",
+    "Falla al persistir cualquiera de las líneas: revierte la operación completa y muestra «No se completó la mayorización; no se registraron cambios»."
+   ],
+   "parametros": [
+    "La mayorización se limita a períodos abiertos según el control de períodos existente.",
+    "La operación se ejecuta de forma atómica."
+   ],
+   "salidas": [
+    "Movimientos incorporados al libro mayor por cuenta.",
+    "Confirmación o mensaje de error de mayorización."
+   ],
+   "almacenamiento_bd": [
+    "movimientos_mayor: id (PK), partida_linea_id (FK, único), cuenta_id (FK), fecha (date), concepto (texto), debe (decimal), haber (decimal), creado_en (timestamp).",
+    "partidas: se actualiza el estado de mayorización conforme al modelo de datos del libro diario.",
+    "Índices por cuenta_id y fecha; inserción de movimientos y actualización de la partida en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Consulta de saldo por cuenta",
+   "descripcion": "El sistema deberá mostrar el saldo acumulado de una cuenta del catálogo hasta una fecha de corte seleccionada.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, sección 5.1 Libro mayor; sección Relación con los estados financieros",
+   "entradas": [
+    "cuenta_id (identificador, entero o UUID)",
+    "fecha_corte (date, formato AAAA-MM-DD)"
+   ],
+   "validacion_entradas": [
+    "La cuenta existe en el catálogo.",
+    "La fecha de corte es una fecha válida."
+   ],
+   "validacion_salidas": [
+    "El total debe es la suma de los débitos mayorizados de la cuenta hasta la fecha de corte.",
+    "El total haber es la suma de los créditos mayorizados de la cuenta hasta la fecha de corte.",
+    "El saldo se calcula como total debe menos total haber; se presenta en el lado deudor si es positivo y en el acreedor si es negativo, respetando el signo y la naturaleza de la cuenta."
+   ],
+   "secuencia": [
+    "El contador selecciona una cuenta y una fecha de corte.",
+    "El sistema recupera los movimientos mayorizados de esa cuenta hasta la fecha indicada.",
+    "El sistema calcula los totales del debe, del haber y el saldo.",
+    "El sistema presenta el saldo y sus componentes."
+   ],
+   "situaciones_anormales": [
+    "Cuenta inexistente: muestra «La cuenta seleccionada no existe» y no genera resultados.",
+    "Fecha inválida: muestra «Ingrese una fecha de corte válida» y no genera resultados.",
+    "La cuenta no tiene movimientos hasta la fecha indicada: muestra los totales en cero y el saldo cero."
+   ],
+   "parametros": [
+    "La fecha de corte es inclusiva.",
+    "Los importes se presentan con la precisión de la moneda contable configurada."
+   ],
+   "salidas": [
+    "Saldo por cuenta con total debe, total haber, saldo y lado de presentación.",
+    "Mensaje de validación cuando no se puede atender la consulta."
+   ],
+   "almacenamiento_bd": [
+    "Consulta de solo lectura sobre movimientos_mayor y cuentas.",
+    "movimientos_mayor: cuenta_id (FK), fecha (date), debe (decimal), haber (decimal).",
+    "Índice compuesto por cuenta_id y fecha; no se almacenan saldos derivados como datos independientes."
+   ]
+  },
+  {
+   "nombre": "Consulta del mayor por rango de fechas",
+   "descripcion": "El sistema deberá presentar los movimientos mayorizados de una cuenta dentro de un rango de fechas, ordenados cronológicamente.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, sección 5.1 Libro mayor",
+   "entradas": [
+    "cuenta_id (identificador, entero o UUID)",
+    "fecha_desde (date, formato AAAA-MM-DD)",
+    "fecha_hasta (date, formato AAAA-MM-DD)"
+   ],
+   "validacion_entradas": [
+    "La cuenta existe en el catálogo.",
+    "Ambas fechas tienen formato válido.",
+    "fecha_desde es menor o igual que fecha_hasta."
+   ],
+   "validacion_salidas": [
+    "Cada movimiento corresponde a la cuenta y al rango inclusivo solicitado.",
+    "Los movimientos se ordenan por fecha y conservan referencia a la partida de origen.",
+    "Los totales del período son iguales a la suma de los débitos y créditos de los movimientos mostrados."
+   ],
+   "secuencia": [
+    "El contador especifica la cuenta y el rango de fechas.",
+    "El sistema valida los datos y recupera los movimientos mayorizados que cumplen los filtros.",
+    "El sistema ordena los movimientos por fecha y calcula los totales del debe y del haber del rango.",
+    "El sistema presenta el detalle y los totales."
+   ],
+   "situaciones_anormales": [
+    "Rango invertido: muestra «La fecha inicial debe ser anterior o igual a la fecha final» y no ejecuta la consulta.",
+    "Cuenta inexistente: muestra «La cuenta seleccionada no existe».",
+    "No hay movimientos en el rango: muestra «No hay movimientos para los criterios seleccionados» y totales en cero."
+   ],
+   "parametros": [
+    "Los extremos del rango de fechas son inclusivos.",
+    "La ordenación principal es por fecha; el desempate conserva el orden de registro de los movimientos."
+   ],
+   "salidas": [
+    "Detalle del mayor por cuenta: fecha, referencia de partida, concepto, debe y haber.",
+    "Totales de debe y haber del rango consultado."
+   ],
+   "almacenamiento_bd": [
+    "Consulta de solo lectura sobre movimientos_mayor y las referencias del libro diario.",
+    "movimientos_mayor: cuenta_id (FK), partida_linea_id (FK), fecha (date), concepto (texto), debe (decimal), haber (decimal).",
+    "Índice compuesto por cuenta_id y fecha."
+   ]
+  },
+  {
+   "nombre": "Generación del balance de comprobación",
+   "descripcion": "El sistema deberá generar un balance de comprobación para un período seleccionado con los saldos deudores y acreedores de las cuentas con saldo o movimientos.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, sección 5.1 Libro mayor; sección Sobre el cierre contable",
+   "entradas": [
+    "fecha_desde (date, formato AAAA-MM-DD)",
+    "fecha_hasta (date, formato AAAA-MM-DD)"
+   ],
+   "validacion_entradas": [
+    "Ambas fechas tienen formato válido.",
+    "fecha_desde es menor o igual que fecha_hasta.",
+    "El rango corresponde a fechas cubiertas por los movimientos mayorizados disponibles."
+   ],
+   "validacion_salidas": [
+    "Para cada cuenta, el saldo al cierre se calcula como saldo anterior al período más débitos del período menos créditos del período.",
+    "Los saldos deudores se presentan en la columna deudora y los acreedores en la columna acreedora, según el saldo neto de cada cuenta.",
+    "La suma de saldos deudores debe ser igual a la suma de saldos acreedores.",
+    "Las cuentas de orden se muestran como información de control separada y no se incorporan a los estados financieros."
+   ],
+   "secuencia": [
+    "El contador indica las fechas del período.",
+    "El sistema obtiene los saldos anteriores y los movimientos mayorizados del período por cuenta.",
+    "El sistema calcula y clasifica los saldos por su lado deudor o acreedor.",
+    "El sistema compara los totales de ambas columnas y presenta el balance de comprobación."
+   ],
+   "situaciones_anormales": [
+    "Rango invertido: muestra «La fecha inicial debe ser anterior o igual a la fecha final» y no genera el reporte.",
+    "Totales deudores distintos de los acreedores: presenta el reporte marcado como descuadrado y muestra la diferencia; no altera los movimientos contables.",
+    "No existen movimientos ni saldos para el período: muestra «No hay saldos para el período seleccionado»."
+   ],
+   "parametros": [
+    "Los importes utilizan la precisión de la moneda contable configurada.",
+    "La fecha inicial y la fecha final son inclusivas.",
+    "La tolerancia de cuadre es 0.00."
+   ],
+   "salidas": [
+    "Balance de comprobación con código y nombre de cuenta, saldo deudor, saldo acreedor y totales.",
+    "Indicador de cuadre y, si corresponde, diferencia entre columnas."
+   ],
+   "almacenamiento_bd": [
+    "Reporte calculado en tiempo de consulta a partir de movimientos_mayor y cuentas; no altera ni reemplaza los movimientos contables.",
+    "movimientos_mayor: cuenta_id (FK), fecha (date), debe (decimal), haber (decimal).",
+    "cuentas: id (PK), código (único), nombre, naturaleza y rubro."
+   ]
+  },
+  {
+   "nombre": "Exportación de reportes del mayor",
+   "descripcion": "El sistema deberá exportar el resultado de una consulta del libro mayor o de un balance de comprobación conservando los filtros y totales mostrados.",
+   "prioridad": "Media",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, sección 5.1 Libro mayor y Libro de estados financieros",
+   "entradas": [
+    "tipo_reporte (texto enumerado: libro_mayor o balance_comprobacion)",
+    "filtros_reporte (estructura: cuenta_id y rango de fechas para libro_mayor; rango de fechas para balance_comprobacion)",
+    "formato_salida (texto enumerado: [PENDIENTE DE VERIFICAR])"
+   ],
+   "validacion_entradas": [
+    "El tipo de reporte corresponde a una consulta disponible.",
+    "Los filtros son válidos para el tipo de reporte seleccionado.",
+    "El formato solicitado está habilitado en la configuración del sistema."
+   ],
+   "validacion_salidas": [
+    "El archivo contiene los mismos movimientos o saldos, filtros, subtotales y totales que el reporte presentado en pantalla.",
+    "La exportación no modifica los registros contables.",
+    "El archivo se genera en el formato seleccionado y puede abrirse sin error."
+   ],
+   "secuencia": [
+    "El contador selecciona un reporte y sus filtros.",
+    "El sistema valida los criterios y genera el reporte con los datos consultados.",
+    "El contador solicita la exportación en un formato disponible.",
+    "El sistema genera el archivo y ofrece su descarga."
+   ],
+   "situaciones_anormales": [
+    "Formato no habilitado: muestra «El formato de exportación no está disponible» y no genera el archivo.",
+    "Error al generar el archivo: muestra «No se pudo generar la exportación; intente nuevamente» y no altera los datos contables.",
+    "Sin resultados: muestra «No hay datos para exportar con los criterios seleccionados»."
+   ],
+   "parametros": [
+    "Formatos de exportación disponibles: [PENDIENTE DE VERIFICAR].",
+    "El nombre del archivo incluye el tipo de reporte y el rango de fechas consultado."
+   ],
+   "salidas": [
+    "Archivo descargable del libro mayor o del balance de comprobación.",
+    "Mensaje de confirmación o de error de exportación."
+   ],
+   "almacenamiento_bd": [
+    "No aplica para el archivo generado; la exportación consulta movimientos_mayor, cuentas y los criterios del reporte.",
+    "No se almacenan copias del archivo en la base de datos, salvo que una política de retención sea definida posteriormente."
+   ]
+  }
+ ],
+ "vacios": [
+  "El manual no define los formatos de archivo admitidos para exportar el libro mayor y el balance de comprobación; se requiere confirmación.",
+  "Los manuales no especifican permisos detallados por rol para consultar, mayorizar o exportar; se requiere definirlos para validar la autorización por actor.",
+  "El manual indica que las formalidades y la lista exacta de libros deben verificarse en la normativa vigente; no se incorporan requisitos legales adicionales en estos requerimientos."
+ ]
+}

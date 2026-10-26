@@ -1,0 +1,520 @@
+{
+ "requerimientos": [
+  {
+   "nombre": "Tiempo de respuesta de operaciones interactivas",
+   "descripcion": "El sistema deberá responder a las operaciones interactivas de consulta y navegación en un tiempo p95 no superior a [PENDIENTE DE VERIFICAR] milisegundos bajo la carga de prueba acordada.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Solicitud interactiva (tipo de operación y parámetros de consulta)",
+    "Carga de prueba (usuarios concurrentes y conjunto de datos)"
+   ],
+   "validacion_entradas": [
+    "La carga de prueba debe identificar las operaciones incluidas, el número de usuarios simultáneos y el tamaño del conjunto de datos."
+   ],
+   "validacion_salidas": [
+    "Medir el tiempo desde el envío de cada solicitud hasta la presentación completa de la respuesta.",
+    "El percentil 95 debe ser menor o igual a [PENDIENTE DE VERIFICAR] milisegundos."
+   ],
+   "secuencia": [
+    "Ejecutar la carga de prueba definida.",
+    "Registrar el tiempo de respuesta de cada operación.",
+    "Calcular el percentil 95 y compararlo con el umbral aprobado."
+   ],
+   "situaciones_anormales": [
+    "Si el percentil 95 excede el umbral, el resultado de la prueba se marca como no conforme y se registra el valor medido."
+   ],
+   "parametros": [
+    "Umbral de respuesta p95: [PENDIENTE DE VERIFICAR] milisegundos.",
+    "Carga de prueba y operaciones incluidas: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Resultado de prueba de rendimiento con tiempos medidos, percentil 95 y estado de conformidad."
+   ],
+   "almacenamiento_bd": [
+    "No aplica; los resultados de prueba pueden conservarse en el repositorio de pruebas técnicas."
+   ]
+  },
+  {
+   "nombre": "Tiempo de contabilización de partidas",
+   "descripcion": "El sistema deberá completar la contabilización de una partida balanceada en un tiempo p95 no superior a [PENDIENTE DE VERIFICAR] milisegundos bajo la carga de prueba acordada.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Partida (fecha, concepto y líneas contables)",
+    "Carga de prueba (usuarios concurrentes y volumen de partidas)"
+   ],
+   "validacion_entradas": [
+    "La partida de prueba debe cumplir las validaciones contables antes de iniciar la medición.",
+    "La carga de prueba debe especificar los usuarios simultáneos y el volumen de datos."
+   ],
+   "validacion_salidas": [
+    "Medir desde la solicitud de contabilización hasta la confirmación del registro.",
+    "El percentil 95 debe ser menor o igual a [PENDIENTE DE VERIFICAR] milisegundos.",
+    "La partida debe quedar registrada íntegramente o no quedar registrada."
+   ],
+   "secuencia": [
+    "Enviar partidas válidas según la carga de prueba.",
+    "Medir el tiempo de cada contabilización confirmada.",
+    "Calcular el percentil 95 y verificar el resultado contable."
+   ],
+   "situaciones_anormales": [
+    "Si se supera el umbral, registrar la medición como no conforme.",
+    "Si ocurre un error durante la contabilización, no mostrar confirmación de éxito y conservar la atomicidad de la operación."
+   ],
+   "parametros": [
+    "Umbral de contabilización p95: [PENDIENTE DE VERIFICAR] milisegundos.",
+    "Tamaño de la partida y carga de prueba: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Confirmación de contabilización y resultado de la medición de rendimiento."
+   ],
+   "almacenamiento_bd": [
+    "No aplica a la estructura lógica contable; la medición se registra en el repositorio de pruebas."
+   ]
+  },
+  {
+   "nombre": "Tiempo de consulta del libro mayor",
+   "descripcion": "El sistema deberá presentar una consulta del libro mayor dentro de un tiempo p95 no superior a [PENDIENTE DE VERIFICAR] segundos para el rango de fechas y volumen de movimientos definidos en la prueba.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Código de cuenta (texto)",
+    "Fecha inicial (date)",
+    "Fecha final (date)",
+    "Volumen de movimientos de prueba (cantidad)"
+   ],
+   "validacion_entradas": [
+    "El código de cuenta debe corresponder a una cuenta existente.",
+    "La fecha inicial no debe ser posterior a la fecha final.",
+    "El volumen de movimientos de prueba debe estar definido antes de ejecutar la medición."
+   ],
+   "validacion_salidas": [
+    "El tiempo se mide desde el envío de la consulta hasta la presentación de todos los movimientos y del saldo calculado.",
+    "El percentil 95 no debe superar [PENDIENTE DE VERIFICAR] segundos.",
+    "Los movimientos y saldos presentados deben corresponder a los filtros ingresados."
+   ],
+   "secuencia": [
+    "Ejecutar consultas con los filtros y volumen acordados.",
+    "Medir el tiempo de respuesta de cada consulta.",
+    "Comparar el percentil 95 con el umbral y verificar la integridad de los resultados."
+   ],
+   "situaciones_anormales": [
+    "Si se supera el umbral, registrar la consulta y su tiempo como no conformes.",
+    "Si los filtros no son válidos, informar el error sin presentar resultados parciales."
+   ],
+   "parametros": [
+    "Umbral de consulta p95: [PENDIENTE DE VERIFICAR] segundos.",
+    "Rango de fechas y volumen de movimientos: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Libro mayor consultado y resultado de medición de rendimiento."
+   ],
+   "almacenamiento_bd": [
+    "No aplica a tablas nuevas; la consulta emplea partidas, partida_lineas y cuentas, con índices adecuados para cuenta_id y fecha."
+   ]
+  },
+  {
+   "nombre": "Tiempo de generación de reportes financieros",
+   "descripcion": "El sistema deberá generar cada reporte financiero seleccionado en un tiempo p95 no superior a [PENDIENTE DE VERIFICAR] segundos para el período y volumen de datos definidos en la prueba.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Tipo de reporte (balance general, estado de resultados, balance de comprobación u otro reporte financiero disponible)",
+    "Período contable (fecha inicial y fecha final)",
+    "Volumen de datos de prueba (cantidad)"
+   ],
+   "validacion_entradas": [
+    "El tipo de reporte debe estar disponible en el sistema.",
+    "El período debe tener fechas válidas y ordenadas.",
+    "El volumen de datos debe estar definido para la prueba."
+   ],
+   "validacion_salidas": [
+    "Medir desde la solicitud hasta la presentación completa del reporte.",
+    "El percentil 95 debe ser menor o igual a [PENDIENTE DE VERIFICAR] segundos.",
+    "Los saldos del reporte deben corresponder a los movimientos del período y al libro mayor."
+   ],
+   "secuencia": [
+    "Solicitar el reporte con el período de prueba.",
+    "Medir el tiempo de generación.",
+    "Comparar el percentil 95 con el umbral y verificar totales y saldos."
+   ],
+   "situaciones_anormales": [
+    "Si se supera el umbral, registrar el resultado como no conforme.",
+    "Si el reporte no puede completarse, mostrar un mensaje de error y no presentar el documento como completo."
+   ],
+   "parametros": [
+    "Umbral de generación p95: [PENDIENTE DE VERIFICAR] segundos.",
+    "Períodos y volúmenes de prueba: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Reporte financiero generado y medición de tiempo de generación."
+   ],
+   "almacenamiento_bd": [
+    "No aplica a tablas nuevas; se consultan el catálogo de cuentas, las partidas y sus líneas."
+   ]
+  },
+  {
+   "nombre": "Tiempo de generación de reportes de costos",
+   "descripcion": "El sistema deberá generar la hoja de costos y el resumen de costos de una orden de trabajo en un tiempo p95 no superior a [PENDIENTE DE VERIFICAR] segundos para el volumen de movimientos definido en la prueba.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables; Manual_aplicación_catálogo_SunGames.docx, política 8 y cuentas 4101 a 4103",
+   "entradas": [
+    "Orden de trabajo (identificador)",
+    "Período de consulta (fecha inicial y fecha final)",
+    "Volumen de movimientos de costos (cantidad)"
+   ],
+   "validacion_entradas": [
+    "La orden de trabajo debe existir.",
+    "Las fechas deben ser válidas y ordenadas.",
+    "El volumen de prueba debe estar definido."
+   ],
+   "validacion_salidas": [
+    "Medir desde la solicitud hasta la presentación completa del reporte.",
+    "El percentil 95 debe ser menor o igual a [PENDIENTE DE VERIFICAR] segundos.",
+    "Los costos presentados deben corresponder a los movimientos asignados a la orden de trabajo."
+   ],
+   "secuencia": [
+    "Solicitar el reporte de la orden de trabajo.",
+    "Medir el tiempo de generación.",
+    "Verificar que los costos sumados correspondan a sus movimientos y comparar el percentil 95 con el umbral."
+   ],
+   "situaciones_anormales": [
+    "Si se supera el umbral, registrar el resultado como no conforme.",
+    "Si la orden de trabajo no existe, informar el error y no generar un reporte vacío como si fuera válido."
+   ],
+   "parametros": [
+    "Umbral de generación p95: [PENDIENTE DE VERIFICAR] segundos.",
+    "Volumen de movimientos por orden de trabajo para la prueba: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Reporte de costos de la orden de trabajo y medición del tiempo de generación."
+   ],
+   "almacenamiento_bd": [
+    "No aplica a tablas nuevas; el reporte consulta órdenes_trabajo, partidas y partida_lineas, con índices para orden_trabajo_id y fecha."
+   ]
+  },
+  {
+   "nombre": "Tiempo de exportación de reportes",
+   "descripcion": "El sistema deberá completar la exportación de un reporte al formato solicitado en un tiempo p95 no superior a [PENDIENTE DE VERIFICAR] segundos para el tamaño de reporte definido en la prueba.",
+   "prioridad": "Media",
+   "actores": [
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Reporte (tipo y período)",
+    "Formato de salida (PDF, Excel .xlsx o CSV)",
+    "Tamaño de reporte de prueba (cantidad de filas)"
+   ],
+   "validacion_entradas": [
+    "El tipo de reporte debe estar disponible.",
+    "El formato debe ser uno de los formatos habilitados.",
+    "El tamaño de reporte debe estar definido para la prueba."
+   ],
+   "validacion_salidas": [
+    "Medir desde la solicitud de exportación hasta que el archivo queda disponible.",
+    "El percentil 95 debe ser menor o igual a [PENDIENTE DE VERIFICAR] segundos.",
+    "El archivo debe poder abrirse y contener los datos y totales correspondientes al reporte solicitado."
+   ],
+   "secuencia": [
+    "Solicitar la exportación con formato y período.",
+    "Medir el tiempo hasta la disponibilidad del archivo.",
+    "Validar el formato, integridad y contenido del archivo."
+   ],
+   "situaciones_anormales": [
+    "Si se supera el umbral, registrar la exportación como no conforme.",
+    "Si la exportación falla, informar que el archivo no está disponible y no ofrecer un archivo incompleto como resultado final."
+   ],
+   "parametros": [
+    "Umbral de exportación p95: [PENDIENTE DE VERIFICAR] segundos.",
+    "Tamaño de reporte de prueba: [PENDIENTE DE VERIFICAR] filas."
+   ],
+   "salidas": [
+    "Archivo exportado en el formato solicitado y resultado de la medición."
+   ],
+   "almacenamiento_bd": [
+    "No aplica; los archivos exportados son salidas generadas a solicitud."
+   ]
+  },
+  {
+   "nombre": "Capacidad anual de partidas",
+   "descripcion": "El sistema deberá almacenar y consultar al menos [PENDIENTE DE VERIFICAR] partidas contabilizadas por ejercicio sin exceder los umbrales de respuesta aprobados para las operaciones contables.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Partidas contabilizadas del ejercicio (cantidad)",
+    "Líneas por partida (cantidad)",
+    "Ejercicio contable (año)"
+   ],
+   "validacion_entradas": [
+    "El conjunto de prueba debe indicar la cantidad de partidas, líneas y ejercicios cargados.",
+    "Las partidas usadas en la prueba deben cumplir las validaciones contables."
+   ],
+   "validacion_salidas": [
+    "Confirmar que se almacenó y recuperó el total de partidas de prueba.",
+    "Medir las operaciones de consulta y contabilización y verificar que cumplan sus respectivos umbrales aprobados."
+   ],
+   "secuencia": [
+    "Cargar el volumen de prueba del ejercicio.",
+    "Ejecutar consultas y contabilizaciones representativas.",
+    "Verificar integridad, conteo de registros y tiempos medidos."
+   ],
+   "situaciones_anormales": [
+    "Si no se alcanza la capacidad o se excede un umbral de rendimiento, registrar la prueba como no conforme y reportar el volumen alcanzado."
+   ],
+   "parametros": [
+    "Capacidad mínima de partidas por ejercicio: [PENDIENTE DE VERIFICAR].",
+    "Distribución de líneas por partida y carga de prueba: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Resultado de capacidad por ejercicio, conteo de partidas y mediciones de rendimiento."
+   ],
+   "almacenamiento_bd": [
+    "partidas: id, correlativo, fecha, concepto y estado; partida_lineas: id, partida_id, cuenta_id, debe y haber; índices para ejercicio, fecha y partida_id."
+   ]
+  },
+  {
+   "nombre": "Capacidad de líneas por partida",
+   "descripcion": "El sistema deberá permitir registrar una partida con hasta [PENDIENTE DE VERIFICAR] líneas contables sin que el tiempo de contabilización exceda el umbral aprobado.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Partida (fecha y concepto)",
+    "Líneas contables (cuenta, debe y haber)",
+    "Cantidad máxima de líneas para la prueba (cantidad)"
+   ],
+   "validacion_entradas": [
+    "Cada cuenta debe existir y cada línea debe cumplir las validaciones contables.",
+    "La prueba debe incluir el máximo de líneas especificado."
+   ],
+   "validacion_salidas": [
+    "El sistema debe conservar todas las líneas sin omisiones ni duplicaciones.",
+    "Debe y haber deben permanecer cuadrados conforme a la regla contable.",
+    "El tiempo de contabilización debe cumplir el umbral aprobado."
+   ],
+   "secuencia": [
+    "Preparar una partida válida con la cantidad máxima de líneas acordada.",
+    "Solicitar su contabilización.",
+    "Verificar el conteo, el cuadre y el tiempo de respuesta."
+   ],
+   "situaciones_anormales": [
+    "Si la partida supera el límite acordado, rechazarla e informar el máximo permitido.",
+    "Si el tiempo excede el umbral o faltan líneas, marcar la prueba como no conforme."
+   ],
+   "parametros": [
+    "Máximo de líneas por partida: [PENDIENTE DE VERIFICAR].",
+    "Umbral de contabilización para la prueba: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Partida contabilizada o mensaje de rechazo por exceder el límite; resultado de la prueba de capacidad."
+   ],
+   "almacenamiento_bd": [
+    "partida_lineas: id, partida_id, cuenta_id, debe y haber; índice para partida_id; la inserción de las líneas y la cabecera se realiza en una transacción."
+   ]
+  },
+  {
+   "nombre": "Usuarios simultáneos",
+   "descripcion": "El sistema deberá atender al menos [PENDIENTE DE VERIFICAR] usuarios autenticados simultáneamente manteniendo los umbrales aprobados de respuesta y sin pérdida de operaciones confirmadas.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Usuarios simultáneos de prueba (cantidad)",
+    "Operaciones concurrentes de prueba (tipo y frecuencia)",
+    "Duración de prueba (tiempo)"
+   ],
+   "validacion_entradas": [
+    "La prueba debe definir la cantidad de usuarios, la mezcla de operaciones y su duración.",
+    "Los usuarios de prueba deben usar operaciones autorizadas para su función."
+   ],
+   "validacion_salidas": [
+    "El sistema debe completar las operaciones sin pérdida ni duplicación.",
+    "Los tiempos de respuesta deben cumplir los umbrales aprobados.",
+    "La cantidad de usuarios concurrentes debe ser igual o superior al mínimo definido."
+   ],
+   "secuencia": [
+    "Iniciar las sesiones de prueba en paralelo.",
+    "Ejecutar la mezcla de operaciones definida.",
+    "Comprobar resultados, errores y tiempos al finalizar la prueba."
+   ],
+   "situaciones_anormales": [
+    "Si se supera la capacidad acordada, registrar el número de sesiones atendidas y las operaciones fallidas.",
+    "Si una operación no concluye, informar el fallo sin presentar un resultado exitoso."
+   ],
+   "parametros": [
+    "Mínimo de usuarios simultáneos: [PENDIENTE DE VERIFICAR].",
+    "Mezcla y duración de la prueba: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Informe de usuarios atendidos, operaciones completadas, errores y tiempos de respuesta."
+   ],
+   "almacenamiento_bd": [
+    "No aplica a la estructura contable; la prueba puede registrar resultados técnicos en el repositorio de pruebas."
+   ]
+  },
+  {
+   "nombre": "Concurrencia de consultas",
+   "descripcion": "El sistema deberá completar al menos [PENDIENTE DE VERIFICAR] consultas simultáneas sin mezclar resultados entre usuarios y cumpliendo los umbrales de respuesta aprobados.",
+   "prioridad": "Media",
+   "actores": [
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Consultas simultáneas (cantidad)",
+    "Filtros independientes por usuario (cuentas, órdenes de trabajo y períodos)",
+    "Carga de datos de prueba"
+   ],
+   "validacion_entradas": [
+    "Cada consulta debe incluir filtros válidos y diferenciables.",
+    "La cantidad de consultas y la carga de datos deben estar definidas en la prueba."
+   ],
+   "validacion_salidas": [
+    "Cada usuario debe recibir exclusivamente los resultados correspondientes a sus propios filtros.",
+    "Las consultas deben cumplir los umbrales de tiempo aprobados.",
+    "El total de consultas completadas debe alcanzar el mínimo definido."
+   ],
+   "secuencia": [
+    "Iniciar las consultas en paralelo con filtros distintos.",
+    "Registrar el tiempo y los resultados de cada consulta.",
+    "Comparar resultados con los filtros enviados y verificar el mínimo de consultas completadas."
+   ],
+   "situaciones_anormales": [
+    "Si se detecta una respuesta asociada a filtros ajenos, marcar la prueba como no conforme y registrar el caso.",
+    "Si una consulta excede el umbral, registrar su tiempo y resultado."
+   ],
+   "parametros": [
+    "Mínimo de consultas simultáneas: [PENDIENTE DE VERIFICAR].",
+    "Umbral de respuesta y carga de datos: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Resultados de consultas y reporte de concurrencia, tiempos y conformidad."
+   ],
+   "almacenamiento_bd": [
+    "No aplica a tablas nuevas; las consultas utilizan tablas contables y sus índices."
+   ]
+  },
+  {
+   "nombre": "Contención en contabilizaciones concurrentes",
+   "descripcion": "El sistema deberá serializar las contabilizaciones concurrentes que afecten recursos compartidos y completar cada operación en un tiempo de espera no superior a [PENDIENTE DE VERIFICAR] segundos, sin producir registros duplicados ni resultados parciales.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Contabilizaciones concurrentes (cantidad)",
+    "Partidas válidas (datos contables)",
+    "Tiempo máximo de espera (segundos)"
+   ],
+   "validacion_entradas": [
+    "Las partidas deben ser válidas y la carga concurrente debe estar definida.",
+    "El tiempo máximo de espera debe estar aprobado para la prueba."
+   ],
+   "validacion_salidas": [
+    "Cada contabilización debe terminar con éxito o con un error explícito.",
+    "No deben aparecer duplicados ni partidas incompletas.",
+    "El tiempo de espera debe ser menor o igual al límite aprobado."
+   ],
+   "secuencia": [
+    "Enviar contabilizaciones simultáneas que utilicen recursos compartidos.",
+    "Registrar esperas, resultados y errores.",
+    "Verificar unicidad, completitud y cumplimiento del tiempo máximo."
+   ],
+   "situaciones_anormales": [
+    "Ante un bloqueo que exceda el límite, cancelar la operación no confirmada, revertir sus cambios parciales y registrar el error.",
+    "Ante una condición de interbloqueo, abortar y revertir una operación participante, informar el resultado y permitir que se reintente."
+   ],
+   "parametros": [
+    "Tiempo máximo de espera por bloqueo: [PENDIENTE DE VERIFICAR] segundos.",
+    "Cantidad y patrón de contabilizaciones concurrentes: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Resultado de cada contabilización y registro de esperas, cancelaciones y errores de concurrencia."
+   ],
+   "almacenamiento_bd": [
+    "partidas y partida_lineas: claves primarias y foráneas, restricciones de unicidad y transacción atómica por partida; las operaciones concurrentes deben respetar el aislamiento requerido para evitar escrituras parciales."
+   ]
+  },
+  {
+   "nombre": "Escalabilidad del almacenamiento contable",
+   "descripcion": "El sistema deberá conservar y consultar los registros contables de al menos [PENDIENTE DE VERIFICAR] ejercicios y [PENDIENTE DE VERIFICAR] movimientos, manteniendo la integridad de los datos y los umbrales aprobados de consulta.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Cantidad de ejercicios (cantidad)",
+    "Cantidad de partidas y líneas (cantidad)",
+    "Distribución de movimientos por período (cantidad)"
+   ],
+   "validacion_entradas": [
+    "La prueba debe definir los ejercicios, el número de partidas y líneas, y su distribución temporal.",
+    "Los datos deben ser válidos y preservar las relaciones entre registros contables."
+   ],
+   "validacion_salidas": [
+    "Todos los registros cargados deben permanecer recuperables y completos.",
+    "Las consultas representativas deben cumplir los umbrales aprobados.",
+    "Los conteos y totales deben coincidir con los datos cargados."
+   ],
+   "secuencia": [
+    "Cargar el volumen de prueba distribuido en los ejercicios acordados.",
+    "Ejecutar consultas históricas y de períodos recientes.",
+    "Verificar integridad, conteos, totales y tiempos de consulta."
+   ],
+   "situaciones_anormales": [
+    "Si el volumen objetivo no puede conservarse o consultarse, registrar la capacidad alcanzada y marcar la prueba como no conforme.",
+    "Si los conteos o totales difieren, informar la discrepancia y no declarar la prueba satisfactoria."
+   ],
+   "parametros": [
+    "Cantidad mínima de ejercicios: [PENDIENTE DE VERIFICAR].",
+    "Cantidad mínima de movimientos: [PENDIENTE DE VERIFICAR].",
+    "Umbrales de consulta y distribución de datos: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Informe de capacidad de almacenamiento, integridad y rendimiento de consultas históricas."
+   ],
+   "almacenamiento_bd": [
+    "partidas, partida_lineas, cuentas, ordenes_trabajo y costos_orden_trabajo: claves primarias y foráneas, índices por fecha, ejercicio, cuenta_id y orden_trabajo_id; consultas históricas deben poder filtrarse sin eliminar registros contables."
+   ]
+  }
+ ],
+ "vacios": [
+  "Los manuales no especifican umbrales de tiempo de respuesta, contabilización, consultas, generación de reportes ni exportaciones; deben definirse y verificarse.",
+  "Los manuales no especifican el volumen anual de partidas, el máximo de líneas por partida, la cantidad de usuarios o consultas simultáneas ni los patrones de carga de prueba; deben definirse y verificarse.",
+  "Los manuales no especifican tiempos máximos de espera por bloqueos, duración de pruebas de concurrencia, cantidad de ejercicios ni volumen histórico de movimientos; deben definirse y verificarse."
+ ]
+}

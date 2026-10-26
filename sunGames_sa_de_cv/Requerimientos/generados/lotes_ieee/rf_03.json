@@ -1,0 +1,271 @@
+{
+ "requerimientos": [
+  {
+   "nombre": "Configuración de datos de la empresa",
+   "descripcion": "El sistema deberá guardar los datos de identificación contable de SunGames para mostrarlos en los libros y reportes generados.",
+   "prioridad": "Media",
+   "actores": [
+    "Administrador",
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, portada y sección 5.1 Libros y registros contables; los datos identificativos adicionales son [PENDIENTE DE VERIFICAR].",
+   "entradas": [
+    "razon_social (texto, máx. 200 caracteres)",
+    "identificador_fiscal (texto, formato [PENDIENTE DE VERIFICAR])",
+    "domicilio (texto, máx. 500 caracteres)",
+    "datos_contacto (texto, máx. 250 caracteres)"
+   ],
+   "validacion_entradas": [
+    "La razón social es obligatoria y debe corresponder a SunGames, S.A. de C.V.",
+    "El formato y la obligatoriedad del identificador fiscal son [PENDIENTE DE VERIFICAR].",
+    "La obligatoriedad del domicilio y los datos de contacto es [PENDIENTE DE VERIFICAR].",
+    "Solo el Administrador o el Contador pueden guardar cambios."
+   ],
+   "validacion_salidas": [
+    "La información guardada se muestra sin alteraciones en las pantallas y reportes que la utilicen.",
+    "Una actualización no crea registros duplicados de la empresa."
+   ],
+   "secuencia": [
+    "El actor autorizado abre los datos de la empresa.",
+    "El sistema presenta los valores actuales.",
+    "El actor modifica los campos permitidos y solicita guardar.",
+    "El sistema valida los campos y guarda los cambios."
+   ],
+   "situaciones_anormales": [
+    "Si falta la razón social, el sistema rechaza el guardado y muestra: «La razón social es obligatoria».",
+    "Si el identificador fiscal no cumple el formato configurado, el sistema rechaza el guardado y muestra: «El identificador fiscal no tiene un formato válido».",
+    "Si ocurre un error de almacenamiento, el sistema revierte la operación y muestra: «No fue posible guardar los datos de la empresa»."
+   ],
+   "parametros": [
+    "Formato de identificador fiscal: [PENDIENTE DE VERIFICAR].",
+    "Campos adicionales requeridos para la entidad: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Datos de empresa guardados y disponibles para los documentos del sistema.",
+    "Mensaje de confirmación o de validación."
+   ],
+   "almacenamiento_bd": [
+    "empresa: id (entero, PK), razon_social (texto, no nulo), identificador_fiscal (texto, nullable, unicidad por confirmar), domicilio (texto, nullable), datos_contacto (texto, nullable), updated_at (fecha_hora).",
+    "La actualización de los campos se realiza en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Configuración de moneda contable",
+   "descripcion": "El sistema deberá permitir configurar la moneda de presentación contable y conservar la moneda informada en cada registro de operaciones de plataforma.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Política 6, conciliación por período y moneda; Modelo_de_Negocio_SunGames.docx, Fuentes de ingresos y venta internacional mediante Steam.",
+   "entradas": [
+    "moneda_presentacion (código de moneda, formato ISO 4217)",
+    "moneda_operacion (código de moneda, formato ISO 4217)"
+   ],
+   "validacion_entradas": [
+    "La moneda de presentación es obligatoria y debe tener un código válido.",
+    "La moneda de operación debe conservarse para cada importe proveniente de reportes de plataforma.",
+    "La moneda funcional o de presentación aplicable a SunGames es [PENDIENTE DE VERIFICAR].",
+    "No se admite conversión monetaria automática sin una fuente y una regla de tipo de cambio aprobadas."
+   ],
+   "validacion_salidas": [
+    "Cada importe mostrado conserva la moneda asociada a su registro.",
+    "Los totales solo se suman cuando corresponden a la misma moneda; de lo contrario, el sistema los separa."
+   ],
+   "secuencia": [
+    "El actor autorizado selecciona la moneda de presentación.",
+    "El sistema valida el código y guarda la configuración.",
+    "Al registrar información de plataforma, el sistema conserva la moneda reportada en cada operación.",
+    "En consultas y conciliaciones, el sistema agrupa los importes por moneda."
+   ],
+   "situaciones_anormales": [
+    "Si el código de moneda no es válido, el sistema rechaza el cambio y muestra: «Código de moneda no válido».",
+    "Si se solicita sumar importes de monedas distintas sin conversión aprobada, el sistema bloquea el total y muestra: «No se pueden sumar importes de monedas distintas»."
+   ],
+   "parametros": [
+    "Moneda de presentación contable: [PENDIENTE DE VERIFICAR].",
+    "Fuente, fecha y método de tipo de cambio para conversión: [PENDIENTE DE VERIFICAR]; conversión automática deshabilitada mientras no se definan."
+   ],
+   "salidas": [
+    "Configuración de moneda de presentación.",
+    "Importes y totales separados por código de moneda."
+   ],
+   "almacenamiento_bd": [
+    "configuracion_contable: id (entero, PK), moneda_presentacion (texto, longitud 3, no nulo), updated_at (fecha_hora).",
+    "operaciones_moneda: id (entero, PK), registro_origen_id (entero), moneda (texto, longitud 3, no nulo), importe (decimal(18,6), no nulo).",
+    "Índice en operaciones_moneda(registro_origen_id, moneda); moneda_presentacion debe cumplir unicidad por configuración activa."
+   ]
+  },
+  {
+   "nombre": "Configuración de parámetros fiscales",
+   "descripcion": "El sistema deberá almacenar parámetros fiscales con vigencia para aplicarlos a cálculos contables únicamente después de que el Contador confirme sus valores.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador",
+    "Administrador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuentas 1106, 1107, 2103, 2104, 2107 y 4502; sección Sobre el cierre contable; Política 8 y Política 9. Modelo_de_Negocio_SunGames.docx, Socios Clave y base legal y marco de cumplimiento.",
+   "entradas": [
+    "tipo_parametro_fiscal (texto: IVA, retención, impuesto sobre la renta, depreciación fiscal u otro)",
+    "valor (decimal)",
+    "unidad (texto: porcentaje, importe o regla)",
+    "vigencia_desde (date)",
+    "vigencia_hasta (date, nullable)",
+    "referencia_documental (texto, máx. 500 caracteres)"
+   ],
+   "validacion_entradas": [
+    "El tipo, valor, unidad y vigencia_desde son obligatorios.",
+    "El valor debe ser no negativo y compatible con la unidad seleccionada.",
+    "La vigencia_hasta, si se informa, debe ser igual o posterior a vigencia_desde.",
+    "No se activan valores fiscales cuya vigencia o aplicación no haya confirmado el Contador.",
+    "El 10% de retención por servicios profesionales a personas naturales y el límite anual de amortización fiscal mencionado en los manuales se registran como referencias sujetas a verificación antes de su aplicación."
+   ],
+   "validacion_salidas": [
+    "Para una fecha dada, el sistema selecciona como máximo un parámetro activo por tipo y unidad.",
+    "El historial conserva el valor, la referencia documental, el responsable y el período de vigencia de cada versión.",
+    "Los parámetros no confirmados no se aplican a cálculos ni generan asientos."
+   ],
+   "secuencia": [
+    "El Contador registra un parámetro y su referencia documental.",
+    "El sistema valida valor, unidad y fechas de vigencia.",
+    "El Contador confirma el parámetro para su aplicación.",
+    "El sistema conserva la versión y la usa solo en operaciones cuya fecha esté dentro de su vigencia."
+   ],
+   "situaciones_anormales": [
+    "Si hay dos parámetros activos del mismo tipo y unidad para una fecha, el sistema bloquea su aplicación y muestra: «Existe más de un parámetro fiscal vigente para este tipo».",
+    "Si el parámetro no está confirmado, el sistema no lo aplica y muestra: «El parámetro fiscal requiere confirmación del Contador».",
+    "Si falta la referencia o no se ha verificado la vigencia aplicable, el sistema conserva el parámetro como pendiente y muestra: «Parámetro fiscal pendiente de verificación»."
+   ],
+   "parametros": [
+    "Porcentaje de retención reportado por los manuales: 10%, sujeto a confirmación de vigencia y aplicación.",
+    "Límite anual de amortización fiscal reportado por el manual: 25%, sujeto a verificación antes de aplicarse.",
+    "Tasas y reglas vigentes de IVA, impuesto sobre la renta y depreciación fiscal: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Parámetros fiscales versionados por tipo y período de vigencia.",
+    "Avisos de parámetros pendientes de confirmación o verificación."
+   ],
+   "almacenamiento_bd": [
+    "parametros_fiscales: id (entero, PK), tipo_parametro (texto, no nulo), valor (decimal(18,6), no nulo), unidad (texto, no nulo), vigencia_desde (date, no nulo), vigencia_hasta (date, nullable), referencia_documental (texto, no nulo), estado (texto: pendiente, confirmado o vencido), confirmado_por (entero, FK a usuarios, nullable), created_at (fecha_hora).",
+    "Índice por tipo_parametro, unidad, vigencia_desde y vigencia_hasta; se impide la superposición de vigencias confirmadas del mismo tipo y unidad.",
+    "El alta o confirmación se registra en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Control de apertura y cierre de períodos",
+   "descripcion": "El sistema deberá controlar la apertura y el cierre de los períodos mensuales y anuales del ejercicio contable, bloqueando nuevos registros en períodos cerrados.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador",
+    "Administrador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, sección Sobre el cierre contable; sección 5.1 Libros y registros contables.",
+   "entradas": [
+    "fecha_inicio_ejercicio (date)",
+    "fecha_fin_ejercicio (date)",
+    "tipo_periodo (texto: mensual o anual)",
+    "fecha_inicio_periodo (date)",
+    "fecha_fin_periodo (date)",
+    "accion_periodo (texto: abrir o cerrar)"
+   ],
+   "validacion_entradas": [
+    "Las fechas de inicio y fin son obligatorias y la fecha final no puede ser anterior a la inicial.",
+    "Los períodos mensuales deben estar contenidos en un ejercicio y no pueden solaparse con otro período del mismo tipo.",
+    "La duración y las fechas exactas del ejercicio de SunGames son [PENDIENTE DE VERIFICAR].",
+    "Solo el Contador o el Administrador pueden cambiar el estado del período.",
+    "El cierre mensual requiere confirmar el cumplimiento del orden de cierre documentado: registro de operaciones, depreciación y amortización, traslado de costos, conciliaciones, liquidación de IVA y balance de comprobación."
+   ],
+   "validacion_salidas": [
+    "Cada fecha contable pertenece a un único período aplicable.",
+    "Un período cerrado no admite altas ni modificaciones de operaciones contables con fecha dentro de ese período.",
+    "El sistema conserva el estado y la fecha de apertura o cierre."
+   ],
+   "secuencia": [
+    "El actor autorizado define el ejercicio y los períodos que lo componen.",
+    "El sistema valida límites y ausencia de solapamientos.",
+    "El actor solicita abrir o cerrar un período.",
+    "Al cerrar, el sistema verifica la lista de cierre mensual aplicable y cambia el estado si está completa.",
+    "El sistema aplica el bloqueo de registros con fecha comprendida en un período cerrado."
+   ],
+   "situaciones_anormales": [
+    "Si el período se solapa con otro, el sistema rechaza la operación y muestra: «El período se solapa con un período existente».",
+    "Si se intenta registrar una operación en un período cerrado, el sistema bloquea la operación y muestra: «El período contable está cerrado».",
+    "Si faltan tareas de cierre, el sistema no cierra el período y muestra: «No se puede cerrar el período; complete las tareas pendientes» junto con la lista pendiente.",
+    "Si ocurre un error durante el cambio de estado, el sistema revierte la operación y conserva el estado anterior."
+   ],
+   "parametros": [
+    "Frecuencia mensual de cierre: respaldada por el procedimiento mensual del manual.",
+    "Fechas de inicio y fin del ejercicio, período de gracia y procedimiento de reapertura: [PENDIENTE DE VERIFICAR].",
+    "La reapertura de períodos cerrados queda deshabilitada hasta que se defina el procedimiento de autorización."
+   ],
+   "salidas": [
+    "Calendario de ejercicios y períodos con su estado.",
+    "Confirmación de apertura o cierre, o listado de validaciones pendientes."
+   ],
+   "almacenamiento_bd": [
+    "ejercicios_contables: id (entero, PK), fecha_inicio (date, no nulo), fecha_fin (date, no nulo), estado (texto: abierto o cerrado), created_at (fecha_hora), CHECK (fecha_fin >= fecha_inicio).",
+    "periodos_contables: id (entero, PK), ejercicio_id (entero, FK), tipo_periodo (texto, no nulo), fecha_inicio (date, no nulo), fecha_fin (date, no nulo), estado (texto: abierto o cerrado), cerrado_por (entero, FK a usuarios, nullable), cerrado_at (fecha_hora, nullable).",
+    "Restricción de no solapamiento de períodos del mismo tipo y ejercicio; índice por ejercicio_id, fecha_inicio y fecha_fin.",
+    "El cambio de estado y la validación del período se ejecutan en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Asignación de correlativos del libro diario",
+   "descripcion": "El sistema deberá asignar automáticamente un correlativo único a cada partida confirmada del libro diario.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, sección 5.1 Libros y registros contables, Libro diario.",
+   "entradas": [
+    "periodo_id (entero, identificador del período contable)",
+    "fecha_partida (date)",
+    "concepto (texto, máx. 250 caracteres)"
+   ],
+   "validacion_entradas": [
+    "La fecha de la partida debe pertenecer a un período contable abierto.",
+    "El concepto es obligatorio.",
+    "El correlativo lo asigna el sistema y no puede ser capturado ni alterado por el usuario.",
+    "La regla de reinicio del correlativo por ejercicio o período es [PENDIENTE DE VERIFICAR]."
+   ],
+   "validacion_salidas": [
+    "Cada partida confirmada tiene un correlativo no nulo y único dentro del ámbito de numeración configurado.",
+    "El correlativo asignado se conserva al consultar el libro diario y al identificar el documento soporte.",
+    "Una partida rechazada o revertida no produce un correlativo duplicado."
+   ],
+   "secuencia": [
+    "El Contador solicita confirmar una partida en un período abierto.",
+    "El sistema obtiene el siguiente correlativo disponible conforme a la configuración aprobada.",
+    "El sistema guarda la partida y su correlativo dentro de una transacción atómica.",
+    "El sistema presenta el correlativo asignado."
+   ],
+   "situaciones_anormales": [
+    "Si el período está cerrado, el sistema no asigna correlativo y muestra: «El período contable está cerrado».",
+    "Si ocurre una colisión por concurrencia, el sistema reintenta la asignación sin duplicar el número o revierte el guardado y muestra: «No fue posible asignar el correlativo; intente nuevamente».",
+    "Si falla el guardado de la partida, el sistema revierte el registro y la reserva del correlativo."
+   ],
+   "parametros": [
+    "Secuencia correlativa sin duplicados: requerida por el libro diario.",
+    "Ámbito de unicidad, formato, prefijo y reinicio de la secuencia: [PENDIENTE DE VERIFICAR].",
+    "El sistema no reutiliza un correlativo ya asignado."
+   ],
+   "salidas": [
+    "Partida del libro diario con correlativo automático.",
+    "Mensaje de confirmación o de error de asignación."
+   ],
+   "almacenamiento_bd": [
+    "partidas_diario: id (entero, PK), periodo_id (entero, FK a periodos_contables), correlativo (entero, no nulo), fecha_partida (date, no nulo), concepto (texto, no nulo), estado (texto), created_at (fecha_hora).",
+    "Restricción UNIQUE sobre correlativo conforme al ámbito de numeración aprobado; clave foránea periodo_id.",
+    "contador_correlativos: id (entero, PK), ambito (texto, no nulo), siguiente_valor (entero, no nulo), version (entero, no nulo).",
+    "La reserva del correlativo y el guardado de la partida se realizan en una transacción atómica con control de concurrencia."
+   ]
+  }
+ ],
+ "vacios": [
+  "No se especifican en los manuales los datos identificativos completos de la empresa, incluido el identificador fiscal, domicilio y datos de contacto, ni sus formatos y obligatoriedad.",
+  "No se establece la moneda funcional o de presentación contable de SunGames ni un método aprobado de conversión monetaria.",
+  "Las tasas y reglas fiscales vigentes de IVA, impuesto sobre la renta y depreciación fiscal deben verificarse antes de configurar su aplicación; los manuales mencionan valores y referencias que requieren confirmación de vigencia.",
+  "No se precisan las fechas de inicio y fin del ejercicio contable, la política de reapertura de períodos cerrados ni el período de gracia.",
+  "No se define el ámbito, formato ni regla de reinicio de los correlativos del libro diario."
+ ]
+}

@@ -1,0 +1,432 @@
+{
+ "requerimientos": [
+  {
+   "nombre": "Apertura de orden de trabajo",
+   "descripcion": "El sistema deberá abrir una orden de trabajo vinculada a un videojuego para acumular y consultar sus costos de desarrollo.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos",
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuenta 1204 y glosario «Orden de trabajo»; Modelo_de_Negocio_SunGames.docx, cada videojuego como unidad de negocio",
+   "entradas": [
+    "código_orden (texto, formato definido por el sistema)",
+    "videojuego (texto, identificador o nombre del título)",
+    "fecha_apertura (date, AAAA-MM-DD)",
+    "responsable (identificador de usuario)",
+    "documento_soporte (texto, referencia opcional)"
+   ],
+   "validacion_entradas": [
+    "El código de orden, el videojuego y la fecha de apertura son obligatorios.",
+    "El código de orden no puede estar previamente registrado.",
+    "El videojuego debe existir en el registro de títulos de SunGames.",
+    "El usuario debe tener permiso de contador o contador de costos."
+   ],
+   "validacion_salidas": [
+    "La orden creada queda asociada a un único videojuego y comienza en estado abierta.",
+    "La orden puede recibir costos únicamente mientras permanezca abierta."
+   ],
+   "secuencia": [
+    "El actor ingresa los datos de la orden.",
+    "El sistema valida obligatoriedad, unicidad, existencia del videojuego y permiso.",
+    "El sistema registra la orden abierta y confirma su código."
+   ],
+   "situaciones_anormales": [
+    "Código duplicado: «No se pudo abrir la orden: el código ya existe.»",
+    "Videojuego inexistente: «No se pudo abrir la orden: el videojuego no está registrado.»",
+    "Usuario sin permiso: «Acceso denegado: no tiene permiso para abrir órdenes de trabajo.»",
+    "Falla al guardar: revierte la operación y muestra «No se pudo abrir la orden; no se guardaron cambios.»"
+   ],
+   "parametros": [
+    "Formato del código de orden: [PENDIENTE DE VERIFICAR].",
+    "No se establece un máximo de órdenes por videojuego en las fuentes."
+   ],
+   "salidas": [
+    "Confirmación de apertura con código, videojuego, fecha y estado de la orden."
+   ],
+   "almacenamiento_bd": [
+    "ordenes_trabajo: id (clave primaria), codigo (texto, único), videojuego_id (texto, no nulo, FK a videojuegos), fecha_apertura (date, no nulo), responsable_id (texto, FK a usuarios), estado (texto, no nulo; valores abierta/cerrada), documento_soporte (texto, nullable), created_at (timestamp).",
+    "Índice por videojuego_id y estado.",
+    "Alta de la orden en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Asignación de mano de obra directa",
+   "descripcion": "El sistema deberá asociar a una orden abierta los costos de mano de obra directa de desarrollo respaldados por la planilla.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos",
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuenta 4101 «Mano de obra directa de desarrollo»; Modelo_de_Negocio_SunGames.docx, estructura de costos por título",
+   "entradas": [
+    "orden_id (identificador, FK)",
+    "periodo (date, mes contable AAAA-MM)",
+    "importe (decimal, moneda contable configurada)",
+    "referencia_planilla (texto)",
+    "documento_soporte (texto, referencia al archivo o expediente)"
+   ],
+   "validacion_entradas": [
+    "La orden debe existir y estar abierta.",
+    "El período debe estar disponible para registro contable.",
+    "El importe debe ser mayor que cero y usar la precisión de la moneda contable.",
+    "La referencia de planilla y el documento soporte son obligatorios.",
+    "El costo debe corresponder a trabajo directo de desarrollo del videojuego de la orden."
+   ],
+   "validacion_salidas": [
+    "El importe asignado se identifica como mano de obra directa y se acumula una sola vez en la orden.",
+    "El total de mano de obra directa de la orden coincide con la suma de sus asignaciones válidas."
+   ],
+   "secuencia": [
+    "El actor selecciona la orden y captura el período, importe y referencias de soporte.",
+    "El sistema valida el estado de la orden, el período, el importe y la documentación.",
+    "El sistema registra la asignación como costo directo asociado a 4101 y actualiza el acumulado de la orden."
+   ],
+   "situaciones_anormales": [
+    "Orden cerrada o inexistente: «No se asignó el costo: la orden no existe o no está abierta.»",
+    "Período no disponible: «No se asignó el costo: el período no está habilitado para registro.»",
+    "Importe no positivo: «No se asignó el costo: el importe debe ser mayor que cero.»",
+    "Falta la referencia de planilla: «No se asignó el costo: indique la planilla soporte.»",
+    "Falla al guardar: revierte la asignación y muestra «No se guardaron cambios en la orden.»"
+   ],
+   "parametros": [
+    "Precisión monetaria: la definida para la moneda contable.",
+    "No se define en las fuentes una tarifa por hora ni una fórmula de conversión de horas a costo; se registra el importe respaldado por planilla."
+   ],
+   "salidas": [
+    "Detalle de mano de obra directa asociado a la orden y acumulado actualizado."
+   ],
+   "almacenamiento_bd": [
+    "costos_orden: id (clave primaria), orden_id (identificador, no nulo, FK a ordenes_trabajo), tipo_costo (texto, no nulo), periodo (date, no nulo), importe (decimal(14,2), no nulo, CHECK importe > 0), cuenta_codigo (texto, no nulo, referencia a cuentas del catálogo), referencia_origen (texto, no nulo), documento_soporte (texto, no nulo), created_at (timestamp).",
+    "Para mano de obra directa, tipo_costo = mano_obra_directa y cuenta_codigo = 4101.",
+    "Índices por orden_id, periodo y tipo_costo; inserción atómica con actualización del acumulado."
+   ]
+  },
+  {
+   "nombre": "Asignación de costos de servicios directos",
+   "descripcion": "El sistema deberá asociar a una orden abierta los costos documentados de servicios profesionales contratados específicamente para el videojuego.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos",
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuentas 4102 y 2101; Política 8 «Servicios Profesionales contratados a terceros»; Modelo_de_Negocio_SunGames.docx, socios clave y estructura de costos",
+   "entradas": [
+    "orden_id (identificador, FK)",
+    "periodo (date, mes contable AAAA-MM)",
+    "importe_del_costo (decimal, moneda contable configurada)",
+    "proveedor_id (identificador, referencia al proveedor)",
+    "referencia_documento (texto)",
+    "documento_soporte (texto, referencia al contrato o documento tributario)"
+   ],
+   "validacion_entradas": [
+    "La orden debe existir y estar abierta.",
+    "El proveedor debe estar registrado y el documento soporte debe identificar el servicio y el videojuego.",
+    "El servicio debe corresponder directamente al desarrollo de ese título; los servicios administrativos no son elegibles para esta asignación.",
+    "El importe debe ser mayor que cero y el período debe estar habilitado.",
+    "Las retenciones, el IVA y el saldo por pagar se toman del registro de compras correspondiente; no se duplican mediante esta asignación."
+   ],
+   "validacion_salidas": [
+    "El importe asociado a la orden coincide con el costo directo documentado del servicio, sin volver a sumar retenciones o impuestos registrados en el módulo de compras.",
+    "El costo se identifica para su acumulación por título en la cuenta 4102 o, según la política contable aprobada, en el tratamiento aplicable."
+   ],
+   "secuencia": [
+    "El actor selecciona la orden y el servicio documentado del proveedor.",
+    "El sistema valida proveedor, soporte, período, importe y correspondencia con el título.",
+    "El sistema asocia el costo a la orden y conserva la referencia al registro de compras, si existe."
+   ],
+   "situaciones_anormales": [
+    "Orden no abierta: «No se asignó el costo: la orden no existe o no está abierta.»",
+    "Proveedor o soporte inexistente: «No se asignó el costo: verifique el proveedor y el documento del servicio.»",
+    "Servicio administrativo: «No se asignó el costo: los honorarios administrativos no corresponden a costos directos de desarrollo.»",
+    "Costo ya asociado al mismo documento: «No se asignó el costo: el documento ya está asociado a esta orden.»",
+    "Falla al guardar: revierte la asociación y muestra «No se guardaron cambios en la orden.»"
+   ],
+   "parametros": [
+    "Precisión monetaria: la definida para la moneda contable.",
+    "La decisión de capitalizar o llevar a gasto depende de la política contable aplicable y aprobada; no se fija un valor predeterminado."
+   ],
+   "salidas": [
+    "Costo de servicio directo vinculado a la orden, con proveedor y referencia documental."
+   ],
+   "almacenamiento_bd": [
+    "costos_orden: id (clave primaria), orden_id (identificador, no nulo, FK a ordenes_trabajo), tipo_costo (texto, no nulo), periodo (date, no nulo), importe (decimal(14,2), no nulo, CHECK importe > 0), cuenta_codigo (texto, referencia a cuentas del catálogo), proveedor_id (identificador, FK a proveedores), referencia_origen (texto, no nulo), documento_soporte (texto, no nulo), created_at (timestamp).",
+    "Para servicios directos registrados como costo, tipo_costo = servicio_directo y cuenta_codigo = 4102; la referencia de origen debe ser única por orden para prevenir duplicados.",
+    "Índices por orden_id, proveedor_id y periodo; asociación transaccional."
+   ]
+  },
+  {
+   "nombre": "Asignación de materiales a órdenes",
+   "descripcion": "El sistema deberá permitir asociar a una orden abierta el costo documentado de materiales únicamente cuando exista una política aprobada que defina su clasificación y origen contable.",
+   "prioridad": "Media",
+   "actores": [
+    "Contador de costos",
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Política 5 «Inexistencia de método de inventarios de mercancías» y cuentas 4101 a 4103; [PENDIENTE DE VERIFICAR: tratamiento de materiales de desarrollo]",
+   "entradas": [
+    "orden_id (identificador, FK)",
+    "material_id (identificador, referencia a inventario físico, si aplica)",
+    "fecha (date, AAAA-MM-DD)",
+    "cantidad (decimal, unidad de medida pendiente de definir)",
+    "costo_asignado (decimal, moneda contable configurada)",
+    "documento_soporte (texto, referencia)",
+    "politica_clasificacion (identificador de política aprobada)"
+   ],
+   "validacion_entradas": [
+    "La orden debe existir y estar abierta.",
+    "El registro solo se habilita si hay una política aprobada que determine que el material es un costo del desarrollo y establezca su tratamiento contable.",
+    "Si el material procede de inventario físico, debe existir y tener cantidad disponible conforme al registro de inventario.",
+    "La cantidad y el costo deben ser mayores que cero; el documento soporte es obligatorio.",
+    "Las licencias digitales no se registran como existencias de mercancías."
+   ],
+   "validacion_salidas": [
+    "El costo asociado no supera el costo documentado de la salida del material.",
+    "La asignación queda identificada separadamente de la mano de obra y los servicios directos.",
+    "El sistema no crea ni presume una cuenta contable para materiales de desarrollo sin una clasificación aprobada."
+   ],
+   "secuencia": [
+    "El actor selecciona la orden y el material documentado.",
+    "El sistema comprueba que exista una política de clasificación aprobada y, si corresponde, valida la salida del inventario físico.",
+    "El sistema registra la asociación y su documento soporte o bloquea la operación si falta la definición contable."
+   ],
+   "situaciones_anormales": [
+    "Sin política aprobada: «No se asignó el material: falta aprobar su clasificación y tratamiento contable.»",
+    "Material no disponible en inventario físico: «No se asignó el material: la cantidad solicitada no está disponible.»",
+    "Orden no abierta: «No se asignó el material: la orden no existe o no está abierta.»",
+    "Intento de registrar una licencia digital como mercancía: «No se asignó el material: las licencias digitales no se controlan como inventario de mercancías.»",
+    "Falla al guardar: revierte la asociación y muestra «No se guardaron cambios en la orden.»"
+   ],
+   "parametros": [
+    "Unidad de medida, método de valoración y cuenta contable para materiales de desarrollo: [PENDIENTE DE VERIFICAR].",
+    "No se establece valor por defecto para la clasificación de materiales."
+   ],
+   "salidas": [
+    "Asociación de costo de material a la orden, únicamente si se encuentra habilitada por una política aprobada; de lo contrario, mensaje de bloqueo."
+   ],
+   "almacenamiento_bd": [
+    "materiales_orden: id (clave primaria), orden_id (identificador, no nulo, FK a ordenes_trabajo), material_id (identificador, nullable, FK a inventario_items), fecha (date, no nulo), cantidad (decimal(14,4), no nulo, CHECK cantidad > 0), costo_asignado (decimal(14,2), no nulo, CHECK costo_asignado > 0), politica_clasificacion_id (identificador, no nulo, FK a politicas_contables), documento_soporte (texto, no nulo), created_at (timestamp).",
+    "La inserción queda condicionada a la existencia y vigencia de la política aprobada; transacción atómica con la salida de inventario cuando corresponda.",
+    "La cuenta contable de materiales queda pendiente de definición y no se infiere del catálogo existente."
+   ]
+  },
+  {
+   "nombre": "Aplicación de costos indirectos",
+   "descripcion": "El sistema deberá distribuir los costos indirectos de desarrollo documentados entre las órdenes elegibles mediante una base y una tasa aprobadas por SunGames.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos",
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuenta 4103 «Costos indirectos de desarrollo» y Política 9 sobre equipo usado directamente en producción; Modelo_de_Negocio_SunGames.docx, costos por título",
+   "entradas": [
+    "periodo (date, mes contable AAAA-MM)",
+    "costo_indirecto_id (identificador, referencia al costo documentado)",
+    "ordenes_elegibles (lista de identificadores de órdenes abiertas)",
+    "base_asignacion (tipo y valor decimal, conforme a política aprobada)",
+    "tasa_asignacion (decimal, conforme a política aprobada)",
+    "politica_asignacion_id (identificador de política aprobada)"
+   ],
+   "validacion_entradas": [
+    "El período debe estar habilitado y las órdenes seleccionadas deben existir y estar abiertas.",
+    "El costo indirecto debe tener documento soporte y corresponder a desarrollo; los gastos administrativos no se asignan como costos indirectos de desarrollo sin respaldo aprobado.",
+    "La base, la tasa y la regla de distribución deben estar configuradas y aprobadas antes de ejecutar la aplicación.",
+    "El mismo costo indirecto no puede aplicarse dos veces a una orden para el mismo período."
+   ],
+   "validacion_salidas": [
+    "Para cada orden, costo aplicado = base de asignación de la orden × tasa aprobada, conforme a la unidad y regla de redondeo configuradas.",
+    "La suma de los importes distribuidos coincide con el importe distribuible del costo indirecto, considerando únicamente el redondeo definido por la política.",
+    "Los importes se identifican con la cuenta 4103 y con el período y orden correspondientes."
+   ],
+   "secuencia": [
+    "El actor selecciona el período, el costo indirecto, las órdenes elegibles y la política aprobada.",
+    "El sistema valida soportes, órdenes y configuración de base y tasa.",
+    "El sistema calcula la distribución conforme a la política y presenta el detalle para confirmación.",
+    "Al confirmar, el sistema registra las asignaciones a las órdenes."
+   ],
+   "situaciones_anormales": [
+    "Falta política, base o tasa aprobada: «No se aplicaron costos indirectos: configure y apruebe la base y la tasa de asignación.»",
+    "Importe distribuido distinto del importe distribuible: «No se aplicaron costos indirectos: la distribución no concilia con el costo seleccionado.»",
+    "Aplicación duplicada: «No se aplicaron costos indirectos: el costo ya fue distribuido a una o más órdenes.»",
+    "Falla al guardar: revierte todas las asignaciones de la ejecución y muestra «No se aplicaron costos indirectos; no se guardaron cambios.»"
+   ],
+   "parametros": [
+    "Base de asignación, tasa, alcance de costos distribuibles y regla de redondeo: [PENDIENTE DE VERIFICAR].",
+    "No se establece una base ni una tasa predeterminada en los manuales."
+   ],
+   "salidas": [
+    "Detalle de costos indirectos distribuidos por orden y período, con base, tasa e importe calculado."
+   ],
+   "almacenamiento_bd": [
+    "aplicaciones_indirectos: id (clave primaria), costo_indirecto_id (identificador, no nulo), periodo (date, no nulo), politica_asignacion_id (identificador, no nulo, FK a politicas_contables), estado (texto, no nulo).",
+    "aplicaciones_indirectos_detalle: id (clave primaria), aplicacion_id (identificador, no nulo, FK a aplicaciones_indirectos), orden_id (identificador, no nulo, FK a ordenes_trabajo), base_importe (decimal(14,2), no nulo), tasa (decimal(9,6), no nulo), importe_aplicado (decimal(14,2), no nulo), cuenta_codigo (texto, no nulo, valor 4103).",
+    "Restricción única por costo_indirecto_id, periodo y orden_id; índices por periodo y orden_id; ejecución completa en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Cierre de orden de trabajo",
+   "descripcion": "El sistema deberá cerrar una orden de trabajo cuando el contador confirme que terminó la acumulación de costos del videojuego y que sus asignaciones están respaldadas.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos",
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, procedimiento mensual de traslado de costos 4101 a 4103 a 1204 y cuenta 1205; Modelo_de_Negocio_SunGames.docx, producción y lanzamiento por título",
+   "entradas": [
+    "orden_id (identificador, FK)",
+    "fecha_cierre (date, AAAA-MM-DD)",
+    "confirmacion_cierre (boolean)",
+    "referencia_lanzamiento (texto, opcional, referencia al registro de lanzamiento)"
+   ],
+   "validacion_entradas": [
+    "La orden debe existir y estar abierta.",
+    "La fecha de cierre debe pertenecer a un período habilitado.",
+    "No deben existir asignaciones sin soporte ni aplicaciones de costos indirectos incompletas.",
+    "La confirmación del contador es obligatoria.",
+    "El lanzamiento del juego se valida con su registro correspondiente si se solicita el traslado de videojuegos en desarrollo a videojuegos terminados."
+   ],
+   "validacion_salidas": [
+    "Una orden cerrada no admite nuevas asignaciones de costos.",
+    "El cierre conserva el detalle y total acumulado por categoría.",
+    "El cierre de la orden no cambia por sí solo el tratamiento contable de los costos; los traslados a 1204 o 1205 dependen de la política contable aprobada."
+   ],
+   "secuencia": [
+    "El actor solicita el cierre e ingresa fecha y confirmación.",
+    "El sistema valida orden, período, soportes y estado de las asignaciones.",
+    "El sistema presenta el total acumulado para revisión.",
+    "Al confirmar, el sistema cambia el estado de la orden a cerrada y registra fecha y usuario."
+   ],
+   "situaciones_anormales": [
+    "Orden inexistente o ya cerrada: «No se cerró la orden: no existe o ya está cerrada.»",
+    "Asignaciones incompletas: «No se cerró la orden: revise los costos sin soporte o las aplicaciones indirectas incompletas.»",
+    "Período no habilitado: «No se cerró la orden: el período no está habilitado.»",
+    "Falta confirmación: «No se cerró la orden: confirme el cierre para continuar.»",
+    "Falla al guardar: revierte el cambio de estado y muestra «No se cerró la orden; no se guardaron cambios.»"
+   ],
+   "parametros": [
+    "El sistema no establece un plazo automático de cierre ni cierra órdenes por fecha.",
+    "El traslado contable de costos requiere la política contable aplicable aprobada."
+   ],
+   "salidas": [
+    "Orden cerrada con fecha, usuario responsable y resumen de costos acumulados."
+   ],
+   "almacenamiento_bd": [
+    "ordenes_trabajo: actualizar estado (texto) a cerrada y registrar fecha_cierre (date), usuario_cierre_id (texto, FK a usuarios) y referencia_lanzamiento (texto, nullable).",
+    "Restricción: solo transición de abierta a cerrada; conservar los registros de costos asociados sin borrado.",
+    "Cambio de estado y registro de auditoría en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Cálculo del costo total y unitario por videojuego",
+   "descripcion": "El sistema deberá calcular el costo total acumulado por videojuego y presentar el costo unitario por título, sin tratar cada licencia digital vendida como una unidad de inventario.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos",
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuentas 4101 a 4103 y cuentas 1204 y 1205; Política 5; Modelo_de_Negocio_SunGames.docx, cada videojuego como unidad de negocio y costo marginal digital casi nulo",
+   "entradas": [
+    "orden_id (identificador, FK)",
+    "fecha_corte (date, AAAA-MM-DD)",
+    "incluir_costos (lista de categorías: mano de obra directa, servicios directos, materiales habilitados e indirectos aplicados)"
+   ],
+   "validacion_entradas": [
+    "La orden debe existir y el usuario debe tener permiso de consulta de costos.",
+    "La fecha de corte no puede ser anterior a la apertura de la orden.",
+    "Solo se incluyen costos válidos y no duplicados asociados a la orden hasta la fecha de corte.",
+    "Los materiales solo se incluyen si su clasificación está aprobada."
+   ],
+   "validacion_salidas": [
+    "Costo total del título = suma de mano de obra directa + servicios directos + materiales habilitados + costos indirectos aplicados, según las categorías efectivamente registradas.",
+    "Costo unitario por título = costo total acumulado de la orden ÷ 1 videojuego.",
+    "El informe identifica fecha de corte, categorías, total y la definición de unidad usada; no calcula costo por licencia vendida ni costo unitario de mercancías digitales."
+   ],
+   "secuencia": [
+    "El actor selecciona la orden y fecha de corte.",
+    "El sistema recupera las asignaciones válidas de costos por categoría.",
+    "El sistema suma los importes, calcula el costo unitario por título y presenta el desglose."
+   ],
+   "situaciones_anormales": [
+    "Orden inexistente: «No se calcularon los costos: la orden no existe.»",
+    "No hay costos registrados: muestra los totales en cero e informa «No hay costos registrados para la orden a la fecha seleccionada.»",
+    "Material sin clasificación aprobada: excluye ese importe y muestra «Hay materiales pendientes de clasificación; el total no los incluye.»",
+    "Falla de consulta: muestra «No se pudo calcular el costo; intente nuevamente.»"
+   ],
+   "parametros": [
+    "Fecha de corte: la seleccionada por el usuario.",
+    "Unidad de costo unitario: un videojuego (un título/orden).",
+    "Precisión y redondeo monetarios: los definidos para la moneda contable."
+   ],
+   "salidas": [
+    "Consulta desglosada por categoría con costo total acumulado y costo unitario por título."
+   ],
+   "almacenamiento_bd": [
+    "No requiere tabla de resultados persistidos: cálculo consultivo sobre costos_orden y aplicaciones_indirectos_detalle.",
+    "Si se conserva historial de consultas: consultas_costos_orden con id (clave primaria), orden_id (FK a ordenes_trabajo), fecha_corte (date), total (decimal(14,2)), unidad_calculo (texto), usuario_id (FK a usuarios), created_at (timestamp).",
+    "La consulta lee únicamente registros confirmados y utiliza una instantánea consistente de los datos."
+   ]
+  },
+  {
+   "nombre": "Integración de costos con contabilidad general",
+   "descripcion": "El sistema deberá preparar la partida contable de los costos de una orden conforme al tratamiento contable aprobado y vincularla con sus documentos y detalle de costos.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos",
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuentas 4101 a 4104, 1204, 1205, política 7 y procedimiento de cierre mensual; Modelo_de_Negocio_SunGames.docx, control de costos por título",
+   "entradas": [
+    "orden_id (identificador, FK)",
+    "periodo_contable (date, AAAA-MM)",
+    "politica_contable_id (identificador de política aprobada)",
+    "cuentas_destino (códigos del catálogo aplicables)",
+    "confirmacion_integracion (boolean)"
+   ],
+   "validacion_entradas": [
+    "La orden debe existir y tener costos confirmados y respaldados.",
+    "El período contable debe estar habilitado.",
+    "La política contable debe estar aprobada y definir si los costos internos de desarrollo se capitalizan o se reconocen como gasto.",
+    "Las cuentas deben existir y estar activas en el catálogo; los códigos 4101 a 4103 y 1204 son los indicados por el manual para el tratamiento de capitalización descrito allí.",
+    "La partida generada debe cumplir la validación de partida doble del libro diario."
+   ],
+   "validacion_salidas": [
+    "El debe y el haber de la partida preparada deben ser iguales.",
+    "Los importes por cuenta concilian con el detalle de costos de la orden y no pueden integrarse dos veces para el mismo período y orden.",
+    "Cuando la política aprobada indique capitalización, el traslado mensual reflejará los costos elegibles desde 4101 a 4103 hacia 1204; al lanzamiento, el saldo aplicable de 1204 se trasladará a 1205 según el registro de lanzamiento.",
+    "Si la política aprobada exige reconocer el desarrollo interno como gasto, el sistema no generará el traslado a 1204 ni 1205."
+   ],
+   "secuencia": [
+    "El actor selecciona orden, período y política contable aprobada.",
+    "El sistema verifica el detalle de costos, las cuentas y el estado del período.",
+    "El sistema prepara la partida con referencias a la orden y los soportes, conforme al tratamiento aprobado.",
+    "El sistema envía la partida al flujo existente del libro diario, sin duplicar su mayorización, y conserva la relación entre partida y orden."
+   ],
+   "situaciones_anormales": [
+    "Tratamiento contable no definido o sin aprobar: «No se integraron los costos: falta definir y aprobar el tratamiento contable aplicable al desarrollo interno.»",
+    "Cuenta inactiva o inexistente: «No se integraron los costos: una cuenta contable no existe o no está activa.»",
+    "Período cerrado: «No se integraron los costos: el período contable no está habilitado.»",
+    "Partida descuadrada: «No se integraron los costos: el debe y el haber no coinciden.»",
+    "Integración duplicada: «No se integraron los costos: la orden ya fue integrada para el período seleccionado.»",
+    "Falla al guardar: revierte partida y vínculo con la orden, y muestra «No se integraron los costos; no se guardaron cambios.»"
+   ],
+   "parametros": [
+    "Tratamiento contable del desarrollo interno: [PENDIENTE DE VERIFICAR] por diferencia entre las reglas de traslado del manual y la Política 7 sobre NIIF para las PYMES.",
+    "Cuentas, decimales y tolerancia de cuadre: las del catálogo y la moneda contable; tolerancia de cuadre 0.00 conforme a partida doble."
+   ],
+   "salidas": [
+    "Partida preparada para el flujo del libro diario, vinculada a la orden, con detalle de cuentas, importes y documentos soporte; o mensaje de bloqueo si falta política aprobada."
+   ],
+   "almacenamiento_bd": [
+    "integraciones_costos_contabilidad: id (clave primaria), orden_id (identificador, no nulo, FK a ordenes_trabajo), periodo_contable (date, no nulo), politica_contable_id (identificador, no nulo, FK a politicas_contables), partida_id (identificador, FK al libro diario), estado (texto, no nulo), created_at (timestamp).",
+    "Restricción única por orden_id y periodo_contable para impedir duplicados; índice por partida_id.",
+    "La creación de la partida y del vínculo se realiza en una transacción atómica; ante error se revierten ambos registros."
+   ]
+  }
+ ],
+ "vacios": [
+  "Los manuales describen los costos de mano de obra directa (4101), servicios directos (4102) y costos indirectos de desarrollo (4103), pero no definen materiales de desarrollo, una cuenta para esos materiales, una unidad de medida ni su método de valoración. Se requiere aprobación antes de habilitar su asignación a órdenes.",
+  "El manual indica trasladar costos 4101 a 4103 a videojuegos en desarrollo (1204) y luego a videojuegos terminados (1205), pero su Política 7 señala que, bajo NIIF para las PYMES, el desarrollo interno se reconoce como gasto. Debe verificarse y aprobarse el marco contable aplicable y el tratamiento que utilizará el sistema antes de integrar costos.",
+  "No se define una base, tasa ni regla de distribución para aplicar costos indirectos entre órdenes; estos parámetros deben ser aprobados antes de ejecutar la distribución.",
+  "Las fuentes no definen el cálculo de costo por licencia vendida ni el número de unidades producidas. El costo unitario especificado se limita al costo por título/orden, no al costo por copia digital."
+ ]
+}

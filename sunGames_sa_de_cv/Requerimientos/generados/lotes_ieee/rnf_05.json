@@ -1,0 +1,495 @@
+{
+ "requerimientos": [
+  {
+   "nombre": "Eficiencia en tareas contables frecuentes",
+   "descripcion": "El sistema deberá permitir que un contador complete las tareas contables frecuentes dentro de los tiempos y con el nivel de éxito establecidos para las pruebas de usabilidad.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Tarea de prueba (texto): consulta de cuenta, ingreso de partida, consulta de costos por orden y generación de reporte.",
+    "Acciones del usuario (eventos de interfaz con marca de tiempo)."
+   ],
+   "validacion_entradas": [
+    "La prueba incluye al menos 5 usuarios que desempeñen funciones contables.",
+    "Cada usuario ejecuta las mismas tareas con datos de prueba y sin asistencia del evaluador."
+   ],
+   "validacion_salidas": [
+    "Al menos el 90 % de las ejecuciones de cada tarea termina correctamente.",
+    "Cada tarea se completa en un máximo de 3 minutos, excluyendo esperas de procesamiento del sistema."
+   ],
+   "secuencia": [
+    "El evaluador presenta una tarea y sus datos de prueba.",
+    "El usuario completa la tarea mediante la interfaz.",
+    "El sistema registra el resultado y la duración.",
+    "El evaluador calcula la tasa de éxito y el tiempo por tarea."
+   ],
+   "situaciones_anormales": [
+    "Si una tarea no puede completarse, la prueba se marca como fallida y se conserva su resultado para evaluar el criterio de aceptación."
+   ],
+   "parametros": [
+    "Tasa mínima de éxito: 90 %.",
+    "Tiempo máximo por tarea: 3 minutos.",
+    "Tamaño mínimo de la muestra de prueba: 5 usuarios."
+   ],
+   "salidas": [
+    "Resultados de pruebas de usabilidad con tasa de éxito y duración por tarea."
+   ],
+   "almacenamiento_bd": [
+    "No aplica; los resultados de prueba pueden conservarse en un informe de aceptación."
+   ]
+  },
+  {
+   "nombre": "Claridad de mensajes de error",
+   "descripcion": "El sistema deberá presentar mensajes de error que identifiquen el dato afectado, la causa comprensible del rechazo y la acción necesaria para corregirlo cuando sea posible.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general",
+    "Contador de costos",
+    "Administrador"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Dato ingresado (tipo según el campo de la operación).",
+    "Resultado de validación (código interno de error)."
+   ],
+   "validacion_entradas": [
+    "Cada error mostrado corresponde a una validación fallida o a una operación no completada.",
+    "El mensaje no incluye contraseñas, datos sensibles, trazas técnicas ni detalles internos de la aplicación."
+   ],
+   "validacion_salidas": [
+    "El 100 % de los errores de validación probados identifica el campo o la operación afectados y describe cómo corregirlos, si existe una corrección aplicable.",
+    "El mensaje se presenta en español y junto al campo afectado o en una zona visible asociada a la operación."
+   ],
+   "secuencia": [
+    "El sistema detecta una condición de error.",
+    "El sistema relaciona el error con el campo o la operación correspondiente.",
+    "El sistema muestra el mensaje comprensible sin revelar información técnica interna."
+   ],
+   "situaciones_anormales": [
+    "Si ocurre un error no clasificado, el sistema muestra: «No se pudo completar la operación. Inténtelo de nuevo o contacte al administrador.» y no presenta detalles técnicos al usuario."
+   ],
+   "parametros": [
+    "Cobertura de mensajes claros para errores de validación: 100 % de los casos probados."
+   ],
+   "salidas": [
+    "Mensaje de error en español, asociado al campo u operación afectados."
+   ],
+   "almacenamiento_bd": [
+    "No aplica; los mensajes y códigos de error son elementos de presentación y configuración de la aplicación."
+   ]
+  },
+  {
+   "nombre": "Navegación uniforme entre módulos",
+   "descripcion": "El sistema deberá mantener una estructura de navegación uniforme que permita acceder a cada módulo principal desde cualquier pantalla autenticada en un máximo de 2 acciones de navegación.",
+   "prioridad": "Media",
+   "actores": [
+    "Contador general",
+    "Contador de costos",
+    "Administrador"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Pantalla actual (identificador de interfaz).",
+    "Módulo destino (opción de navegación).",
+    "Acciones de navegación (eventos de interfaz)."
+   ],
+   "validacion_entradas": [
+    "La prueba comprende todas las pantallas principales disponibles para el rol que la ejecuta.",
+    "Solo se cuentan acciones explícitas de navegación del usuario; no se cuentan autenticación ni confirmaciones requeridas por una operación."
+   ],
+   "validacion_salidas": [
+    "Cada módulo principal se alcanza desde cualquier pantalla autenticada en un máximo de 2 acciones de navegación.",
+    "El elemento de navegación del módulo activo se identifica visualmente de forma consistente."
+   ],
+   "secuencia": [
+    "El usuario inicia desde una pantalla autenticada.",
+    "El usuario selecciona el módulo principal o su acceso directo.",
+    "El sistema abre el destino y señala el módulo activo."
+   ],
+   "situaciones_anormales": [
+    "Si el destino no está disponible, el sistema conserva la pantalla actual y muestra: «No se pudo abrir esta sección. Inténtelo de nuevo.»"
+   ],
+   "parametros": [
+    "Máximo de acciones de navegación hasta un módulo principal: 2."
+   ],
+   "salidas": [
+    "Pantalla del módulo seleccionado con navegación consistente y ubicación activa identificable."
+   ],
+   "almacenamiento_bd": [
+    "No aplica; la navegación es una característica de interfaz."
+   ]
+  },
+  {
+   "nombre": "Operación completa mediante teclado",
+   "descripcion": "El sistema deberá permitir completar mediante teclado todas las acciones disponibles en las pantallas contables principales, sin requerir un dispositivo apuntador.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general",
+    "Contador de costos",
+    "Administrador"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Eventos de teclado (tecla y elemento enfocado).",
+    "Acción de interfaz (operación seleccionada)."
+   ],
+   "validacion_entradas": [
+    "La prueba recorre captura y validación de partidas, consultas del mayor, órdenes de trabajo, reportes y navegación principal.",
+    "Cada control interactivo de las pantallas probadas admite foco y activación por teclado."
+   ],
+   "validacion_salidas": [
+    "El 100 % de las acciones probadas se completa por teclado.",
+    "El foco es visible en todo momento y sigue un orden coherente con la lectura de la pantalla."
+   ],
+   "secuencia": [
+    "El usuario navega entre controles con el teclado.",
+    "El usuario ejecuta la acción del control enfocado.",
+    "El sistema actualiza el foco de forma visible y permite continuar la operación."
+   ],
+   "situaciones_anormales": [
+    "Si un control no puede activarse, el sistema conserva la información capturada, señala el control y permite continuar sin perder los datos ingresados."
+   ],
+   "parametros": [
+    "Cobertura de operación por teclado: 100 % de las acciones probadas."
+   ],
+   "salidas": [
+    "Controles accesibles por teclado y estado de foco visible."
+   ],
+   "almacenamiento_bd": [
+    "No aplica; la navegación por teclado es una característica de interfaz."
+   ]
+  },
+  {
+   "nombre": "Contraste de texto e interfaz",
+   "descripcion": "El sistema deberá presentar texto y componentes gráficos con contraste suficiente para distinguirlos de sus fondos en las pantallas contables principales.",
+   "prioridad": "Media",
+   "actores": [
+    "Contador general",
+    "Contador de costos",
+    "Administrador"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Color de texto o componente (valor de color).",
+    "Color de fondo (valor de color).",
+    "Tamaño del texto (píxeles)."
+   ],
+   "validacion_entradas": [
+    "Se evalúan las combinaciones de colores de texto, controles, estados y fondos de las pantallas principales.",
+    "Se identifican por separado el texto normal, el texto grande y los componentes gráficos esenciales."
+   ],
+   "validacion_salidas": [
+    "El texto normal alcanza una relación de contraste mínima de 4.5:1.",
+    "El texto grande y los componentes gráficos esenciales alcanzan una relación de contraste mínima de 3:1."
+   ],
+   "secuencia": [
+    "El evaluador obtiene los colores de cada elemento y su fondo.",
+    "El evaluador calcula la relación de contraste.",
+    "El resultado se compara con el mínimo correspondiente al tipo de elemento."
+   ],
+   "situaciones_anormales": [
+    "Si un elemento no alcanza el contraste mínimo, se rechaza la pantalla para aceptación y se identifica el elemento que requiere corrección."
+   ],
+   "parametros": [
+    "Contraste mínimo para texto normal: 4.5:1.",
+    "Contraste mínimo para texto grande y componentes gráficos esenciales: 3:1."
+   ],
+   "salidas": [
+    "Informe de contraste por pantalla y elemento evaluado."
+   ],
+   "almacenamiento_bd": [
+    "No aplica; el contraste corresponde a estilos de presentación de la aplicación."
+   ]
+  },
+  {
+   "nombre": "Adaptación a distintos tamaños de pantalla",
+   "descripcion": "El sistema deberá adaptar las pantallas contables principales a distintos tamaños de ventana sin ocultar controles ni exigir desplazamiento horizontal de toda la página.",
+   "prioridad": "Media",
+   "actores": [
+    "Contador general",
+    "Contador de costos",
+    "Administrador"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Ancho y alto de la ventana (píxeles).",
+    "Pantalla o módulo solicitado (identificador de interfaz)."
+   ],
+   "validacion_entradas": [
+    "La prueba comprende ventanas de 360 × 640, 768 × 1024 y 1920 × 1080 píxeles.",
+    "Se prueban formularios, tablas de consulta y reportes en pantalla."
+   ],
+   "validacion_salidas": [
+    "En los tamaños probados no se recortan controles ni etiquetas esenciales.",
+    "La página no requiere desplazamiento horizontal global; las tablas extensas pueden usar desplazamiento horizontal dentro de su propia región."
+   ],
+   "secuencia": [
+    "El evaluador abre una pantalla principal en cada tamaño de ventana definido.",
+    "El evaluador verifica controles, etiquetas, tablas y lectura del contenido.",
+    "El evaluador registra si se cumplen los criterios de adaptación."
+   ],
+   "situaciones_anormales": [
+    "Si un control o dato esencial queda oculto, la pantalla no supera la prueba y se informa la pantalla y el tamaño de ventana afectados."
+   ],
+   "parametros": [
+    "Tamaños mínimos de prueba: 360 × 640, 768 × 1024 y 1920 × 1080 píxeles."
+   ],
+   "salidas": [
+    "Pantallas adaptadas a los tamaños de ventana probados e informe de aceptación."
+   ],
+   "almacenamiento_bd": [
+    "No aplica; la adaptación corresponde a la presentación de la aplicación."
+   ]
+  },
+  {
+   "nombre": "Interfaz íntegramente en español",
+   "descripcion": "El sistema deberá presentar en español todos los textos de interfaz, mensajes, ayudas y etiquetas de reportes generados por la aplicación.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general",
+    "Contador de costos",
+    "Administrador"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Pantalla, mensaje, ayuda o reporte (contenido de interfaz generado por la aplicación)."
+   ],
+   "validacion_entradas": [
+    "La revisión comprende todos los módulos, mensajes de validación, ayudas y reportes generados por el sistema.",
+    "Los nombres propios, códigos de cuenta y valores ingresados por usuarios se excluyen de la traducción automática."
+   ],
+   "validacion_salidas": [
+    "El 100 % de los textos de interfaz generados por la aplicación está en español.",
+    "No se mezclan etiquetas en otro idioma con las etiquetas traducidas dentro de una misma pantalla."
+   ],
+   "secuencia": [
+    "El evaluador recorre los módulos y genera los mensajes y reportes de prueba.",
+    "El evaluador revisa los textos generados por la aplicación.",
+    "Se registra cualquier etiqueta que no esté en español."
+   ],
+   "situaciones_anormales": [
+    "Si falta una traducción, el sistema muestra la etiqueta en español más cercana disponible y la incidencia se registra para corregirla antes de aceptación."
+   ],
+   "parametros": [
+    "Idioma predeterminado de la interfaz: español.",
+    "Cobertura de textos de interfaz en español: 100 %."
+   ],
+   "salidas": [
+    "Interfaz, mensajes, ayudas y etiquetas de reportes en español."
+   ],
+   "almacenamiento_bd": [
+    "No aplica; los textos localizados pueden residir en recursos de la aplicación."
+   ]
+  },
+  {
+   "nombre": "Presentación de importes en USD",
+   "descripcion": "El sistema deberá presentar los importes contables en dólares estadounidenses, sin convertirlos automáticamente a otra moneda.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general",
+    "Contador de costos",
+    "Administrador"
+   ],
+   "fuente": "Decisión de diseño del equipo (parámetros por defecto)",
+   "entradas": [
+    "Importe (decimal de hasta 2 posiciones decimales).",
+    "Moneda de presentación (código ISO 4217)."
+   ],
+   "validacion_entradas": [
+    "La moneda predeterminada de presentación es USD.",
+    "El importe se presenta con dos decimales y conserva su valor numérico al mostrarse."
+   ],
+   "validacion_salidas": [
+    "Todos los importes contables de pantallas y reportes de prueba se identifican como USD o mediante el símbolo «$» acompañado de un contexto inequívoco.",
+    "La presentación no altera el valor almacenado ni aplica conversiones de moneda."
+   ],
+   "secuencia": [
+    "El sistema obtiene el importe contable almacenado.",
+    "El sistema aplica el formato de presentación configurado.",
+    "El sistema muestra el importe en USD sin modificar el valor contable."
+   ],
+   "situaciones_anormales": [
+    "Si se solicita una moneda de presentación distinta de USD que no esté configurada, el sistema conserva la presentación en USD y muestra: «Moneda de presentación no configurada; se utilizará USD.»"
+   ],
+   "parametros": [
+    "Moneda predeterminada: USD, configurable por el administrador.",
+    "Decimales de presentación: 2, configurables por el administrador."
+   ],
+   "salidas": [
+    "Importes contables presentados en USD con dos decimales."
+   ],
+   "almacenamiento_bd": [
+    "No aplica a la presentación; el almacenamiento de importes se especifica en los requerimientos funcionales de cada operación contable."
+   ]
+  },
+  {
+   "nombre": "Formato uniforme de fechas",
+   "descripcion": "El sistema deberá presentar las fechas de la interfaz y los reportes en un formato uniforme y explícito para evitar ambigüedades de interpretación.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general",
+    "Contador de costos",
+    "Administrador"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Fecha (date).",
+    "Configuración de formato de fecha (texto)."
+   ],
+   "validacion_entradas": [
+    "La fecha debe ser una fecha válida de calendario.",
+    "La configuración del formato de fecha debe corresponder a un formato admitido por la aplicación."
+   ],
+   "validacion_salidas": [
+    "El formato predeterminado de presentación es DD/MM/AAAA.",
+    "La misma fecha se presenta con el mismo formato en formularios, consultas y reportes generados por la aplicación."
+   ],
+   "secuencia": [
+    "El sistema obtiene la fecha registrada.",
+    "El sistema aplica el formato de presentación configurado.",
+    "El sistema presenta la fecha con día, mes y año completos."
+   ],
+   "situaciones_anormales": [
+    "Si una fecha no es válida, el sistema no la presenta como fecha válida y muestra: «Ingrese una fecha válida.»"
+   ],
+   "parametros": [
+    "Formato predeterminado: DD/MM/AAAA, configurable por el administrador."
+   ],
+   "salidas": [
+    "Fechas presentadas de forma uniforme en pantallas y reportes."
+   ],
+   "almacenamiento_bd": [
+    "No aplica al formato de presentación; las fechas se almacenan como valores de tipo date en los registros correspondientes."
+   ]
+  },
+  {
+   "nombre": "Formato uniforme de números e importes",
+   "descripcion": "El sistema deberá presentar números e importes con separadores uniformes según el idioma español y la precisión monetaria configurada.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general",
+    "Contador de costos",
+    "Administrador"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Número decimal (valor numérico).",
+    "Importe monetario (decimal).",
+    "Configuración de separadores (caracteres)."
+   ],
+   "validacion_entradas": [
+    "El valor numérico debe ser válido y finito.",
+    "Los importes monetarios respetan los decimales configurados."
+   ],
+   "validacion_salidas": [
+    "La presentación predeterminada usa punto para separar millares y coma para decimales; por ejemplo, 1.234,56.",
+    "Los importes se presentan con dos decimales y mantienen el mismo formato en pantallas y reportes legibles por personas."
+   ],
+   "secuencia": [
+    "El sistema obtiene el valor numérico.",
+    "El sistema aplica separadores y precisión configurados.",
+    "El sistema presenta el valor sin alterar su valor numérico."
+   ],
+   "situaciones_anormales": [
+    "Si el valor no puede interpretarse como número válido, el sistema muestra: «Ingrese un número válido.» y no lo acepta como entrada numérica."
+   ],
+   "parametros": [
+    "Separador de millares predeterminado: punto.",
+    "Separador decimal predeterminado: coma.",
+    "Precisión monetaria predeterminada: 2 decimales, configurable por el administrador."
+   ],
+   "salidas": [
+    "Números e importes presentados con separadores consistentes."
+   ],
+   "almacenamiento_bd": [
+    "No aplica al formato de presentación; los valores se almacenan en tipos numéricos decimales según cada operación contable."
+   ]
+  },
+  {
+   "nombre": "Escalado del texto de interfaz",
+   "descripcion": "El sistema deberá conservar la legibilidad y el acceso a los controles principales cuando el usuario aumente el tamaño del texto de la interfaz hasta el 200 %.",
+   "prioridad": "Media",
+   "actores": [
+    "Contador general",
+    "Contador de costos",
+    "Administrador"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Tamaño de texto seleccionado (porcentaje).",
+    "Pantalla o módulo (identificador de interfaz)."
+   ],
+   "validacion_entradas": [
+    "El porcentaje de prueba comprende desde 100 % hasta 200 %.",
+    "La prueba incluye formularios, navegación, tablas y mensajes de validación."
+   ],
+   "validacion_salidas": [
+    "Al 200 % no se truncan etiquetas ni mensajes esenciales.",
+    "Los controles principales permanecen visibles y utilizables sin superposición que impida completar las operaciones probadas."
+   ],
+   "secuencia": [
+    "El evaluador establece el tamaño de texto al 200 %.",
+    "El evaluador recorre las pantallas incluidas en la prueba.",
+    "El evaluador verifica legibilidad, visibilidad y uso de los controles principales."
+   ],
+   "situaciones_anormales": [
+    "Si el aumento del texto oculta un control necesario o impide leer un mensaje, la pantalla no supera la prueba de aceptación."
+   ],
+   "parametros": [
+    "Aumento de texto verificable: hasta 200 %."
+   ],
+   "salidas": [
+    "Interfaz legible y controles principales utilizables con el texto ampliado."
+   ],
+   "almacenamiento_bd": [
+    "No aplica; el escalado del texto es una característica de presentación."
+   ]
+  },
+  {
+   "nombre": "Identificación accesible de campos",
+   "descripcion": "El sistema deberá asociar cada campo de entrada de las pantallas contables principales con una etiqueta programática que identifique su propósito a las tecnologías de asistencia.",
+   "prioridad": "Media",
+   "actores": [
+    "Contador general",
+    "Contador de costos",
+    "Administrador"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Campo de entrada (control de interfaz).",
+    "Etiqueta del campo (texto).",
+    "Descripción de ayuda o error asociada (texto, cuando aplique)."
+   ],
+   "validacion_entradas": [
+    "La prueba cubre el 100 % de los campos editables de las pantallas principales.",
+    "Cada etiqueta describe el dato solicitado y está asociada al campo correspondiente."
+   ],
+   "validacion_salidas": [
+    "Una tecnología de asistencia puede identificar cada campo por su propósito y anunciar la etiqueta asociada.",
+    "Los mensajes de validación, cuando existan, pueden asociarse al campo correspondiente."
+   ],
+   "secuencia": [
+    "El evaluador recorre los campos con una tecnología de asistencia.",
+    "El evaluador verifica la etiqueta anunciada y la asociación de mensajes de validación.",
+    "Se registra cualquier campo sin identificación accesible."
+   ],
+   "situaciones_anormales": [
+    "Si un campo no tiene una etiqueta accesible, la pantalla no supera la prueba y se identifica el campo para corrección."
+   ],
+   "parametros": [
+    "Cobertura de campos de entrada con etiqueta accesible: 100 % de las pantallas principales probadas."
+   ],
+   "salidas": [
+    "Campos de entrada identificables mediante tecnologías de asistencia."
+   ],
+   "almacenamiento_bd": [
+    "No aplica; la asociación de etiquetas es una característica de la interfaz."
+   ]
+  }
+ ],
+ "vacios": []
+}

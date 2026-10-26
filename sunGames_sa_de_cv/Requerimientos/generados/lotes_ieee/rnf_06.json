@@ -1,0 +1,531 @@
+{
+ "requerimientos": [
+  {
+   "nombre": "Arquitectura modular",
+   "descripcion": "El sistema deberá separar contabilidad general, costos, catálogo, seguridad y presentación en módulos con interfaces explícitas y sin dependencias circulares.",
+   "prioridad": "Media",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Código fuente (archivos de texto en el lenguaje de implementación)",
+    "Configuración de dependencias (archivo estructurado)"
+   ],
+   "validacion_entradas": [
+    "Cada módulo declara sus dependencias e interfaces públicas."
+   ],
+   "validacion_salidas": [
+    "El análisis automatizado de dependencias informa cero ciclos entre módulos.",
+    "Cada módulo puede compilarse o probarse de forma aislada mediante sus interfaces declaradas."
+   ],
+   "secuencia": [
+    "El equipo organiza el código en los módulos definidos.",
+    "La integración continua analiza las dependencias.",
+    "El sistema de construcción informa ciclos o dependencias no declaradas."
+   ],
+   "situaciones_anormales": [
+    "Si se detecta una dependencia circular, la integración falla e identifica los módulos involucrados.",
+    "Si una interfaz pública no está declarada, la integración falla e identifica el módulo afectado."
+   ],
+   "parametros": [
+    "Número máximo de dependencias circulares permitidas: 0."
+   ],
+   "salidas": [
+    "Informe de análisis de dependencias por compilación."
+   ],
+   "almacenamiento_bd": [
+    "No aplica"
+   ]
+  },
+  {
+   "nombre": "Análisis estático del código",
+   "descripcion": "El sistema deberá aplicar reglas automatizadas de calidad al código fuente y bloquear la integración de cambios con hallazgos críticos o altos sin resolver.",
+   "prioridad": "Media",
+   "actores": [
+    "Administrador"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Código fuente (archivos del proyecto)",
+    "Reglas de análisis estático (configuración versionada)"
+   ],
+   "validacion_entradas": [
+    "La configuración de reglas debe estar presente en el repositorio de código.",
+    "Cada cambio propuesto debe someterse al análisis estático."
+   ],
+   "validacion_salidas": [
+    "El análisis produce un resultado identificable por cambio y clasifica los hallazgos por severidad.",
+    "La integración se acepta únicamente con cero hallazgos críticos y cero hallazgos altos."
+   ],
+   "secuencia": [
+    "El sistema de integración obtiene el cambio propuesto.",
+    "Ejecuta el análisis estático con las reglas versionadas.",
+    "Publica el informe y acepta o bloquea la integración según los hallazgos."
+   ],
+   "situaciones_anormales": [
+    "Si el analizador no puede ejecutarse, la integración queda bloqueada y se informa «Análisis estático no completado».",
+    "Si existen hallazgos críticos o altos, la integración queda bloqueada y se muestra su cantidad y ubicación."
+   ],
+   "parametros": [
+    "Hallazgos críticos permitidos para integrar: 0.",
+    "Hallazgos altos permitidos para integrar: 0."
+   ],
+   "salidas": [
+    "Informe de análisis estático asociado al cambio.",
+    "Estado de integración aceptado o bloqueado."
+   ],
+   "almacenamiento_bd": [
+    "No aplica"
+   ]
+  },
+  {
+   "nombre": "Pruebas automatizadas contables",
+   "descripcion": "El sistema deberá ejecutar pruebas automatizadas para las reglas y cálculos contables cubiertos por el software antes de aceptar una versión.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Código fuente (archivos del proyecto)",
+    "Casos de prueba (datos y resultados esperados)",
+    "Módulos contables sujetos a prueba (identificadores de módulo)"
+   ],
+   "validacion_entradas": [
+    "Cada cambio ejecutable debe activar la suite automatizada.",
+    "Los casos de prueba deben incluir resultados esperados verificables para las reglas contables implementadas."
+   ],
+   "validacion_salidas": [
+    "La cobertura de líneas de código en los módulos contables debe ser igual o superior al 80 %.",
+    "El 100 % de las pruebas automatizadas debe aprobarse para aceptar una versión."
+   ],
+   "secuencia": [
+    "La integración compila el cambio.",
+    "Ejecuta la suite automatizada y mide la cobertura de los módulos contables.",
+    "Publica los resultados y bloquea la versión si incumple el umbral."
+   ],
+   "situaciones_anormales": [
+    "Si falla una prueba, la versión queda bloqueada y se presenta el nombre de la prueba fallida.",
+    "Si la cobertura es inferior al 80 %, la versión queda bloqueada y se informa el porcentaje obtenido."
+   ],
+   "parametros": [
+    "Cobertura mínima de los módulos contables: 80 %.",
+    "Pruebas fallidas permitidas para aceptar una versión: 0."
+   ],
+   "salidas": [
+    "Informe de pruebas y cobertura por módulo.",
+    "Estado de aceptación o bloqueo de la versión."
+   ],
+   "almacenamiento_bd": [
+    "No aplica"
+   ]
+  },
+  {
+   "nombre": "Documentación técnica verificable",
+   "descripcion": "El sistema deberá mantener documentación técnica actualizada para todas las interfaces de integración, estructuras de importación y exportación, y procedimientos de despliegue.",
+   "prioridad": "Media",
+   "actores": [
+    "Administrador"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Interfaces publicadas (especificación técnica versionada)",
+    "Formatos de intercambio (esquemas versionados)",
+    "Procedimiento de despliegue (documentación versionada)"
+   ],
+   "validacion_entradas": [
+    "La documentación debe almacenarse junto al código o en un repositorio vinculado a la versión.",
+    "Cada interfaz, formato de intercambio y procedimiento vigente debe contar con documentación."
+   ],
+   "validacion_salidas": [
+    "El 100 % de las interfaces publicadas y formatos de intercambio vigentes está documentado.",
+    "El procedimiento documentado permite completar un despliegue de prueba sin instrucciones externas no registradas."
+   ],
+   "secuencia": [
+    "El equipo modifica una interfaz, formato o procedimiento.",
+    "Actualiza la documentación en el mismo cambio.",
+    "La integración verifica la presencia de documentación para los elementos modificados."
+   ],
+   "situaciones_anormales": [
+    "Si falta documentación para un elemento modificado, la integración bloquea el cambio e identifica el elemento.",
+    "Si el despliegue de prueba no puede seguir el procedimiento documentado, la validación falla y registra el paso no reproducible."
+   ],
+   "parametros": [
+    "Cobertura de documentación de interfaces, formatos y procedimientos: 100 %."
+   ],
+   "salidas": [
+    "Documentación técnica vinculada a cada versión.",
+    "Resultado de validación de documentación y despliegue de prueba."
+   ],
+   "almacenamiento_bd": [
+    "No aplica"
+   ]
+  },
+  {
+   "nombre": "Versionado de componentes",
+   "descripcion": "El sistema deberá conservar en control de versiones todo el código fuente, configuración no secreta, esquemas de intercambio y scripts de migración utilizados para generar cada versión.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Código fuente (archivos de texto)",
+    "Configuraciones no secretas (archivos estructurados)",
+    "Scripts de migración (archivos de texto)",
+    "Identificador de versión (etiqueta inmutable)"
+   ],
+   "validacion_entradas": [
+    "Cada versión liberada debe tener una etiqueta única.",
+    "Los archivos requeridos para construir y actualizar la versión deben estar registrados en el control de versiones."
+   ],
+   "validacion_salidas": [
+    "Es posible identificar la revisión exacta de cada componente incluido en una versión liberada.",
+    "La reconstrucción de una versión desde su etiqueta usa únicamente componentes versionados y dependencias identificadas."
+   ],
+   "secuencia": [
+    "El sistema registra los cambios en el repositorio.",
+    "Al liberar una versión, asigna una etiqueta única y conserva las revisiones incluidas.",
+    "El proceso de construcción registra la etiqueta de origen."
+   ],
+   "situaciones_anormales": [
+    "Si se intenta liberar una versión sin etiqueta única, la operación se rechaza y se informa «Identificador de versión duplicado».",
+    "Si falta un componente necesario para reconstruir la versión, el proceso falla y lista los componentes faltantes."
+   ],
+   "parametros": [
+    "Cada versión liberada debe corresponder a una etiqueta única e inmutable."
+   ],
+   "salidas": [
+    "Historial de cambios y etiquetas de versiones.",
+    "Manifiesto de componentes de cada versión."
+   ],
+   "almacenamiento_bd": [
+    "No aplica"
+   ]
+  },
+  {
+   "nombre": "Despliegue reproducible",
+   "descripcion": "El sistema deberá permitir desplegar y revertir una versión mediante procedimientos automatizados y repetibles en un entorno equivalente al de producción.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Paquete de versión (artefacto identificado)",
+    "Configuración del entorno (parámetros sin secretos)",
+    "Instrucción de despliegue o reversión (comando o acción autorizada)"
+   ],
+   "validacion_entradas": [
+    "El paquete debe corresponder a una versión identificada y haber superado las pruebas automatizadas.",
+    "La configuración requerida debe estar completa antes del despliegue."
+   ],
+   "validacion_salidas": [
+    "El mismo paquete y configuración producen el mismo resultado de despliegue en tres ejecuciones consecutivas de prueba.",
+    "La reversión de una versión desplegada se completa en un máximo de 15 minutos y restaura la versión de aplicación anterior."
+   ],
+   "secuencia": [
+    "El administrador selecciona un paquete aprobado.",
+    "El sistema valida la configuración y ejecuta el despliegue.",
+    "El sistema verifica la disponibilidad de la aplicación.",
+    "Si se solicita reversión, restaura la versión anterior y registra el resultado."
+   ],
+   "situaciones_anormales": [
+    "Si la validación previa falla, el despliegue no comienza y se identifica el parámetro faltante.",
+    "Si falla la verificación posterior, el sistema inicia la reversión automática y muestra «Despliegue fallido; reversión ejecutada» o informa que requiere intervención si no pudo completarla."
+   ],
+   "parametros": [
+    "Ejecuciones consecutivas reproducibles exigidas: 3.",
+    "Tiempo máximo de reversión: 15 minutos."
+   ],
+   "salidas": [
+    "Resultado y duración del despliegue.",
+    "Resultado y duración de la reversión."
+   ],
+   "almacenamiento_bd": [
+    "No aplica"
+   ]
+  },
+  {
+   "nombre": "Compatibilidad de navegadores",
+   "descripcion": "El sistema deberá ofrecer sus funciones de usuario en las dos versiones estables más recientes de Chrome, Firefox y Edge disponibles al liberar cada versión.",
+   "prioridad": "Media",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Navegador y versión (nombre y número de versión)",
+    "Función de usuario bajo prueba (identificador funcional)"
+   ],
+   "validacion_entradas": [
+    "Las pruebas deben ejecutarse en las dos versiones estables más recientes de cada navegador especificado al momento de liberar la versión.",
+    "La batería de pruebas debe cubrir las funciones disponibles para cada rol."
+   ],
+   "validacion_salidas": [
+    "El 100 % de los casos de prueba funcionales de la batería debe aprobarse en cada navegador y versión incluidos.",
+    "No se admiten errores que impidan completar una operación o visualizar correctamente sus resultados."
+   ],
+   "secuencia": [
+    "El equipo identifica las versiones objetivo de los navegadores.",
+    "Ejecuta la batería funcional en cada combinación navegador-versión.",
+    "Registra los resultados y bloquea la liberación si alguna combinación incumple el criterio."
+   ],
+   "situaciones_anormales": [
+    "Si una prueba funcional falla en una combinación objetivo, la liberación queda bloqueada y se informa navegador, versión y caso fallido.",
+    "Si no es posible ejecutar una combinación objetivo, la validación queda incompleta y no se considera aprobada."
+   ],
+   "parametros": [
+    "Navegadores compatibles: Chrome, Firefox y Edge.",
+    "Versiones objetivo: las dos versiones estables más recientes de cada navegador al liberar."
+   ],
+   "salidas": [
+    "Matriz de resultados por navegador, versión y caso de prueba."
+   ],
+   "almacenamiento_bd": [
+    "No aplica"
+   ]
+  },
+  {
+   "nombre": "Portabilidad entre motores de base de datos",
+   "descripcion": "El sistema deberá poder ejecutar sus operaciones contables en PostgreSQL y MariaDB sin alterar los resultados contables ni depender de extensiones exclusivas de un motor.",
+   "prioridad": "Media",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Configuración de conexión (motor, versión, servidor y credenciales)",
+    "Migraciones de esquema (scripts versionados)",
+    "Suite de pruebas de persistencia (casos y resultados esperados)"
+   ],
+   "validacion_entradas": [
+    "Las migraciones y pruebas deben ejecutarse en las versiones de PostgreSQL y MariaDB declaradas como compatibles para la versión del sistema.",
+    "Las credenciales se suministran mediante configuración del entorno, no mediante código fuente."
+   ],
+   "validacion_salidas": [
+    "El 100 % de las pruebas de persistencia y reglas contables debe aprobarse en ambos motores compatibles.",
+    "Los mismos datos de prueba producen los mismos saldos y resultados contables en ambos motores."
+   ],
+   "secuencia": [
+    "El equipo prepara una instancia de cada motor compatible.",
+    "Aplica las migraciones versionadas.",
+    "Ejecuta la suite de persistencia y compara resultados.",
+    "Publica la matriz de compatibilidad para la versión."
+   ],
+   "situaciones_anormales": [
+    "Si una migración falla en un motor compatible, la validación falla, revierte la migración de prueba y señala el motor y el paso fallido.",
+    "Si los resultados contables difieren entre motores, la liberación queda bloqueada y se informa el conjunto de datos discrepante."
+   ],
+   "parametros": [
+    "Motores compatibles: PostgreSQL y MariaDB.",
+    "Pruebas de persistencia aprobadas requeridas por motor: 100 %."
+   ],
+   "salidas": [
+    "Matriz de compatibilidad por motor y versión.",
+    "Informe de resultados comparativos de persistencia."
+   ],
+   "almacenamiento_bd": [
+    "No aplica"
+   ]
+  },
+  {
+   "nombre": "Exportación interoperable de datos",
+   "descripcion": "El sistema deberá exportar los datos y reportes seleccionados en formatos utilizables por herramientas externas, conservando sus encabezados, tipos y valores.",
+   "prioridad": "Media",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Decisión de diseño del equipo (parámetros por defecto)",
+   "entradas": [
+    "Conjunto de datos o reporte (identificador)",
+    "Formato de archivo solicitado (PDF, .xlsx o CSV)",
+    "Filtros de exportación (criterios y período)"
+   ],
+   "validacion_entradas": [
+    "El formato solicitado debe ser PDF, .xlsx o CSV según el tipo de salida.",
+    "Los filtros deben corresponder a campos disponibles en el conjunto seleccionado."
+   ],
+   "validacion_salidas": [
+    "El archivo se abre mediante un lector compatible con el formato seleccionado.",
+    "Los totales y registros exportados coinciden con el conjunto de datos obtenido con los mismos filtros.",
+    "Los importes exportados conservan la precisión almacenada y las fechas mantienen un formato documentado."
+   ],
+   "secuencia": [
+    "El usuario selecciona datos o reporte, filtros y formato.",
+    "El sistema genera el archivo con nombres de columnas y tipos documentados.",
+    "El sistema verifica la integridad estructural del archivo antes de ofrecerlo para descarga."
+   ],
+   "situaciones_anormales": [
+    "Si el formato no es compatible con el conjunto seleccionado, el sistema cancela la exportación y muestra «Formato no disponible para esta salida».",
+    "Si falla la generación, no entrega un archivo parcial y muestra «No fue posible generar el archivo de exportación»."
+   ],
+   "parametros": [
+    "Formatos por defecto: PDF y .xlsx para reportes; CSV para datos.",
+    "La configuración de formatos permitidos es modificable por el administrador."
+   ],
+   "salidas": [
+    "Archivo descargable en el formato solicitado.",
+    "Mensaje de confirmación o error de exportación."
+   ],
+   "almacenamiento_bd": [
+    "No aplica"
+   ]
+  },
+  {
+   "nombre": "Importación estructurada de datos",
+   "descripcion": "El sistema deberá importar datos desde archivos CSV que cumplan una plantilla publicada y validar su estructura y valores antes de incorporarlos.",
+   "prioridad": "Media",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Archivo de importación (CSV en codificación UTF-8)",
+    "Plantilla de importación (versión identificada)",
+    "Modo de validación (previsualización o confirmación)"
+   ],
+   "validacion_entradas": [
+    "El archivo debe corresponder a una plantilla vigente y contener los encabezados obligatorios.",
+    "Cada fila debe cumplir los tipos, formatos, campos obligatorios y referencias indicados en la plantilla.",
+    "La importación debe rechazar el archivo completo si contiene errores estructurales o de datos."
+   ],
+   "validacion_salidas": [
+    "La previsualización identifica el número de filas válidas y los errores por fila y campo.",
+    "Tras la confirmación, el número de registros incorporados coincide con el número de filas válidas de la previsualización.",
+    "Si existe cualquier error, se incorporan cero registros."
+   ],
+   "secuencia": [
+    "El usuario selecciona el archivo y la versión de plantilla.",
+    "El sistema valida encabezados, tipos, formatos y referencias, y presenta la previsualización.",
+    "El usuario confirma una importación válida.",
+    "El sistema incorpora los registros y presenta el resultado."
+   ],
+   "situaciones_anormales": [
+    "Si el archivo no corresponde a una plantilla vigente, el sistema lo rechaza e informa «Plantilla de importación no compatible».",
+    "Si hay errores en filas, el sistema no incorpora datos y presenta fila, campo y motivo de cada error.",
+    "Si ocurre un fallo durante la incorporación, revierte la operación completa y muestra «Importación cancelada; no se incorporaron registros»."
+   ],
+   "parametros": [
+    "Formato de datos de importación: CSV UTF-8.",
+    "Registros parcialmente importados ante errores: 0."
+   ],
+   "salidas": [
+    "Previsualización de filas y errores.",
+    "Confirmación con el número de registros incorporados o informe de rechazo."
+   ],
+   "almacenamiento_bd": [
+    "No aplica"
+   ]
+  },
+  {
+   "nombre": "Fidelidad de intercambio de datos",
+   "descripcion": "El sistema deberá conservar sin alteración los valores contables y las referencias documentadas al exportar datos a CSV e importarlos nuevamente mediante su plantilla vigente.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Conjunto de datos exportable (registros seleccionados)",
+    "Archivo CSV exportado (UTF-8)",
+    "Plantilla de importación correspondiente (versión identificada)"
+   ],
+   "validacion_entradas": [
+    "Los registros de prueba deben incluir campos obligatorios, referencias y valores decimales con la precisión configurada.",
+    "El archivo de reingreso debe conservar encabezados y formato definido por la plantilla."
+   ],
+   "validacion_salidas": [
+    "En la prueba de ida y vuelta, el 100 % de los campos incluidos mantiene su valor, formato decimal y referencia, excepto identificadores técnicos regenerados que estén documentados.",
+    "Los totales de los importes antes y después del intercambio son iguales con la precisión configurada."
+   ],
+   "secuencia": [
+    "Se selecciona un conjunto de datos de prueba y se exporta a CSV.",
+    "Se importa el archivo mediante la plantilla correspondiente en un entorno de prueba.",
+    "El sistema compara campos y totales del conjunto original con el importado.",
+    "El equipo registra el resultado de la prueba de ida y vuelta."
+   ],
+   "situaciones_anormales": [
+    "Si cambia algún valor o total, la prueba falla, identifica el campo discrepante y bloquea la aprobación del formato de intercambio.",
+    "Si un identificador técnico debe regenerarse, la comparación lo excluye únicamente cuando esa excepción esté documentada en la plantilla."
+   ],
+   "parametros": [
+    "Campos conservados en la prueba de ida y vuelta: 100 %, salvo excepciones documentadas para identificadores técnicos.",
+    "La precisión de importes utiliza la configuración decimal del sistema."
+   ],
+   "salidas": [
+    "Informe comparativo de fidelidad de importación y exportación.",
+    "Resultado aprobado o fallido de la prueba de ida y vuelta."
+   ],
+   "almacenamiento_bd": [
+    "No aplica"
+   ]
+  },
+  {
+   "nombre": "Compatibilidad de actualización",
+   "descripcion": "El sistema deberá actualizar una instalación desde cualquiera de las dos versiones principales inmediatamente anteriores sin pérdida de datos ni alteración de saldos contables.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Versión instalada (identificador de versión)",
+    "Versión destino (identificador de versión)",
+    "Migraciones de datos (scripts versionados)",
+    "Conjunto de datos de prueba (registros y saldos de control)"
+   ],
+   "validacion_entradas": [
+    "La versión de origen debe ser una de las dos versiones principales anteriores declaradas como compatibles.",
+    "Las migraciones deben estar asociadas a la versión destino y haber superado pruebas en una copia del conjunto de datos."
+   ],
+   "validacion_salidas": [
+    "En pruebas de actualización, el 100 % de los registros persistentes conserva sus valores o recibe una transformación documentada.",
+    "Los saldos de control antes y después de actualizar coinciden exactamente con la precisión configurada.",
+    "La actualización de prueba concluye en un máximo de 60 minutos."
+   ],
+   "secuencia": [
+    "El equipo restaura una copia de datos de la versión de origen en un entorno de prueba.",
+    "Ejecuta las migraciones de la versión destino.",
+    "Compara registros y saldos de control con los valores previos.",
+    "Registra duración y resultado de la prueba de actualización."
+   ],
+   "situaciones_anormales": [
+    "Si una migración falla, la actualización de prueba se revierte y se informa el paso fallido.",
+    "Si se detecta pérdida de registros o diferencia de saldos, la actualización no se aprueba y se informa la discrepancia.",
+    "Si la prueba excede 60 minutos, se marca como fallida y se registra la duración."
+   ],
+   "parametros": [
+    "Versiones principales anteriores compatibles: 2.",
+    "Tiempo máximo de actualización de prueba: 60 minutos.",
+    "Diferencia permitida en saldos contables: 0.00 según la precisión configurada."
+   ],
+   "salidas": [
+    "Informe de actualización por versión de origen.",
+    "Comparación de registros y saldos antes y después.",
+    "Duración y estado aprobado o fallido de la actualización."
+   ],
+   "almacenamiento_bd": [
+    "No aplica"
+   ]
+  }
+ ],
+ "vacios": []
+}

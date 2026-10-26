@@ -1,0 +1,399 @@
+{
+ "requerimientos": [
+  {
+   "nombre": "Conservación según plazo legal",
+   "descripcion": "El sistema deberá impedir la eliminación automática de libros y documentos soporte antes de que venza el plazo de conservación legal verificado para cada tipo de registro.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, sección 5.1 Libros y registros contables",
+   "entradas": [
+    "Tipo de registro (enum: libro diario, libro mayor, libro de estados financieros, registro de IVA, documento soporte u otro)",
+    "Plazo de conservación aplicable (entero, cantidad de días o meses)",
+    "Referencia normativa verificada (texto, máximo 500 caracteres)",
+    "Fecha de inicio de conservación (date)"
+   ],
+   "validacion_entradas": [
+    "El tipo de registro y la fecha de inicio son obligatorios",
+    "El plazo debe ser positivo y tener una referencia normativa verificada",
+    "Si el plazo o la referencia no están verificados, el registro de la política debe quedar marcado como pendiente y no se debe habilitar la eliminación automática"
+   ],
+   "validacion_salidas": [
+    "El 100 % de los registros sujetos a conservación tiene asociado un plazo verificado o un estado visible de pendiente",
+    "Ningún registro se elimina automáticamente antes de la fecha calculada como fecha de inicio más plazo aplicable"
+   ],
+   "secuencia": [
+    "El administrador registra el tipo de registro, el plazo y la referencia normativa",
+    "El sistema valida que el plazo y su referencia estén verificados",
+    "El sistema calcula la fecha mínima de conservación",
+    "Antes de eliminar un registro, el sistema comprueba que la fecha actual sea posterior a la fecha mínima"
+   ],
+   "situaciones_anormales": [
+    "Plazo no verificado: el sistema muestra «No se puede configurar la eliminación: el plazo legal de conservación está pendiente de verificar» y mantiene los registros",
+    "Intento de eliminación antes del vencimiento: el sistema rechaza la operación y muestra «El registro debe conservarse hasta [fecha]»"
+   ],
+   "parametros": [
+    "Plazo legal de conservación por tipo de registro: [PENDIENTE DE VERIFICAR]"
+   ],
+   "salidas": [
+    "Política de conservación por tipo de registro",
+    "Fecha mínima de conservación calculada",
+    "Aviso de política pendiente o rechazo de eliminación anticipada"
+   ],
+   "almacenamiento_bd": [
+    "politicas_conservacion: id (PK), tipo_registro, plazo_valor integer, plazo_unidad, referencia_normativa, estado_verificacion, fecha_inicio date, created_at",
+    "registros_conservados: id (PK), tipo_registro, registro_id, fecha_inicio date, fecha_minima_conservacion date, politica_id (FK)",
+    "Restricción: no permitir eliminación de registros cuya fecha_minima_conservacion sea posterior a la fecha actual"
+   ]
+  },
+  {
+   "nombre": "Disponibilidad de libros contables principales",
+   "descripcion": "El sistema deberá permitir obtener, para cada ejercicio contable, los libros diario, mayor y de estados financieros con el 100 % de los registros que les correspondan.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, sección 5.1 Libros y registros contables",
+   "entradas": [
+    "Ejercicio contable (año, formato AAAA)",
+    "Tipo de libro (enum: diario, mayor, estados financieros)"
+   ],
+   "validacion_entradas": [
+    "El ejercicio debe ser un año válido",
+    "El tipo de libro debe corresponder a uno de los libros principales indicados en el manual",
+    "El usuario debe tener acceso a la función de consulta del libro"
+   ],
+   "validacion_salidas": [
+    "El libro contiene todos los registros contabilizados del ejercicio que correspondan al tipo solicitado",
+    "El libro diario se presenta cronológicamente y el libro mayor se ordena por código de cuenta",
+    "El libro de estados financieros reúne los estados del ejercicio disponibles"
+   ],
+   "secuencia": [
+    "El contador selecciona el ejercicio y el tipo de libro",
+    "El sistema recupera los registros correspondientes",
+    "El sistema verifica la cobertura temporal y la integridad de los registros recuperados",
+    "El sistema presenta el libro solicitado"
+   ],
+   "situaciones_anormales": [
+    "Ejercicio sin registros: el sistema muestra «No hay registros disponibles para el ejercicio seleccionado»",
+    "Falta de registros esperados o inconsistencia de recuperación: el sistema informa «No se puede validar la integridad del libro; revise los registros del ejercicio» y no presenta el resultado como completo"
+   ],
+   "parametros": [
+    "Ejercicio contable: año calendario, del 1 de enero al 31 de diciembre, configurable según la decisión de diseño del equipo"
+   ],
+   "salidas": [
+    "Libro diario del ejercicio",
+    "Libro mayor del ejercicio ordenado por código de cuenta",
+    "Libro de estados financieros del ejercicio"
+   ],
+   "almacenamiento_bd": [
+    "libros_generados: id (PK), ejercicio integer, tipo_libro, estado_integridad, fecha_generacion timestamp, usuario_id",
+    "libros_generados.tipo_libro restringido a diario, mayor o estados_financieros",
+    "La generación debe consultar en una transacción coherente los registros del ejercicio"
+   ]
+  },
+  {
+   "nombre": "Clasificación de estados financieros conforme al catálogo",
+   "descripcion": "El sistema deberá clasificar los saldos de las cuentas en los estados financieros según las relaciones entre rubros y estados definidas en el manual de aplicación.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, sección Relación con los estados financieros",
+   "entradas": [
+    "Ejercicio contable (año, formato AAAA)",
+    "Saldos por cuenta (código de cuenta, decimal(14,2))",
+    "Clasificación de cuenta (código de rubro del catálogo)"
+   ],
+   "validacion_entradas": [
+    "Cada saldo debe corresponder a una cuenta existente en el catálogo",
+    "Cada cuenta debe tener una clasificación de rubro definida en el catálogo",
+    "El ejercicio debe ser válido"
+   ],
+   "validacion_salidas": [
+    "Los rubros 1, 2 y 3 se presentan en el balance general; los rubros 4 y 5 en el estado de resultados; los rubros 6 y 7 se excluyen de ambos",
+    "El activo corriente y no corriente, y el pasivo corriente y no corriente, se presentan por separado",
+    "Las cuentas 1203, 1206 y 1208 se presentan restando del activo correspondiente",
+    "La suma de los saldos presentados coincide con los saldos fuente, considerando las cuentas excluidas y las contra cuentas según su clasificación"
+   ],
+   "secuencia": [
+    "El sistema recupera los saldos del libro mayor para el ejercicio",
+    "El sistema asigna cada cuenta al estado y sección definidos por el catálogo",
+    "El sistema aplica la presentación de las cuentas acumuladas como disminución del activo relacionado",
+    "El sistema presenta los estados y sus totales de control"
+   ],
+   "situaciones_anormales": [
+    "Cuenta sin clasificación: el sistema muestra «No se puede generar el estado financiero: la cuenta [código] no tiene clasificación» y no emite el estado como completo",
+    "Totales de presentación distintos de los saldos fuente: el sistema muestra «La presentación no concilia con los saldos del libro mayor»"
+   ],
+   "parametros": [
+    "Clasificación por cuenta y estado financiero: según el catálogo aprobado de SunGames"
+   ],
+   "salidas": [
+    "Balance general con secciones y rubros clasificados",
+    "Estado de resultados con secciones y rubros clasificados",
+    "Resultado de validación de concordancia con los saldos del libro mayor"
+   ],
+   "almacenamiento_bd": [
+    "cuentas: id (PK), codigo varchar(4) UNIQUE, nombre, rubro, estado",
+    "saldos_mayor: id (PK), cuenta_id (FK), ejercicio integer, saldo decimal(14,2)",
+    "mapeos_estados_financieros: id (PK), cuenta_id (FK), estado_financiero, seccion, tratamiento_presentacion",
+    "Restricción: cada cuenta activa debe tener un mapeo contable aplicable a su rubro; la generación se ejecuta con una lectura transaccional coherente"
+   ]
+  },
+  {
+   "nombre": "Firma de estados financieros del ejercicio",
+   "descripcion": "El sistema deberá identificar como pendientes de formalización los estados financieros anuales que no cuenten con evidencia de firma de los responsables correspondientes.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general",
+    "Administrador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, sección 5.1 Libros y registros contables",
+   "entradas": [
+    "Ejercicio contable (año, formato AAAA)",
+    "Estado financiero (enum: balance general, estado de resultados, estado de cambios en el patrimonio, estado de flujos de efectivo u otro estado del ejercicio)",
+    "Evidencia de firma (archivo, formato PDF o referencia documental)",
+    "Responsables firmantes (lista de nombres, texto)"
+   ],
+   "validacion_entradas": [
+    "El ejercicio, el estado y la evidencia son obligatorios para marcar un estado como firmado",
+    "El archivo debe ser legible y corresponder al ejercicio y estado seleccionados",
+    "La lista de responsables debe contener al menos un nombre; la identidad de los responsables que deben firmar queda sujeta a verificación"
+   ],
+   "validacion_salidas": [
+    "El 100 % de los estados incluidos en el libro de estados financieros muestra un estado explícito: pendiente o con evidencia de firma",
+    "Un estado solo figura como firmado si tiene evidencia vinculada al ejercicio y al estado correspondiente"
+   ],
+   "secuencia": [
+    "El contador registra o adjunta la evidencia de firma del estado financiero",
+    "El sistema valida que la evidencia esté asociada al ejercicio y estado seleccionados",
+    "El sistema marca el estado como firmado con evidencia o lo conserva como pendiente",
+    "El sistema presenta el estado de formalización en el libro de estados financieros"
+   ],
+   "situaciones_anormales": [
+    "Falta evidencia: el sistema muestra «El estado financiero permanece pendiente de firma»",
+    "Archivo no asociado al ejercicio o estado seleccionado: el sistema rechaza la asociación y muestra «La evidencia no corresponde al estado financiero seleccionado»"
+   ],
+   "parametros": [
+    "Identidad y cantidad de responsables firmantes requeridos: [PENDIENTE DE VERIFICAR]"
+   ],
+   "salidas": [
+    "Estado de formalización de cada estado financiero anual",
+    "Evidencia de firma vinculada al ejercicio y al estado correspondiente"
+   ],
+   "almacenamiento_bd": [
+    "estados_financieros: id (PK), ejercicio integer, tipo_estado, fecha_generacion timestamp, estado_formalizacion",
+    "evidencias_firma: id (PK), estado_financiero_id (FK), archivo_id (FK), responsables_firmantes, fecha_registro timestamp",
+    "Restricción: no marcar como firmado un estado financiero sin evidencia asociada"
+   ]
+  },
+  {
+   "nombre": "Conciliación mensual de registros de IVA",
+   "descripcion": "El sistema deberá permitir comprobar mensualmente que los totales de los registros de IVA de compras y ventas concilien con los saldos de las cuentas 1106 y 2103, respectivamente.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, secciones 5.1 Libros y registros contables y Sobre el cierre contable",
+   "entradas": [
+    "Mes de conciliación (año y mes, formato AAAA-MM)",
+    "Total del registro de compras (decimal(14,2), USD)",
+    "Total del registro de ventas (decimal(14,2), USD)",
+    "Saldo de cuenta 1106 (decimal(14,2), USD)",
+    "Saldo de cuenta 2103 (decimal(14,2), USD)"
+   ],
+   "validacion_entradas": [
+    "El mes debe estar comprendido dentro de un ejercicio contable válido",
+    "Los totales y saldos deben ser importes numéricos no negativos con dos decimales",
+    "Los saldos deben proceder del libro mayor del mismo mes"
+   ],
+   "validacion_salidas": [
+    "La diferencia entre el total del registro de compras y el saldo aplicable de 1106 debe ser 0.00",
+    "La diferencia entre el total del registro de ventas y el saldo aplicable de 2103 debe ser 0.00",
+    "El resultado identifica por separado la conciliación de compras y la de ventas"
+   ],
+   "secuencia": [
+    "El contador selecciona el mes de conciliación",
+    "El sistema recupera los totales de los registros de IVA y los saldos mensuales de las cuentas 1106 y 2103",
+    "El sistema calcula las diferencias de cada conciliación",
+    "El sistema presenta cada conciliación como conciliada o con diferencia"
+   ],
+   "situaciones_anormales": [
+    "Diferencia distinta de 0.00: el sistema muestra «La conciliación de IVA presenta una diferencia de [importe] USD» e identifica el registro afectado",
+    "Falta el registro de compras o ventas: el sistema muestra «No se puede completar la conciliación: falta el registro de IVA del mes seleccionado»"
+   ],
+   "parametros": [
+    "Moneda y precisión: USD, 2 decimales, configurables por el administrador según la decisión de diseño del equipo",
+    "Tolerancia de conciliación: 0.00, configurable por el administrador según la decisión de diseño del equipo"
+   ],
+   "salidas": [
+    "Resultado mensual de conciliación de IVA de compras contra 1106",
+    "Resultado mensual de conciliación de IVA de ventas contra 2103",
+    "Diferencias calculadas y resultado de conciliación"
+   ],
+   "almacenamiento_bd": [
+    "conciliaciones_iva: id (PK), periodo char(7), total_compras decimal(14,2), saldo_1106 decimal(14,2), diferencia_compras decimal(14,2), total_ventas decimal(14,2), saldo_2103 decimal(14,2), diferencia_ventas decimal(14,2), estado",
+    "Restricción: una conciliación por periodo; periodo con formato AAAA-MM; resultados relacionados con registros de IVA y saldos del mayor del mismo periodo"
+   ]
+  },
+  {
+   "nombre": "Verificación de parámetros fiscales",
+   "descripcion": "El sistema deberá impedir que una regla fiscal se aplique a cálculos contables mientras su tasa o regla no tenga estado verificado y referencia normativa registrada.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, sección Sobre el cierre contable y sección 5.1 Libros y registros contables; Modelo_de_Negocio_SunGames.docx, sección Base legal y marco de cumplimiento",
+   "entradas": [
+    "Tipo de regla fiscal (enum: IVA, impuesto sobre la renta, retenciones, reserva legal o depreciación fiscal)",
+    "Tasa o regla (decimal o texto estructurado)",
+    "Estado de verificación (enum: pendiente, verificado)",
+    "Referencia normativa y fecha de verificación (texto y date)"
+   ],
+   "validacion_entradas": [
+    "El tipo de regla es obligatorio y debe pertenecer a los tipos definidos",
+    "Una regla marcada como verificada requiere tasa o regla, referencia normativa y fecha de verificación",
+    "Una regla pendiente no puede habilitar cálculos automáticos ni generación de asientos fiscales derivados"
+   ],
+   "validacion_salidas": [
+    "El 100 % de las reglas aplicadas a cálculos fiscales tiene estado verificado y referencia normativa",
+    "Si una regla permanece pendiente, el sistema no produce un importe fiscal calculado con esa regla"
+   ],
+   "secuencia": [
+    "El administrador registra o actualiza una regla y su estado de verificación",
+    "El sistema valida la presencia de referencia y fecha cuando la regla se marca como verificada",
+    "Al solicitar un cálculo fiscal, el sistema comprueba el estado de la regla aplicable",
+    "El sistema calcula únicamente con reglas verificadas o informa que el cálculo está bloqueado"
+   ],
+   "situaciones_anormales": [
+    "Regla pendiente: el sistema muestra «Cálculo bloqueado: la regla fiscal [tipo] está pendiente de verificar» y no genera asiento",
+    "Regla marcada como verificada sin referencia: el sistema muestra «No se puede verificar la regla fiscal sin referencia normativa y fecha de verificación»"
+   ],
+   "parametros": [
+    "Tasas y reglas de IVA, impuesto sobre la renta, retenciones, reserva legal y depreciación fiscal: [PENDIENTE DE VERIFICAR]"
+   ],
+   "salidas": [
+    "Registro de reglas fiscales con estado y referencia",
+    "Mensaje de cálculo fiscal permitido o bloqueado"
+   ],
+   "almacenamiento_bd": [
+    "reglas_fiscales: id (PK), tipo_regla, tasa_valor decimal(14,6), regla_texto, estado_verificacion, referencia_normativa, fecha_verificacion date, actualizado_at timestamp",
+    "Restricción: no usar reglas con estado pendiente en cálculos; los cambios se conservan con su fecha de vigencia y referencia"
+   ]
+  },
+  {
+   "nombre": "Separación de depreciación contable y fiscal",
+   "descripcion": "El sistema deberá mantener separadas las cuotas de depreciación contable y fiscal para impedir que una sustituya o sobrescriba a la otra.",
+   "prioridad": "Media",
+   "actores": [
+    "Contador general"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Política 9: Depreciación de activos fijos",
+   "entradas": [
+    "Activo (identificador, código de cuenta 1201 o 1202)",
+    "Periodo de depreciación (año y mes, formato AAAA-MM)",
+    "Cuota de depreciación contable (decimal(14,2), USD)",
+    "Cuota de depreciación fiscal (decimal(14,2), USD)",
+    "Método y parámetros de cálculo (texto estructurado)"
+   ],
+   "validacion_entradas": [
+    "El activo debe existir y corresponder a mobiliario y equipo de oficina o equipo de cómputo",
+    "El periodo debe ser válido y único para cada activo y tipo de cuota",
+    "Las cuotas deben ser importes no negativos con dos decimales",
+    "La cuota fiscal no puede calcularse con una tasa no verificada"
+   ],
+   "validacion_salidas": [
+    "Cada importe queda identificado inequívocamente como cuota contable o cuota fiscal",
+    "La generación de la cuota de una clase no altera ni reemplaza el importe de la otra clase",
+    "Las cuotas contables se vinculan a la cuenta 4207 y a la depreciación acumulada 1203 según el uso indicado en el manual"
+   ],
+   "secuencia": [
+    "El contador registra los datos del activo y el periodo",
+    "El sistema clasifica cada cuota como contable o fiscal",
+    "El sistema valida que la regla aplicada a la cuota fiscal esté verificada",
+    "El sistema conserva y presenta ambas cuotas como registros separados"
+   ],
+   "situaciones_anormales": [
+    "Tasa fiscal pendiente: el sistema muestra «No se puede calcular la depreciación fiscal: la tasa aplicable está pendiente de verificar»",
+    "Intento de sobrescribir una cuota de otra clase: el sistema rechaza la operación y muestra «La cuota contable y la cuota fiscal deben conservarse en registros separados»"
+   ],
+   "parametros": [
+    "Tasas máximas de depreciación fiscal: [PENDIENTE DE VERIFICAR]",
+    "Método, vida útil y valor residual contables: valores definidos por la política contable aplicable y sujetos a revisión"
+   ],
+   "salidas": [
+    "Auxiliar de depreciación contable por activo y periodo",
+    "Auxiliar separado de depreciación fiscal por activo y periodo",
+    "Aviso de cálculo fiscal pendiente cuando no existe tasa verificada"
+   ],
+   "almacenamiento_bd": [
+    "depreciaciones_activos: id (PK), activo_id (FK), periodo char(7), tipo_depreciacion, cuota decimal(14,2), metodo, parametros_calculo, regla_fiscal_id (FK nullable)",
+    "Restricción: unicidad por activo_id, periodo y tipo_depreciacion; tipo_depreciacion limitado a contable o fiscal; transacción atómica por registro"
+   ]
+  },
+  {
+   "nombre": "Control de aprobación y codificación del catálogo",
+   "descripcion": "El sistema deberá impedir que una cuenta nueva o modificada quede habilitada para contabilizar sin evidencia de aprobación y conservar el código asignado sin reutilizarlo ni cambiarlo una vez que haya sido usado.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Procedimiento para crear, modificar o dar de baja una cuenta",
+   "entradas": [
+    "Código de cuenta (texto, cuatro dígitos)",
+    "Nombre de cuenta (texto)",
+    "Rubro y grupo (código)",
+    "Justificación del cambio (texto)",
+    "Documento de respaldo (archivo o referencia documental)",
+    "Evidencia del acuerdo de aprobación (archivo o referencia documental)"
+   ],
+   "validacion_entradas": [
+    "El código debe respetar la estructura decimal del catálogo y ser único",
+    "El nombre, rubro, grupo, justificación y documento de respaldo son obligatorios para una solicitud de cuenta nueva",
+    "La cuenta no puede activarse sin evidencia de aprobación",
+    "Un código ya utilizado no puede cambiarse ni asignarse a otra cuenta"
+   ],
+   "validacion_salidas": [
+    "El 100 % de las cuentas habilitadas tiene código único y evidencia de aprobación asociada",
+    "Los códigos previamente utilizados permanecen reservados incluso si la cuenta se da de baja",
+    "Una modificación aprobada conserva el historial de versiones del catálogo"
+   ],
+   "secuencia": [
+    "El contador registra la solicitud de creación o modificación con justificación y respaldo",
+    "El administrador registra la evidencia de aprobación correspondiente",
+    "El sistema valida estructura, unicidad y disponibilidad del código",
+    "El sistema habilita la cuenta solo después de validar la aprobación y conserva el cambio en el historial"
+   ],
+   "situaciones_anormales": [
+    "Falta evidencia de aprobación: el sistema muestra «La cuenta no puede habilitarse sin evidencia de aprobación»",
+    "Código utilizado o duplicado: el sistema muestra «El código no puede asignarse porque ya está utilizado o reservado»",
+    "Intento de modificar el código de una cuenta en uso: el sistema rechaza el cambio y muestra «El código de una cuenta utilizada no se puede modificar»"
+   ],
+   "parametros": [
+    "Estructura del código: sistema decimal de cuatro dígitos según el catálogo aprobado",
+    "Subcuentas: no habilitadas conforme al catálogo de SunGames"
+   ],
+   "salidas": [
+    "Catálogo vigente con cuentas aprobadas",
+    "Historial de cambios del catálogo con sus evidencias",
+    "Mensaje de aceptación o rechazo de la solicitud"
+   ],
+   "almacenamiento_bd": [
+    "cuentas: id (PK), codigo varchar(4) UNIQUE, nombre, rubro, grupo, estado, fecha_uso nullable",
+    "solicitudes_catalogo: id (PK), cuenta_id (FK nullable), tipo_solicitud, justificacion, documento_respaldo_id (FK), evidencia_aprobacion_id (FK nullable), estado, created_at timestamp",
+    "historial_catalogo: id (PK), cuenta_id (FK), version, valores_anteriores json, valores_nuevos json, fecha_cambio timestamp",
+    "Restricción: no reutilizar códigos históricos; activar una cuenta requiere evidencia de aprobación; guardar cada cambio en una transacción atómica"
+   ]
+  }
+ ],
+ "vacios": [
+  "Plazos legales exactos de conservación de libros y documentos soporte, y formalidades vigentes para su autorización y conservación: [PENDIENTE DE VERIFICAR].",
+  "Identidad y cantidad de responsables que deben firmar los estados financieros, y requisitos legales mínimos exactos de presentación que deban añadirse a la estructura descrita en el manual: [PENDIENTE DE VERIFICAR].",
+  "Tasas y reglas fiscales de IVA, impuesto sobre la renta, retenciones, reserva legal y depreciación fiscal: [PENDIENTE DE VERIFICAR]."
+ ]
+}

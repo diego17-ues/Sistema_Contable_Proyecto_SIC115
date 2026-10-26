@@ -1,0 +1,587 @@
+{
+ "requerimientos": [
+  {
+   "nombre": "Cuadre obligatorio de partidas",
+   "descripcion": "El sistema deberá mantener cada partida contabilizada con el total del Debe igual al total del Haber, dentro de la tolerancia configurada.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Libro diario",
+   "entradas": [
+    "Líneas de partida: cuenta (código de catálogo), debe (decimal), haber (decimal)"
+   ],
+   "validacion_entradas": [
+    "Cada línea debe registrar un importe no negativo en Debe o Haber, pero no en ambos.",
+    "La cuenta debe existir en el catálogo."
+   ],
+   "validacion_salidas": [
+    "La suma de Debe menos la suma de Haber debe ser igual a 0.00 conforme a la tolerancia por defecto.",
+    "El 100 % de las partidas contabilizadas debe satisfacer esta condición."
+   ],
+   "secuencia": [
+    "El sistema suma los importes del Debe y del Haber.",
+    "Compara ambos totales con la tolerancia configurada.",
+    "Solo permite contabilizar la partida si cumple el cuadre."
+   ],
+   "situaciones_anormales": [
+    "Si la diferencia excede la tolerancia, el sistema rechaza la contabilización y muestra los totales y la diferencia.",
+    "Si falla el cálculo, el sistema no contabiliza la partida y revierte la operación."
+   ],
+   "parametros": [
+    "Moneda y precisión por defecto: USD y 2 decimales, configurables por el Administrador.",
+    "Tolerancia de cuadre por defecto: 0.00, configurable por el Administrador."
+   ],
+   "salidas": [
+    "Resultado de validación del cuadre.",
+    "Totales de Debe, Haber y diferencia."
+   ],
+   "almacenamiento_bd": [
+    "partidas: id (PK), estado, fecha_contabilizacion.",
+    "partida_lineas: id (PK), partida_id (FK), cuenta_id (FK), debe decimal(14,2), haber decimal(14,2); restricción CHECK para impedir importes negativos y para que una línea no tenga importe simultáneo en Debe y Haber."
+   ]
+  },
+  {
+   "nombre": "Inmutabilidad de partidas contabilizadas",
+   "descripcion": "El sistema deberá impedir la modificación o eliminación física de una partida después de contabilizarla.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general",
+    "Administrador"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Solicitud de modificación o eliminación: partida_id (identificador)"
+   ],
+   "validacion_entradas": [
+    "La partida debe existir.",
+    "El sistema debe verificar el estado de la partida antes de ejecutar cualquier cambio."
+   ],
+   "validacion_salidas": [
+    "El 100 % de las solicitudes que alteren o eliminen una partida contabilizada debe ser rechazado.",
+    "Los datos de la partida deben permanecer idénticos tras un intento rechazado."
+   ],
+   "secuencia": [
+    "El sistema identifica la partida solicitada.",
+    "Verifica su estado.",
+    "Si está contabilizada, rechaza la operación y conserva todos sus datos."
+   ],
+   "situaciones_anormales": [
+    "Si se solicita alterar o eliminar una partida contabilizada, el sistema muestra: «La partida contabilizada no puede modificarse ni eliminarse».",
+    "Si la partida no existe, el sistema muestra: «La partida no existe»."
+   ],
+   "parametros": [
+    "La protección se aplica a todas las partidas en estado contabilizado."
+   ],
+   "salidas": [
+    "Confirmación de rechazo o mensaje de partida inexistente."
+   ],
+   "almacenamiento_bd": [
+    "partidas: id (PK), estado, fecha_contabilizacion; restricción de actualización y eliminación física para registros contabilizados.",
+    "partida_lineas: partida_id (FK); las líneas de una partida contabilizada quedan protegidas contra actualización y eliminación física."
+   ]
+  },
+  {
+   "nombre": "Corrección mediante partida compensatoria",
+   "descripcion": "El sistema deberá conservar la partida contabilizada original cuando se corrija un registro y exigir una nueva partida que documente el ajuste contable.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, especificaciones de cuentas y Libro diario; Práctica general de sistemas contables",
+   "entradas": [
+    "Partida original: partida_id (identificador)",
+    "Partida de ajuste: fecha (date), concepto (texto), líneas (cuentas e importes decimal)"
+   ],
+   "validacion_entradas": [
+    "La partida original debe existir y estar contabilizada.",
+    "La partida de ajuste debe cumplir las validaciones de cuadre.",
+    "El concepto debe identificar el motivo del ajuste."
+   ],
+   "validacion_salidas": [
+    "La partida original debe conservar sus datos sin cambios.",
+    "La nueva partida debe guardar la referencia a la partida original y cumplir la partida doble."
+   ],
+   "secuencia": [
+    "El contador identifica la partida original.",
+    "El sistema conserva el registro original.",
+    "El contador registra la partida de ajuste.",
+    "El sistema valida y contabiliza el ajuste con referencia a la partida original."
+   ],
+   "situaciones_anormales": [
+    "Si se intenta corregir sin referenciar una partida original existente, el sistema rechaza el registro y muestra: «Debe indicar una partida contabilizada existente».",
+    "Si el ajuste no cuadra, el sistema lo rechaza sin alterar la partida original."
+   ],
+   "parametros": [
+    "Las partidas originales contabilizadas se conservan sin modificación; las correcciones se registran en partidas separadas."
+   ],
+   "salidas": [
+    "Partida de ajuste contabilizada y vinculada a la original, o mensaje de rechazo."
+   ],
+   "almacenamiento_bd": [
+    "partidas: id (PK), partida_original_id (FK nullable a partidas.id), estado, concepto.",
+    "La referencia partida_original_id permite rastrear ajustes sin actualizar la partida original.",
+    "El alta del ajuste y su referencia se realiza en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Correlativo anual sin saltos",
+   "descripcion": "El sistema deberá asignar correlativos consecutivos sin saltos a las partidas contabilizadas de cada ejercicio contable.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general"
+   ],
+   "fuente": "Decisión de diseño del equipo (parámetros por defecto)",
+   "entradas": [
+    "Ejercicio contable (año, AAAA)",
+    "Solicitud de contabilización de partida (identificador)"
+   ],
+   "validacion_entradas": [
+    "El ejercicio debe corresponder a la fecha de la partida.",
+    "La solicitud debe superar las validaciones previas a la contabilización."
+   ],
+   "validacion_salidas": [
+    "El correlativo sigue el formato AAAA-NNNNNN.",
+    "Dentro de cada ejercicio, cada correlativo contabilizado incrementa en una unidad al anterior, sin saltos ni reutilización.",
+    "Una operación rechazada o revertida antes de contabilizar no consume un correlativo."
+   ],
+   "secuencia": [
+    "El sistema determina el ejercicio de la fecha de la partida.",
+    "Reserva el siguiente correlativo en la misma transacción de contabilización.",
+    "Confirma correlativo y partida conjuntamente al completar la transacción."
+   ],
+   "situaciones_anormales": [
+    "Si no se puede reservar el siguiente número, el sistema no contabiliza la partida y muestra: «No se pudo asignar el correlativo; la partida no fue contabilizada».",
+    "Si ocurre una reversión antes de confirmar la transacción, el número reservado vuelve a estar disponible."
+   ],
+   "parametros": [
+    "Formato por defecto: AAAA-NNNNNN; reinicio por ejercicio calendario del 1 de enero al 31 de diciembre; configurable por el Administrador.",
+    "Asignación consecutiva sin saltos como criterio de integridad."
+   ],
+   "salidas": [
+    "Correlativo único asociado a la partida contabilizada."
+   ],
+   "almacenamiento_bd": [
+    "partidas: id (PK), ejercicio smallint, correlativo (texto), estado; restricción UNIQUE (ejercicio, correlativo).",
+    "secuencias_partida: ejercicio (PK), ultimo_correlativo bigint; actualización atómica junto con la contabilización."
+   ]
+  },
+  {
+   "nombre": "Unicidad de correlativos concurrentes",
+   "descripcion": "El sistema deberá impedir que dos contabilizaciones simultáneas reciban el mismo correlativo dentro de un ejercicio.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general"
+   ],
+   "fuente": "Práctica general de sistemas contables; Decisión de diseño del equipo (parámetros por defecto)",
+   "entradas": [
+    "Solicitudes concurrentes de contabilización: identificadores de partida",
+    "Ejercicio contable (año, AAAA)"
+   ],
+   "validacion_entradas": [
+    "Cada partida debe superar las validaciones de contabilización.",
+    "El ejercicio debe coincidir con la fecha de cada partida."
+   ],
+   "validacion_salidas": [
+    "El 100 % de las partidas contabilizadas simultáneamente debe tener un correlativo distinto.",
+    "Los correlativos asignados deben conservar la secuencia anual sin saltos."
+   ],
+   "secuencia": [
+    "El sistema serializa la asignación de correlativos por ejercicio.",
+    "Asigna y confirma cada correlativo junto con su partida.",
+    "Reintenta o rechaza la transacción que no consiga una asignación válida."
+   ],
+   "situaciones_anormales": [
+    "Si una solicitud concurrente no obtiene un correlativo, el sistema revierte esa transacción y muestra: «No se pudo asignar el correlativo; vuelva a intentar la contabilización»."
+   ],
+   "parametros": [
+    "Correlativo por defecto: formato AAAA-NNNNNN y reinicio por ejercicio; la asignación debe ser atómica y configurable por el Administrador."
+   ],
+   "salidas": [
+    "Partidas contabilizadas con correlativos únicos, o mensaje de rechazo sin registro parcial."
+   ],
+   "almacenamiento_bd": [
+    "partidas: id (PK), ejercicio smallint, correlativo (texto); restricción UNIQUE (ejercicio, correlativo).",
+    "secuencias_partida: ejercicio (PK), ultimo_correlativo bigint; bloqueo o control de concurrencia por ejercicio durante la asignación."
+   ]
+  },
+  {
+   "nombre": "Cobertura de bitácora contable",
+   "descripcion": "El sistema deberá registrar en bitácora el 100 % de las altas, cambios de estado y ajustes que afecten partidas, líneas de partidas o cuentas del catálogo.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general"
+   ],
+   "fuente": "Práctica general de sistemas contables; Manual_aplicación_catálogo_SunGames.docx, procedimiento para crear, modificar o dar de baja una cuenta",
+   "entradas": [
+    "Operación contable: tipo de entidad, identificador, acción y datos afectados",
+    "Usuario ejecutor (identificador)",
+    "Fecha y hora de la operación (timestamp)"
+   ],
+   "validacion_entradas": [
+    "La operación debe estar asociada a un usuario autenticado.",
+    "La entidad y la acción deben identificarse con valores válidos."
+   ],
+   "validacion_salidas": [
+    "Cada operación confirmada debe tener exactamente un registro de bitácora asociado a la transacción.",
+    "No se confirma la operación si no puede persistirse su registro de bitácora."
+   ],
+   "secuencia": [
+    "El sistema prepara la operación y su evento de bitácora.",
+    "Persiste ambos dentro de una transacción.",
+    "Confirma ambos registros conjuntamente."
+   ],
+   "situaciones_anormales": [
+    "Si no se puede registrar el evento, el sistema revierte la operación contable y muestra: «No se guardó el cambio porque no pudo registrarse en la bitácora»."
+   ],
+   "parametros": [
+    "Cobertura exigida: 100 % de las operaciones contables confirmadas."
+   ],
+   "salidas": [
+    "Registro de bitácora asociado a cada operación contable confirmada."
+   ],
+   "almacenamiento_bd": [
+    "bitacora_contable: id (PK), usuario_id, entidad, entidad_id, accion, fecha_hora timestamp, transaccion_id.",
+    "Índice por entidad y entidad_id, y por fecha_hora.",
+    "La escritura de bitácora y la operación relacionada se ejecutan en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Bitácora de valores anteriores y nuevos",
+   "descripcion": "El sistema deberá conservar en la bitácora los valores anteriores y nuevos de cada campo alterado en los registros contables modificables.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Registro afectado: entidad y entidad_id",
+    "Valores anteriores y nuevos por campo (datos estructurados)"
+   ],
+   "validacion_entradas": [
+    "Cada campo alterado debe identificarse.",
+    "Los valores anteriores y nuevos deben corresponder al mismo registro y a la misma transacción."
+   ],
+   "validacion_salidas": [
+    "El 100 % de los campos cambiados debe contar con su valor anterior y nuevo en la bitácora.",
+    "La bitácora debe permitir reconstruir el cambio registrado."
+   ],
+   "secuencia": [
+    "El sistema obtiene los valores existentes.",
+    "Registra los valores anteriores y los nuevos junto con la operación.",
+    "Confirma el cambio solo cuando el detalle de bitácora se ha persistido."
+   ],
+   "situaciones_anormales": [
+    "Si falta el valor anterior o nuevo de un campo alterado, el sistema revierte el cambio y muestra: «No se guardó el cambio porque su detalle de auditoría está incompleto»."
+   ],
+   "parametros": [
+    "Cobertura de campos alterados: 100 %."
+   ],
+   "salidas": [
+    "Detalle auditable de los campos modificados y sus valores previos y posteriores."
+   ],
+   "almacenamiento_bd": [
+    "bitacora_detalle: id (PK), bitacora_id (FK), nombre_campo, valor_anterior (texto estructurado), valor_nuevo (texto estructurado).",
+    "Índice por bitacora_id y nombre_campo."
+   ]
+  },
+  {
+   "nombre": "Protección de bitácora contra alteración",
+   "descripcion": "El sistema deberá impedir la modificación o eliminación de registros de bitácora ya confirmados.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Solicitud de modificación o eliminación: bitacora_id (identificador)"
+   ],
+   "validacion_entradas": [
+    "El registro de bitácora debe existir.",
+    "El sistema debe verificar si el registro está confirmado."
+   ],
+   "validacion_salidas": [
+    "El 100 % de los intentos de modificar o eliminar bitácora confirmada debe ser rechazado.",
+    "El registro debe conservar su contenido original."
+   ],
+   "secuencia": [
+    "El sistema identifica el registro solicitado.",
+    "Verifica su estado confirmado.",
+    "Rechaza cualquier actualización o eliminación física."
+   ],
+   "situaciones_anormales": [
+    "Ante un intento de alteración, el sistema muestra: «Los registros de bitácora confirmados no pueden modificarse ni eliminarse» y conserva el registro."
+   ],
+   "parametros": [
+    "Los registros de bitácora confirmados son inmutables."
+   ],
+   "salidas": [
+    "Rechazo de la operación de alteración o eliminación."
+   ],
+   "almacenamiento_bd": [
+    "bitacora_contable: id (PK), fecha_hora timestamp, datos del evento; restricción de actualización y eliminación física una vez confirmado.",
+    "bitacora_detalle: id (PK), bitacora_id (FK); restricción de actualización y eliminación física una vez confirmado."
+   ]
+  },
+  {
+   "nombre": "Identidad temporal de eventos contables",
+   "descripcion": "El sistema deberá asociar a cada evento de bitácora contable el usuario ejecutor y una marca de fecha y hora generada por el sistema.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "Usuario ejecutor (identificador)",
+    "Fecha y hora del sistema (timestamp con zona horaria)",
+    "Evento contable (identificador)"
+   ],
+   "validacion_entradas": [
+    "El usuario debe existir y estar autenticado durante la operación.",
+    "La fecha y hora deben generarse en el servidor y ser válidas."
+   ],
+   "validacion_salidas": [
+    "El 100 % de los eventos de bitácora debe incluir usuario, fecha y hora.",
+    "La marca temporal debe ser inmutable después de confirmar el evento."
+   ],
+   "secuencia": [
+    "El sistema identifica al usuario autenticado.",
+    "Genera la marca temporal al recibir el evento.",
+    "Guarda ambos datos con el evento de bitácora."
+   ],
+   "situaciones_anormales": [
+    "Si no se puede identificar al usuario o generar la marca temporal, el sistema rechaza y revierte la operación asociada y muestra: «No se registró el evento contable por falta de datos de auditoría»."
+   ],
+   "parametros": [
+    "Precisión mínima de la marca temporal: milisegundos.",
+    "Zona horaria almacenada: UTC; presentación local configurable."
+   ],
+   "salidas": [
+    "Evento de bitácora con usuario y marca temporal verificables."
+   ],
+   "almacenamiento_bd": [
+    "bitacora_contable: id (PK), usuario_id (FK), fecha_hora timestamp con zona horaria, entidad, entidad_id, accion.",
+    "Índices por usuario_id y fecha_hora."
+   ]
+  },
+  {
+   "nombre": "Vinculación de partidas con documentos soporte",
+   "descripcion": "El sistema deberá conservar una referencia identificable entre cada partida contabilizada y el documento soporte de la operación.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Libro diario y conservación de libros y documentos soporte",
+   "entradas": [
+    "Partida: identificador",
+    "Documento soporte: tipo (texto), número de referencia (texto) y ubicación o referencia de archivo (texto)"
+   ],
+   "validacion_entradas": [
+    "El tipo y número de referencia del documento soporte son obligatorios al contabilizar.",
+    "La partida debe existir y el documento debe estar asociado a una operación."
+   ],
+   "validacion_salidas": [
+    "El 100 % de las partidas contabilizadas debe permitir recuperar la referencia de su documento soporte.",
+    "La relación entre partida y documento debe mantenerse disponible durante la conservación del registro."
+   ],
+   "secuencia": [
+    "El contador asocia el documento soporte a la partida.",
+    "El sistema valida la presencia de la referencia.",
+    "Guarda la relación como parte de la contabilización."
+   ],
+   "situaciones_anormales": [
+    "Si falta la referencia del documento soporte, el sistema rechaza la contabilización y muestra: «Debe asociar el documento soporte antes de contabilizar».",
+    "Si la referencia no está disponible al consultarla, el sistema informa: «No se pudo localizar el documento soporte asociado»."
+   ],
+   "parametros": [
+    "Referencia obligatoria para el 100 % de las partidas contabilizadas."
+   ],
+   "salidas": [
+    "Partida con referencia consultable al documento soporte."
+   ],
+   "almacenamiento_bd": [
+    "documentos_soporte: id (PK), tipo, numero_referencia, ubicacion_referencia, fecha_registro.",
+    "partida_documentos: partida_id (FK), documento_id (FK), PK compuesta (partida_id, documento_id).",
+    "Índice por numero_referencia."
+   ]
+  },
+  {
+   "nombre": "Integridad referencial de cuentas y líneas",
+   "descripcion": "El sistema deberá impedir que las líneas de partidas contabilizadas referencien cuentas inexistentes en el catálogo.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general",
+    "Administrador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, estructura del catálogo y Libro mayor",
+   "entradas": [
+    "Línea de partida: cuenta_id (identificador de cuenta)",
+    "Cuenta del catálogo: id y código"
+   ],
+   "validacion_entradas": [
+    "La cuenta referenciada debe existir antes de guardar la línea.",
+    "No se permite borrar físicamente una cuenta referenciada por una línea contabilizada."
+   ],
+   "validacion_salidas": [
+    "El 100 % de las líneas contabilizadas debe conservar una referencia válida al catálogo.",
+    "No puede quedar ninguna referencia contable huérfana."
+   ],
+   "secuencia": [
+    "El sistema verifica la existencia de la cuenta.",
+    "Guarda la línea con su referencia.",
+    "Impide la eliminación física de cuentas utilizadas por partidas contabilizadas."
+   ],
+   "situaciones_anormales": [
+    "Si la cuenta no existe, el sistema rechaza la línea y muestra: «La cuenta seleccionada no existe en el catálogo».",
+    "Si se intenta eliminar una cuenta referenciada, el sistema muestra: «No se puede eliminar una cuenta utilizada en partidas contabilizadas»."
+   ],
+   "parametros": [
+    "Integridad referencial exigida: 100 % de las líneas contabilizadas."
+   ],
+   "salidas": [
+    "Líneas contables con referencias válidas o mensajes de rechazo."
+   ],
+   "almacenamiento_bd": [
+    "cuentas: id (PK), codigo (texto, único), nombre, estado.",
+    "partida_lineas: id (PK), partida_id (FK), cuenta_id (FK); clave foránea con restricción que impide eliminar cuentas referenciadas."
+   ]
+  },
+  {
+   "nombre": "Atomicidad de contabilización",
+   "descripcion": "El sistema deberá confirmar o revertir como una sola transacción la partida, sus líneas, su correlativo y la bitácora asociada.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general"
+   ],
+   "fuente": "Práctica general de sistemas contables; Decisión de diseño del equipo (parámetros por defecto)",
+   "entradas": [
+    "Partida: fecha, concepto y líneas",
+    "Correlativo reservado",
+    "Evento de bitácora asociado"
+   ],
+   "validacion_entradas": [
+    "La partida y sus líneas deben superar todas las validaciones antes de confirmar la transacción.",
+    "Las referencias al ejercicio y al usuario deben ser válidas."
+   ],
+   "validacion_salidas": [
+    "Ante éxito, todos los componentes quedan persistidos.",
+    "Ante error, ninguno de los componentes queda persistido ni el correlativo queda consumido."
+   ],
+   "secuencia": [
+    "El sistema inicia una transacción.",
+    "Guarda partida, líneas, correlativo y bitácora.",
+    "Confirma todos los registros únicamente si todas las escrituras concluyen.",
+    "En caso contrario, revierte la transacción completa."
+   ],
+   "situaciones_anormales": [
+    "Si falla cualquier escritura, el sistema revierte partida, líneas, correlativo y bitácora y muestra: «La contabilización falló; no se guardó ningún cambio»."
+   ],
+   "parametros": [
+    "Atomicidad requerida: 100 % de las operaciones de contabilización."
+   ],
+   "salidas": [
+    "Confirmación de contabilización completa o mensaje de reversión completa."
+   ],
+   "almacenamiento_bd": [
+    "partidas, partida_lineas, secuencias_partida y bitacora_contable se escriben en una única transacción atómica.",
+    "Las claves foráneas y restricciones únicas se verifican antes de confirmar."
+   ]
+  },
+  {
+   "nombre": "Concordancia entre diario y mayor",
+   "descripcion": "El sistema deberá asegurar que los movimientos y saldos del libro mayor correspondan íntegramente a las partidas contabilizadas del libro diario.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Libro diario y Libro mayor",
+   "entradas": [
+    "Partidas contabilizadas del período (fecha, cuenta, debe y haber)",
+    "Período de consulta (fecha inicial y fecha final)"
+   ],
+   "validacion_entradas": [
+    "El período debe tener fechas válidas y fecha inicial no posterior a fecha final.",
+    "Solo se consideran partidas contabilizadas."
+   ],
+   "validacion_salidas": [
+    "Para cada cuenta y período, el total de movimientos del mayor debe ser igual a la suma de sus líneas del diario.",
+    "El saldo por cuenta debe calcularse como saldo inicial más movimientos del período según Debe y Haber.",
+    "La diferencia entre diario y mayor debe ser 0.00."
+   ],
+   "secuencia": [
+    "El sistema obtiene las partidas contabilizadas del período.",
+    "Agrupa los movimientos por cuenta.",
+    "Calcula los saldos del mayor.",
+    "Compara los totales del mayor con las líneas del diario y reporta diferencias."
+   ],
+   "situaciones_anormales": [
+    "Si se detecta una diferencia, el sistema identifica cuenta y período, muestra los totales comparados y marca la conciliación como fallida.",
+    "Si no hay partidas para el período, el sistema presenta totales cero."
+   ],
+   "parametros": [
+    "Precisión monetaria por defecto: 2 decimales; tolerancia de diferencia: 0.00, configurables por el Administrador."
+   ],
+   "salidas": [
+    "Consulta de movimientos y saldos por cuenta.",
+    "Resultado de concordancia entre diario y mayor, con diferencias identificadas."
+   ],
+   "almacenamiento_bd": [
+    "partidas: id (PK), fecha, estado.",
+    "partida_lineas: id (PK), partida_id (FK), cuenta_id (FK), debe decimal(14,2), haber decimal(14,2).",
+    "El libro mayor se obtiene de las líneas contabilizadas; no se almacenan saldos derivados como única fuente de verdad."
+   ]
+  },
+  {
+   "nombre": "Retención y recuperación de registros contables",
+   "descripcion": "El sistema deberá conservar los registros contables y sus documentos soporte sin eliminación física y permitir recuperar sus datos y relaciones durante el período de retención configurado.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Conservación de libros y documentos soporte; Práctica general de sistemas contables",
+   "entradas": [
+    "Registro contable o documento soporte: identificador",
+    "Período de retención (duración configurable)",
+    "Solicitud de consulta o recuperación"
+   ],
+   "validacion_entradas": [
+    "El período de retención debe estar configurado antes de permitir una eliminación lógica o depuración.",
+    "El registro solicitado debe tener un identificador válido."
+   ],
+   "validacion_salidas": [
+    "El 100 % de los registros dentro del período de retención debe conservarse y poder recuperarse con sus relaciones.",
+    "No se permite la eliminación física de partidas contabilizadas, líneas asociadas, bitácoras ni documentos soporte vinculados."
+   ],
+   "secuencia": [
+    "El sistema verifica el período de retención aplicable.",
+    "Conserva los registros protegidos y sus relaciones.",
+    "Al recibir una solicitud, recupera el registro y sus referencias asociadas."
+   ],
+   "situaciones_anormales": [
+    "Si se solicita eliminar físicamente un registro protegido, el sistema rechaza la operación y muestra: «El registro está sujeto a conservación y no puede eliminarse».",
+    "Si un registro no puede recuperarse, el sistema lo informa y registra el incidente técnico."
+   ],
+   "parametros": [
+    "Duración legal de conservación: [PENDIENTE DE VERIFICAR].",
+    "No eliminación física de registros contables contabilizados mientras estén sujetos al período de conservación configurado."
+   ],
+   "salidas": [
+    "Registro contable y documentos soporte recuperados con sus referencias.",
+    "Mensaje de rechazo por conservación o aviso de fallo de recuperación."
+   ],
+   "almacenamiento_bd": [
+    "partidas, partida_lineas, bitacora_contable, bitacora_detalle, documentos_soporte y partida_documentos conservan sus claves y relaciones.",
+    "Campos de fecha de creación y fecha de contabilización disponibles para determinar retención.",
+    "Restricciones de eliminación física para registros contables contabilizados, bitácoras confirmadas y documentos soporte vinculados."
+   ]
+  }
+ ],
+ "vacios": [
+  "El plazo legal aplicable para conservar libros contables y documentos soporte no está especificado en las fuentes; verificar la normativa vigente antes de configurar la duración de retención."
+ ]
+}

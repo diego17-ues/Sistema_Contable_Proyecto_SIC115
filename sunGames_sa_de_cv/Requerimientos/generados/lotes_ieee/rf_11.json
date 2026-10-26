@@ -1,0 +1,234 @@
+{
+ "requerimientos": [
+  {
+   "nombre": "Ajustes mensuales de depreciación y amortización",
+   "descripcion": "El sistema deberá generar partidas de ajuste mensuales por depreciación y amortización de activos conforme a los métodos, vidas útiles, valores residuales y fechas de inicio aprobados para cada activo.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Sobre el cierre contable; Política 4.2; Política 7; Política 9",
+   "entradas": [
+    "periodo_contable (año-mes, AAAA-MM)",
+    "activos y licencias sujetos a cálculo (identificadores del auxiliar, cuenta contable, costo y fecha de puesta en uso o disponibilidad para venta)",
+    "vida_util (decimal, años o meses)",
+    "valor_residual (decimal, moneda contable)",
+    "metodo (texto; línea recta u otro método aprobado)",
+    "uso_del_activo (enumeración: administrativo o desarrollo)"
+   ],
+   "validacion_entradas": [
+    "El periodo debe estar abierto según el control de períodos existente.",
+    "Cada activo debe existir, estar vigente y tener costo, fecha de inicio y cuentas contables asociadas.",
+    "La vida útil debe ser mayor que cero; el valor residual debe ser mayor o igual que cero y menor que el costo.",
+    "El método debe estar aprobado y la cuenta de contrapartida debe corresponder al tipo y uso del activo.",
+    "No debe existir una partida de ajuste ya generada para el mismo activo, concepto y periodo."
+   ],
+   "validacion_salidas": [
+    "Para línea recta, cuota periódica = (costo del activo - valor residual) / número de periodos de vida útil; la cuota no excede el importe en libros depreciable o amortizable pendiente.",
+    "La amortización de videojuegos terminados carga 4104 y abona 1206; la depreciación de activos administrativos carga 4207 y abona 1203; la amortización de licencias administrativas carga 4208 y abona 1208.",
+    "Los activos de uso directo en desarrollo se asignan a 4103 y a las órdenes correspondientes cuando aplique, conforme al manual.",
+    "Cada partida generada cumple el cuadre entre debe y haber."
+   ],
+   "secuencia": [
+    "El contador selecciona el periodo y los activos a calcular.",
+    "El sistema valida los parámetros aprobados y comprueba que no existan ajustes duplicados.",
+    "El sistema calcula las cuotas por activo y prepara las partidas de ajuste en borrador para su revisión y mayorización mediante las funciones existentes.",
+    "El sistema presenta el detalle calculado y los totales por cuenta."
+   ],
+   "situaciones_anormales": [
+    "Periodo cerrado: el sistema rechaza la operación y muestra «No se pueden generar ajustes en un período cerrado».",
+    "Parámetros incompletos o no aprobados: el sistema no genera partidas e identifica los activos pendientes de configuración.",
+    "Ajuste duplicado para el activo y periodo: el sistema bloquea la generación e informa el identificador de la partida existente.",
+    "Fallo al guardar: el sistema revierte el lote completo y muestra «No se guardaron los ajustes; vuelva a intentarlo»."
+   ],
+   "parametros": [
+    "Frecuencia: mensual, conforme al cierre descrito en el manual.",
+    "Método de línea recta para depreciación de activos fijos, según Política 9.",
+    "Vida útil, valor residual y método de amortización de videojuegos: valores aprobados por activo; la política inicial indica cuatro años y valor residual cero, sujetos a la confirmación de la política contable aplicable.",
+    "Precisión monetaria: la configurada para la moneda contable."
+   ],
+   "salidas": [
+    "Partidas de ajuste mensuales en borrador, con detalle por activo, cuenta, periodo y cálculo.",
+    "Resumen de cuotas por concepto y cuenta.",
+    "Mensajes de validación o de resultado del proceso."
+   ],
+   "almacenamiento_bd": [
+    "ajuste_lotes: id (PK), periodo_contable, tipo_ajuste, estado, usuario_id, created_at; índice por periodo_contable y tipo_ajuste.",
+    "ajuste_detalles: id (PK), lote_id (FK), activo_id, costo_base decimal(14,2), valor_residual decimal(14,2), vida_util_periodos, cuota decimal(14,2), cuenta_debe_id (FK), cuenta_haber_id (FK), partida_id (FK, nullable); unicidad por activo_id, tipo_ajuste y periodo_contable.",
+    "El cálculo y la creación del lote se realizan en una transacción atómica; las partidas resultantes usan el mecanismo existente de borrador y mayorización."
+   ]
+  },
+  {
+   "nombre": "Traslado de costos de desarrollo al activo",
+   "descripcion": "El sistema deberá generar la partida de traslado de los costos acumulados de desarrollo de un videojuego desde las cuentas 4101 a 4103 hacia 1204 al cierre del periodo, y de 1204 hacia 1205 cuando se registre que el videojuego está completo y disponible para la venta.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuentas 1204, 1205 y 4101 a 4103; Sobre el cierre contable; Política 4.1 y Política 7",
+   "entradas": [
+    "periodo_contable (año-mes, AAAA-MM)",
+    "orden_trabajo_id (identificador existente)",
+    "saldo_por_cuenta (lista de cuenta contable y monto decimal(14,2))",
+    "evento_de_lanzamiento (booleano)",
+    "fecha_disponible_para_venta (date, obligatoria si evento_de_lanzamiento es verdadero)",
+    "politica_contable_aplicable (enumeración o referencia a configuración aprobada)"
+   ],
+   "validacion_entradas": [
+    "El periodo debe estar abierto según el control de períodos existente.",
+    "La orden de trabajo debe existir y tener costos acumulados conciliables con las cuentas 4101 a 4103.",
+    "Los importes deben ser no negativos y corresponder a los saldos del mayor para la orden y el periodo.",
+    "El traslado hacia 1205 requiere evento de lanzamiento verdadero y fecha de disponibilidad para la venta.",
+    "La política contable aplicable debe estar aprobada antes de capitalizar costos internos; si no está definida, el sistema debe bloquear el asiento de capitalización."
+   ],
+   "validacion_salidas": [
+    "El importe trasladado desde 4101 a 4103 debe ser igual al total elegible acumulado en la orden de trabajo.",
+    "El asiento hacia 1204 debe cargar 1204 y abonar las cuentas de costos de desarrollo por los importes trasladados.",
+    "Al lanzarse el videojuego, el asiento debe cargar 1205 y abonar 1204 por el saldo trasladado correspondiente.",
+    "Cada partida debe cuadrar y no puede trasladar dos veces el mismo saldo."
+   ],
+   "secuencia": [
+    "El contador selecciona el periodo y la orden de trabajo.",
+    "El sistema compara el costo acumulado de la orden con los saldos contables de 4101 a 4103.",
+    "El sistema verifica la política contable aprobada y prepara el traslado a 1204.",
+    "Si se informó que el videojuego está completo y disponible para la venta, el sistema prepara el traslado del saldo aplicable de 1204 a 1205.",
+    "El sistema presenta las partidas en borrador para revisión y mayorización mediante las funciones existentes."
+   ],
+   "situaciones_anormales": [
+    "Política contable no definida o no aprobada: el sistema bloquea la capitalización y muestra «No se pueden capitalizar costos hasta confirmar la política contable aplicable».",
+    "Costos de la orden distintos de los saldos contables: el sistema bloquea el traslado y muestra ambos importes para conciliación.",
+    "No existe saldo trasladable en la cuenta de origen: el sistema no genera una partida en cero e informa «No hay costos disponibles para trasladar».",
+    "Fallo al guardar cualquiera de las partidas: el sistema revierte el conjunto de traslados del proceso."
+   ],
+   "parametros": [
+    "Cuentas de origen para costos de desarrollo: 4101, 4102 y 4103; cuenta de activo en desarrollo: 1204; cuenta de videojuegos terminados: 1205.",
+    "La capitalización de desarrollo interno queda condicionada a la política contable que SunGames confirme y apruebe.",
+    "La fecha de disponibilidad para la venta se registra por videojuego."
+   ],
+   "salidas": [
+    "Partida de traslado de costos a 1204 en borrador.",
+    "Cuando corresponda, partida de traslado de 1204 a 1205 en borrador.",
+    "Detalle de importes por cuenta, orden de trabajo y videojuego, con resultado de validación."
+   ],
+   "almacenamiento_bd": [
+    "traslados_costos: id (PK), orden_trabajo_id (FK), periodo_contable, tipo_traslado, importe decimal(14,2), fecha_disponible_para_venta nullable, partida_id (FK, nullable), usuario_id, created_at; unicidad por orden_trabajo_id, tipo_traslado y periodo_contable.",
+    "traslado_costos_detalles: id (PK), traslado_id (FK), cuenta_origen_id (FK), cuenta_destino_id (FK), importe decimal(14,2).",
+    "La validación de saldos, creación de traslados y generación de partidas se realiza en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Cierre contable del ejercicio",
+   "descripcion": "El sistema deberá generar las partidas de cierre anual que liquiden los saldos de ingresos y egresos contra la cuenta 3104 y trasladen el resultado del ejercicio a 3103.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuenta 3104; Sobre el cierre contable, Cierre anual",
+   "entradas": [
+    "ejercicio (año, AAAA)",
+    "saldos_de_cierre (lista de cuentas contables y saldos del libro mayor)",
+    "resultado_del_ejercicio (decimal(14,2), derivado de los saldos validados)",
+    "impuesto_sobre_la_renta_determinado (decimal(14,2), cuando corresponda)",
+    "reserva_legal_a_separar (decimal(14,2), cuando corresponda)"
+   ],
+   "validacion_entradas": [
+    "El ejercicio debe estar abierto para cierre y no debe tener un cierre anual contabilizado previamente.",
+    "Los saldos de cierre deben corresponder al mayor y las cuentas deben conservar la naturaleza definida en el catálogo.",
+    "El impuesto y la reserva legal, si se ingresan, deben contar con importes determinados y respaldados; el sistema no inventa tasas ni calcula valores legales no definidos.",
+    "No se permite finalizar el cierre si existen partidas de cierre en borrador o si el balance de comprobación no cuadra."
+   ],
+   "validacion_salidas": [
+    "Los saldos de ingresos y egresos incluidos en el cierre quedan liquidados contra 3104 y 3104 queda en cero tras trasladar el resultado.",
+    "El resultado trasladado a 3103 coincide con la utilidad o pérdida determinada en 3104.",
+    "El total del debe es igual al total del haber en cada partida generada.",
+    "Los saldos finales utilizados para los reportes financieros corresponden al mayor después del cierre."
+   ],
+   "secuencia": [
+    "El contador solicita el cierre anual para el ejercicio.",
+    "El sistema valida que estén registrados los movimientos y ajustes del ejercicio y que los saldos cuadren.",
+    "El sistema prepara las partidas para liquidar ingresos y egresos contra 3104.",
+    "El sistema calcula el saldo de 3104 y prepara su traslado a 3103.",
+    "El sistema presenta las partidas de cierre en borrador para revisión y mayorización mediante las funciones existentes."
+   ],
+   "situaciones_anormales": [
+    "Ejercicio con cierre anual ya contabilizado: el sistema bloquea la operación y muestra «El ejercicio ya tiene un cierre anual contabilizado».",
+    "Balance de comprobación descuadrado o ajustes pendientes: el sistema bloquea la generación del cierre e identifica la condición pendiente.",
+    "Importe de impuesto o reserva sin determinación o respaldo: el sistema no lo incorpora y solicita completar la determinación correspondiente.",
+    "Fallo al guardar el cierre: el sistema revierte todas las partidas del proceso y muestra «No se guardó el cierre anual; no se aplicaron cambios»."
+   ],
+   "parametros": [
+    "Frecuencia: una vez por ejercicio contable.",
+    "Cuenta liquidadora: 3104; cuenta de resultados acumulados: 3103.",
+    "Los valores de impuesto sobre la renta y reserva legal se reciben determinados; no se define una tasa por defecto."
+   ],
+   "salidas": [
+    "Partidas de cierre anual en borrador.",
+    "Resultado del ejercicio y saldo final de 3104.",
+    "Resumen de cuentas liquidadas y validaciones del proceso."
+   ],
+   "almacenamiento_bd": [
+    "cierres_ejercicio: id (PK), ejercicio, estado, resultado decimal(14,2), impuesto_determinado decimal(14,2) nullable, reserva_legal decimal(14,2) nullable, usuario_id, created_at; restricción de unicidad para un cierre contabilizado por ejercicio.",
+    "cierre_ejercicio_partidas: id (PK), cierre_id (FK), partida_id (FK), tipo_partida; unicidad por cierre_id y tipo_partida.",
+    "El cierre anual y sus partidas se guardan en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Reapertura autorizada de periodo cerrado",
+   "descripcion": "El sistema deberá permitir que el Administrador reabra un periodo cerrado únicamente con una justificación obligatoria y registrando la operación en una bitácora de auditoría.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador"
+   ],
+   "fuente": "Práctica general de sistemas contables; alcance de reapertura controlada solicitado para el submódulo",
+   "entradas": [
+    "periodo_contable (año-mes, AAAA-MM)",
+    "justificacion (texto, obligatoria)",
+    "usuario_solicitante_id (identificador de usuario autenticado)",
+    "fecha_hora_solicitud (timestamp)"
+   ],
+   "validacion_entradas": [
+    "El usuario debe tener el rol Administrador conforme a la asignación de roles existente.",
+    "El periodo debe existir y estar cerrado.",
+    "La justificación debe contener texto no vacío.",
+    "La solicitud debe referirse a un solo periodo contable."
+   ],
+   "validacion_salidas": [
+    "El periodo cambia de cerrado a abierto solo si pasan todas las validaciones.",
+    "La bitácora conserva el periodo, el usuario, la fecha y hora, la justificación y el estado anterior y posterior.",
+    "La operación no modifica ni elimina partidas contables existentes."
+   ],
+   "secuencia": [
+    "El Administrador selecciona un periodo cerrado e ingresa la justificación.",
+    "El sistema valida el rol, el estado del periodo y la justificación.",
+    "El sistema reabre el periodo y registra el evento en la bitácora dentro de una transacción atómica.",
+    "El sistema confirma el periodo reabierto y muestra el registro de auditoría."
+   ],
+   "situaciones_anormales": [
+    "Usuario sin rol Administrador: el sistema bloquea la operación y muestra «No tiene permiso para reabrir períodos».",
+    "Periodo no cerrado: el sistema bloquea la operación y muestra «El período seleccionado no está cerrado».",
+    "Justificación vacía: el sistema rechaza la solicitud y muestra «Ingrese la justificación de la reapertura».",
+    "Fallo al actualizar el periodo o registrar la bitácora: el sistema revierte la operación completa y muestra «No se reabrió el período; no se aplicaron cambios»."
+   ],
+   "parametros": [
+    "Rol autorizado: Administrador.",
+    "Justificación: obligatoria; longitud máxima [PENDIENTE DE VERIFICAR].",
+    "La reapertura no altera partidas ni elimina el historial de cierre."
+   ],
+   "salidas": [
+    "Confirmación del periodo reabierto.",
+    "Registro de auditoría de la reapertura o mensaje de rechazo."
+   ],
+   "almacenamiento_bd": [
+    "reaperturas_periodo: id (PK), periodo_id (FK), usuario_id (FK), justificacion (texto), estado_anterior, estado_posterior, created_at; índice por periodo_id y created_at.",
+    "La actualización del estado del periodo y la inserción de la bitácora se ejecutan en una transacción atómica."
+   ]
+  }
+ ],
+ "vacios": [
+  "El Manual_aplicación_catálogo_SunGames.docx contiene una discrepancia sobre capitalizar desarrollo interno: las Políticas 4.1 y 7 contemplan acumular costos en 1204 y trasladarlos a 1205, mientras que la Política 7 indica que bajo NIIF para las PYMES el desarrollo interno se reconoce como gasto. Debe confirmarse y aprobarse el marco y tratamiento contable aplicables antes de habilitar el traslado.",
+  "La vida útil de videojuegos se presenta como una política inicial de cuatro años y también se menciona un máximo fiscal anual cuya aplicabilidad y vigencia deben confirmarse; el sistema requiere la vida útil contable aprobada para cada activo.",
+  "El manual no especifica la autoridad, el flujo de aprobación ni la longitud máxima de la justificación para reabrir periodos; se ha definido al Administrador como actor autorizado para concretar la reapertura controlada solicitada.",
+  "El manual exige determinar el impuesto sobre la renta y separar la reserva legal en el cierre anual, pero no aporta en este alcance las tasas ni las fórmulas necesarias para calcular sus importes; deben ingresarse importes determinados y respaldados.",
+  "El manual presenta políticas de amortización y depreciación sujetas a aprobación o revisión. Los parámetros definitivos por activo deben confirmarse antes de generar ajustes."
+ ]
+}

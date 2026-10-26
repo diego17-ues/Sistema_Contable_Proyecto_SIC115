@@ -1,0 +1,548 @@
+{
+ "requerimientos": [
+  {
+   "nombre": "Identificador único de usuario",
+   "descripcion": "El sistema deberá exigir un identificador único para cada usuario autenticado.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "identificador (texto)",
+    "contraseña (texto)"
+   ],
+   "validacion_entradas": [
+    "El identificador es obligatorio y único, sin distinguir mayúsculas de minúsculas.",
+    "La autenticación solo procede si el identificador corresponde a una cuenta habilitada y la contraseña es válida."
+   ],
+   "validacion_salidas": [
+    "Una cuenta individual permite identificar al usuario que realizó cada operación autenticada.",
+    "No se aceptan dos cuentas con el mismo identificador normalizado."
+   ],
+   "secuencia": [
+    "El usuario introduce identificador y contraseña.",
+    "El sistema localiza la cuenta por identificador y valida las credenciales.",
+    "El sistema concede acceso únicamente a la cuenta autenticada."
+   ],
+   "situaciones_anormales": [
+    "Identificador o contraseña no válidos: mostrar «Credenciales no válidas.» sin indicar cuál dato falló.",
+    "Cuenta inexistente o deshabilitada: rechazar la autenticación sin crear una sesión."
+   ],
+   "parametros": [
+    "El identificador debe ser único dentro del sistema."
+   ],
+   "salidas": [
+    "Resultado de autenticación y, si es satisfactoria, la identidad de usuario asociada a la sesión."
+   ],
+   "almacenamiento_bd": [
+    "usuarios: id (clave primaria), identificador (texto, único e indexado), estado (texto), created_at (fecha y hora)."
+   ]
+  },
+  {
+   "nombre": "Política de contraseñas",
+   "descripcion": "El sistema deberá rechazar las contraseñas que no cumplan la política configurada.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Decisión de diseño del equipo (parámetros por defecto)",
+   "entradas": [
+    "contraseña_nueva (texto)",
+    "historial_contraseñas (conjunto de hashes asociados a la cuenta)"
+   ],
+   "validacion_entradas": [
+    "La contraseña nueva debe tener al menos 10 caracteres, una letra mayúscula, una letra minúscula y un número.",
+    "La contraseña nueva no debe coincidir con ninguna de las últimas 5 contraseñas de la cuenta."
+   ],
+   "validacion_salidas": [
+    "El cambio se completa únicamente si todas las reglas configuradas se satisfacen.",
+    "La contraseña nueva no se devuelve ni se muestra en claro después de su envío."
+   ],
+   "secuencia": [
+    "El usuario envía la contraseña nueva.",
+    "El sistema comprueba longitud, composición y coincidencia con el historial.",
+    "Si cumple todas las reglas, registra la contraseña y actualiza el historial; de lo contrario, rechaza el cambio."
+   ],
+   "situaciones_anormales": [
+    "Contraseña fuera de política: mostrar «La contraseña no cumple la política configurada.» y no modificar la contraseña vigente.",
+    "Coincidencia con una contraseña reciente: mostrar «No puede reutilizar una de sus últimas 5 contraseñas.» y no modificar la contraseña vigente."
+   ],
+   "parametros": [
+    "Mínimo de 10 caracteres, mayúscula, minúscula y número; no reutilizar las últimas 5 contraseñas. Valores configurables por el administrador."
+   ],
+   "salidas": [
+    "Confirmación de cambio de contraseña o mensaje de rechazo."
+   ],
+   "almacenamiento_bd": [
+    "usuarios: id (clave primaria), identificador (texto, único), password_hash (texto), estado (texto).",
+    "historial_contraseñas: id (clave primaria), usuario_id (clave foránea a usuarios.id), password_hash (texto), created_at (fecha y hora); índice por usuario_id y fecha, conservando las 5 más recientes."
+   ]
+  },
+  {
+   "nombre": "Almacenamiento de contraseñas",
+   "descripcion": "El sistema deberá almacenar las contraseñas exclusivamente como hashes adaptativos con sal individual y nunca en texto recuperable.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "contraseña (texto, recibida durante autenticación o cambio de credencial)"
+   ],
+   "validacion_entradas": [
+    "La contraseña solo puede procesarse en memoria durante la operación de autenticación o actualización.",
+    "Ningún proceso podrá persistir la contraseña en claro en tablas, registros de aplicación o bitácoras."
+   ],
+   "validacion_salidas": [
+    "La inspección de la base de datos, bitácoras y registros no debe revelar contraseñas en claro ni permitir recuperarlas.",
+    "Cada hash debe generarse con una sal individual y un algoritmo adaptativo de almacenamiento de contraseñas."
+   ],
+   "secuencia": [
+    "El sistema recibe la contraseña por un canal protegido.",
+    "El sistema calcula o verifica su hash adaptativo con sal individual.",
+    "El sistema persiste únicamente el hash y los metadatos necesarios para verificarlo."
+   ],
+   "situaciones_anormales": [
+    "Falla al generar o verificar el hash: cancelar la autenticación o el cambio y mostrar «No fue posible completar la operación de credenciales.» sin guardar la contraseña.",
+    "Detección de una contraseña en claro en un registro persistente: impedir la escritura y registrar el evento de seguridad sin incluir la contraseña."
+   ],
+   "parametros": [
+    "El algoritmo de hash debe ser adaptativo y usar sal individual; la configuración criptográfica debe poder actualizarse sin almacenar contraseñas en claro."
+   ],
+   "salidas": [
+    "Verificación de contraseña o confirmación de actualización sin exponer la credencial."
+   ],
+   "almacenamiento_bd": [
+    "usuarios: id (clave primaria), password_hash (texto), password_algorithm (texto), password_parameters (texto).",
+    "Restricción: no almacenar campos de contraseña en claro; acceso de lectura a password_hash restringido a los procesos de autenticación."
+   ]
+  },
+  {
+   "nombre": "Bloqueo por intentos fallidos",
+   "descripcion": "El sistema deberá bloquear temporalmente la autenticación de una cuenta al alcanzar el límite configurado de intentos fallidos consecutivos.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Decisión de diseño del equipo (parámetros por defecto)",
+   "entradas": [
+    "identificador (texto)",
+    "resultado_autenticación (booleano)",
+    "fecha_hora_intento (fecha y hora)"
+   ],
+   "validacion_entradas": [
+    "Cada intento debe asociarse a la cuenta identificada, si existe, y registrarse con fecha y hora.",
+    "El contador de intentos consecutivos se reinicia después de una autenticación satisfactoria."
+   ],
+   "validacion_salidas": [
+    "Con 5 intentos fallidos consecutivos, la cuenta queda bloqueada durante 15 minutos.",
+    "Mientras el bloqueo esté vigente, ningún intento permite crear una sesión."
+   ],
+   "secuencia": [
+    "El sistema registra el resultado del intento.",
+    "Si es fallido, incrementa el contador consecutivo.",
+    "Al alcanzar el límite, establece la hora de desbloqueo y rechaza nuevos inicios de sesión hasta entonces.",
+    "Al cumplirse el plazo, permite volver a intentar la autenticación."
+   ],
+   "situaciones_anormales": [
+    "Cuenta bloqueada: mostrar «Cuenta bloqueada temporalmente. Intente nuevamente más tarde.» y no crear sesión.",
+    "Error al registrar el contador: rechazar la autenticación y mostrar «No fue posible completar la autenticación.»."
+   ],
+   "parametros": [
+    "Límite: 5 intentos fallidos consecutivos; duración del bloqueo: 15 minutos. Valores configurables por el administrador."
+   ],
+   "salidas": [
+    "Resultado del intento, estado de bloqueo y hora de desbloqueo cuando aplique."
+   ],
+   "almacenamiento_bd": [
+    "usuarios: id (clave primaria), estado_bloqueo (texto), bloqueada_hasta (fecha y hora, anulable), intentos_fallidos (entero).",
+    "intentos_autenticación: id (clave primaria), usuario_id (clave foránea anulable a usuarios.id), identificador_ingresado (texto), resultado (booleano), fecha_hora (fecha y hora); índice por usuario_id y fecha_hora."
+   ]
+  },
+  {
+   "nombre": "Expiración por inactividad",
+   "descripcion": "El sistema deberá invalidar una sesión cuando alcance el tiempo configurado sin actividad del usuario.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Decisión de diseño del equipo (parámetros por defecto)",
+   "entradas": [
+    "sesión_id (identificador opaco)",
+    "fecha_hora_última_actividad (fecha y hora)",
+    "fecha_hora_solicitud (fecha y hora)"
+   ],
+   "validacion_entradas": [
+    "La sesión debe pertenecer a un usuario autenticado y estar vigente.",
+    "La actividad se actualiza solo ante una solicitud autenticada válida."
+   ],
+   "validacion_salidas": [
+    "Una sesión sin actividad durante 30 minutos queda invalidada.",
+    "Una sesión expirada no permite consultar ni modificar datos."
+   ],
+   "secuencia": [
+    "El sistema comprueba la vigencia de la sesión al recibir una solicitud.",
+    "Calcula el tiempo transcurrido desde la última actividad válida.",
+    "Si se alcanzó el umbral, invalida la sesión; si no, procesa la solicitud y actualiza la última actividad."
+   ],
+   "situaciones_anormales": [
+    "Sesión expirada: rechazar la solicitud y mostrar «La sesión expiró. Inicie sesión nuevamente.»",
+    "Identificador de sesión inválido: rechazar la solicitud y mostrar «La sesión no es válida. Inicie sesión nuevamente.»"
+   ],
+   "parametros": [
+    "Expiración tras 30 minutos de inactividad. Valor configurable por el administrador."
+   ],
+   "salidas": [
+    "Acceso concedido a la solicitud o aviso de sesión expirada."
+   ],
+   "almacenamiento_bd": [
+    "sesiones: id (clave primaria), token_hash (texto, único), usuario_id (clave foránea a usuarios.id), ultima_actividad (fecha y hora), expira_en (fecha y hora), estado (texto); índice por token_hash y usuario_id."
+   ]
+  },
+  {
+   "nombre": "Invalidación de sesiones",
+   "descripcion": "El sistema deberá invalidar el identificador de sesión al cerrar sesión y renovar la sesión después de una autenticación satisfactoria.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "sesión_id (identificador opaco)",
+    "acción (enum: iniciar_sesión, cerrar_sesión)"
+   ],
+   "validacion_entradas": [
+    "La acción de cierre debe referirse a una sesión autenticada vigente.",
+    "El identificador de sesión debe ser generado por el sistema y no derivarse de datos predecibles del usuario."
+   ],
+   "validacion_salidas": [
+    "Después del cierre, el identificador anterior no autoriza solicitudes posteriores.",
+    "Después de autenticarse, el sistema emite un identificador de sesión nuevo y no conserva el identificador previo."
+   ],
+   "secuencia": [
+    "Tras una autenticación satisfactoria, el sistema genera una sesión nueva.",
+    "Al recibir cierre de sesión, invalida la sesión en el almacenamiento.",
+    "El sistema rechaza cualquier uso posterior del identificador invalidado."
+   ],
+   "situaciones_anormales": [
+    "Cierre de una sesión inexistente: mostrar «La sesión no es válida o ya fue cerrada.» y no conceder acceso.",
+    "Falla al invalidar la sesión: mostrar «No fue posible cerrar la sesión.» y rechazar solicitudes protegidas con ese identificador."
+   ],
+   "parametros": [
+    "Los identificadores de sesión deben ser opacos, impredecibles y renovados al autenticar."
+   ],
+   "salidas": [
+    "Confirmación de cierre de sesión o rechazo de una sesión inválida."
+   ],
+   "almacenamiento_bd": [
+    "sesiones: id (clave primaria), token_hash (texto, único), usuario_id (clave foránea a usuarios.id), estado (texto), created_at (fecha y hora), invalidada_en (fecha y hora, anulable)."
+   ]
+  },
+  {
+   "nombre": "Autorización por rol",
+   "descripcion": "El sistema deberá permitir cada operación protegida únicamente al rol cuyas funciones la incluyen.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Decisión de diseño del equipo (parámetros por defecto)",
+   "entradas": [
+    "usuario_id (identificador)",
+    "rol (enum: administrador, contador_general, contador_costos)",
+    "operación (identificador de función)"
+   ],
+   "validacion_entradas": [
+    "Toda solicitud protegida debe estar asociada a una sesión autenticada y a un rol asignado.",
+    "Las funciones autorizadas se limitan a las definidas para los roles: administrador (usuarios, parámetros y catálogo), contador general (partidas, mayor y reportes) y contador de costos (órdenes de trabajo y costos)."
+   ],
+   "validacion_salidas": [
+    "El 100 % de las pruebas de acceso a operaciones fuera de las funciones del rol debe resultar denegado.",
+    "Las solicitudes autorizadas se procesan solo después de validar rol y operación."
+   ],
+   "secuencia": [
+    "El sistema identifica al usuario y su rol desde la sesión vigente.",
+    "Compara la operación solicitada con las funciones del rol.",
+    "Autoriza la operación si está incluida; en caso contrario, la rechaza."
+   ],
+   "situaciones_anormales": [
+    "Operación no autorizada: mostrar «No tiene permiso para realizar esta operación.» y no ejecutar ni persistir cambios.",
+    "Rol ausente o inválido: rechazar la solicitud y registrar el evento de seguridad."
+   ],
+   "parametros": [
+    "Roles por defecto: Administrador, Contador general y Contador de costos; asignación de funciones conforme a las responsabilidades indicadas. Configurable por el administrador."
+   ],
+   "salidas": [
+    "Ejecución de la operación autorizada o mensaje de acceso denegado."
+   ],
+   "almacenamiento_bd": [
+    "roles: id (clave primaria), nombre (texto, único).",
+    "usuarios: id (clave primaria), rol_id (clave foránea a roles.id).",
+    "operaciones_rol: id (clave primaria), rol_id (clave foránea a roles.id), operación (texto); restricción única por rol_id y operación."
+   ]
+  },
+  {
+   "nombre": "Cifrado de comunicaciones",
+   "descripcion": "El sistema deberá proteger toda comunicación entre cliente y servidor mediante un canal cifrado.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "solicitud_red (protocolo y destino)",
+    "respuesta_red (datos transmitidos)"
+   ],
+   "validacion_entradas": [
+    "Las solicitudes que transporten credenciales o datos del sistema deben dirigirse exclusivamente a un canal HTTPS con TLS 1.2 o superior.",
+    "El servidor debe rechazar conexiones HTTP no cifradas y protocolos TLS inferiores al mínimo establecido."
+   ],
+   "validacion_salidas": [
+    "Las pruebas de configuración de red deben confirmar que el 100 % de las rutas de aplicación usan HTTPS y que no se aceptan protocolos inferiores a TLS 1.2.",
+    "Los datos transmitidos no deben ser legibles en una captura de tráfico de red."
+   ],
+   "secuencia": [
+    "El cliente establece una conexión cifrada con el servidor.",
+    "El servidor valida el canal antes de recibir credenciales o datos.",
+    "El sistema transmite la solicitud y la respuesta únicamente por el canal protegido."
+   ],
+   "situaciones_anormales": [
+    "Conexión no cifrada o protocolo no permitido: rechazar la solicitud y mostrar «Conexión segura requerida.»",
+    "Falla al establecer el canal seguro: no transmitir datos y mostrar «No fue posible establecer una conexión segura.»"
+   ],
+   "parametros": [
+    "Protocolo mínimo: TLS 1.2; HTTP sin cifrado no permitido."
+   ],
+   "salidas": [
+    "Comunicación completada por un canal cifrado o rechazo de conexión insegura."
+   ],
+   "almacenamiento_bd": [
+    "No aplica; el requisito se verifica sobre la configuración del canal de comunicación y las pruebas de red."
+   ]
+  },
+  {
+   "nombre": "Cifrado de datos almacenados",
+   "descripcion": "El sistema deberá cifrar los datos contables y credenciales almacenados en bases de datos y copias de respaldo.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "datos_persistidos (registros contables, usuarios y archivos de respaldo)",
+    "clave_cifrado (material criptográfico protegido)"
+   ],
+   "validacion_entradas": [
+    "Los datos persistentes y las copias de respaldo deben cifrarse antes de quedar almacenados.",
+    "Las claves de cifrado no deben almacenarse junto con los datos cifrados ni en texto accesible a usuarios de aplicación."
+   ],
+   "validacion_salidas": [
+    "La inspección del almacenamiento y de los respaldos debe confirmar que los datos protegidos no son legibles sin la clave autorizada.",
+    "Las pruebas de restauración deben confirmar que los datos pueden recuperarse por un proceso autorizado."
+   ],
+   "secuencia": [
+    "El sistema cifra los datos antes de escribirlos en almacenamiento persistente o respaldo.",
+    "El sistema protege las claves mediante un mecanismo separado del almacenamiento cifrado.",
+    "Un proceso autorizado descifra los datos solo cuando se requieren para una operación válida."
+   ],
+   "situaciones_anormales": [
+    "Falla de cifrado o clave no disponible: cancelar la escritura o lectura, no exponer datos y mostrar «No fue posible acceder de forma segura a los datos.»",
+    "Intento de acceso con una clave no autorizada: rechazarlo y registrar el evento sin exponer la clave."
+   ],
+   "parametros": [
+    "Los algoritmos y parámetros criptográficos deben poder actualizarse; las claves deben mantenerse separadas de los datos cifrados."
+   ],
+   "salidas": [
+    "Datos persistidos cifrados o resultado de operación autorizado."
+   ],
+   "almacenamiento_bd": [
+    "No aplica como campos funcionales; almacenar los datos cifrados y mantener las claves fuera de la base de datos de aplicación."
+   ]
+  },
+  {
+   "nombre": "Prevención de inyección",
+   "descripcion": "El sistema deberá impedir que entradas externas se interpreten como instrucciones ejecutables en consultas o comandos.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "datos_usuario (texto, numérico o fecha recibidos por formularios, consultas o importaciones)"
+   ],
+   "validacion_entradas": [
+    "Las consultas a la base de datos deben usar parámetros enlazados o mecanismos equivalentes, no concatenar entradas en instrucciones ejecutables.",
+    "Los datos deben validarse según tipo y formato antes de procesarse."
+   ],
+   "validacion_salidas": [
+    "El 100 % de los casos de prueba con cargas de inyección en entradas de la aplicación debe ser rechazado o tratado como dato literal.",
+    "Las cargas de prueba no deben alterar consultas, registros, permisos ni resultados contables."
+   ],
+   "secuencia": [
+    "El sistema valida el tipo y formato de cada entrada.",
+    "El sistema transmite los valores mediante parámetros separados de las instrucciones.",
+    "El sistema procesa la operación y devuelve únicamente su resultado previsto."
+   ],
+   "situaciones_anormales": [
+    "Entrada no válida: mostrar «El formato de uno o más datos no es válido.» y no ejecutar la operación.",
+    "Fallo de seguridad detectado: cancelar y revertir la transacción, mostrar «No fue posible completar la operación.» y registrar el evento sin incluir secretos."
+   ],
+   "parametros": [
+    "Criterio de aceptación: cero alteraciones de consultas o comandos en las pruebas automatizadas de inyección."
+   ],
+   "salidas": [
+    "Resultado de la operación o rechazo seguro de la entrada."
+   ],
+   "almacenamiento_bd": [
+    "No aplica como tabla propia; las consultas deben ejecutarse mediante parámetros enlazados y las escrituras deben conservar transaccionalidad."
+   ]
+  },
+  {
+   "nombre": "Prevención de XSS",
+   "descripcion": "El sistema deberá impedir que contenido ingresado por usuarios se ejecute como código en el navegador de otro usuario.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "texto_usuario (texto mostrado en pantallas, mensajes, conceptos o reportes)"
+   ],
+   "validacion_entradas": [
+    "El texto debe codificarse de acuerdo con el contexto de salida antes de mostrarse en una página.",
+    "El navegador no debe ejecutar contenido ingresado como HTML o script no confiable."
+   ],
+   "validacion_salidas": [
+    "El 100 % de las pruebas con cargas XSS almacenadas y reflejadas debe mostrarse como texto inerte o rechazarse.",
+    "Las cargas de prueba no deben ejecutar código ni leer datos de sesión."
+   ],
+   "secuencia": [
+    "El sistema recibe y valida el texto.",
+    "Antes de renderizarlo, codifica los caracteres según el contexto de salida.",
+    "El navegador presenta el contenido como texto no ejecutable."
+   ],
+   "situaciones_anormales": [
+    "Contenido no válido: mostrar «El contenido ingresado no puede procesarse.» sin ejecutarlo ni persistir código activo.",
+    "Falla de codificación de salida: no renderizar el contenido y registrar el evento de seguridad."
+   ],
+   "parametros": [
+    "Criterio de aceptación: cero ejecuciones de cargas XSS en las pruebas de seguridad."
+   ],
+   "salidas": [
+    "Contenido mostrado como texto seguro o rechazo del contenido."
+   ],
+   "almacenamiento_bd": [
+    "No aplica como tabla propia; todo texto almacenado y presentado debe codificarse en el punto de salida conforme a su contexto."
+   ]
+  },
+  {
+   "nombre": "Minimización de datos personales",
+   "descripcion": "El sistema deberá recopilar y conservar únicamente los datos personales necesarios para autenticar usuarios y atribuir operaciones contables.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "dato_personal (campo de usuario o información incluida en un documento soporte)",
+    "finalidad (texto que describe el uso del dato)"
+   ],
+   "validacion_entradas": [
+    "Cada campo personal incorporado debe tener una finalidad documentada relacionada con autenticación, identificación del usuario o registro contable.",
+    "No deben solicitarse datos personales de clientes de Steam que no sean necesarios para el registro contable."
+   ],
+   "validacion_salidas": [
+    "La revisión del esquema y de los formularios debe confirmar que cada campo personal tiene finalidad documentada y que no existen campos personales sin uso definido.",
+    "Las pantallas no deben revelar datos personales a usuarios sin autorización para la función correspondiente."
+   ],
+   "secuencia": [
+    "El sistema recibe únicamente los datos personales definidos para una finalidad documentada.",
+    "El sistema valida que el dato sea necesario para la operación solicitada.",
+    "El sistema guarda o presenta el dato solo en el contexto funcional que requiere esa finalidad."
+   ],
+   "situaciones_anormales": [
+    "Campo personal sin finalidad documentada: rechazar su incorporación al formulario o almacenamiento y mostrar «El dato no está habilitado para esta operación.»",
+    "Acceso no autorizado a un dato personal: denegar la solicitud y registrar el evento."
+   ],
+   "parametros": [
+    "Criterio verificable: 100 % de los campos personales deben tener una finalidad documentada; no recopilar datos personales de clientes de Steam innecesarios para la contabilidad."
+   ],
+   "salidas": [
+    "Datos mínimos asociados a una finalidad contable o de autenticación."
+   ],
+   "almacenamiento_bd": [
+    "usuarios: id (clave primaria), identificador (texto, único), datos_personales_estrictamente_necesarios (campos documentados según finalidad).",
+    "Restricción: cada campo personal debe tener propósito definido y acceso limitado a la operación que lo requiere."
+   ]
+  },
+  {
+   "nombre": "Registro de eventos de seguridad",
+   "descripcion": "El sistema deberá registrar los eventos de autenticación, denegación de permisos y cambios de usuarios o roles sin incluir secretos de autenticación.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Práctica general de sistemas contables",
+   "entradas": [
+    "tipo_evento (enum)",
+    "usuario_id (identificador, anulable)",
+    "fecha_hora (fecha y hora)",
+    "resultado (enum)",
+    "detalle_no_sensible (texto)"
+   ],
+   "validacion_entradas": [
+    "Los eventos de inicio de sesión satisfactorio o fallido, denegación de acceso y cambio de usuario o rol deben producir un registro.",
+    "El registro no debe incluir contraseñas, hashes de contraseña, tokens de sesión ni claves criptográficas."
+   ],
+   "validacion_salidas": [
+    "El 100 % de los eventos definidos debe producir un registro con tipo, fecha y hora, resultado y usuario cuando sea identificable.",
+    "Los registros deben poder consultarse por usuarios autorizados y no deben permitir alteración desde las funciones ordinarias de la aplicación."
+   ],
+   "secuencia": [
+    "El sistema detecta el evento de seguridad.",
+    "El sistema registra sus atributos no sensibles junto con fecha y hora.",
+    "El sistema conserva el registro para consulta autorizada."
+   ],
+   "situaciones_anormales": [
+    "Falla al registrar un evento: mostrar «No fue posible completar la operación de forma segura.» y denegar operaciones sensibles que no puedan dejar rastro.",
+    "Intento de incluir una credencial o token en el detalle: omitir el valor sensible y registrar el evento sin dicho valor."
+   ],
+   "parametros": [
+    "Cobertura requerida: 100 % de los eventos de seguridad definidos; los datos secretos quedan excluidos de la bitácora."
+   ],
+   "salidas": [
+    "Registro consultable del evento de seguridad o denegación de la operación cuando no pueda garantizarse el registro."
+   ],
+   "almacenamiento_bd": [
+    "bitacora_seguridad: id (clave primaria), tipo_evento (texto), usuario_id (clave foránea anulable a usuarios.id), fecha_hora (fecha y hora), resultado (texto), detalle_no_sensible (texto); índices por fecha_hora, tipo_evento y usuario_id; restricción de no almacenar credenciales ni tokens."
+   ]
+  }
+ ],
+ "vacios": []
+}
