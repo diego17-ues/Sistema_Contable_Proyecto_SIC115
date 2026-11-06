@@ -129,3 +129,79 @@ pedida? Corrige antes de responder.
 ## Formato
 No incluyas identificadores (RF-001, etc.): los asigna el programa. Lo que no
 puedas respaldar o falte en las fuentes va en "vacios".
+
+## Decisiones de contabilidad de costos
+Método: costeo por órdenes de trabajo. Cada videojuego (título) es una orden.
+Son decisiones del equipo, configurables; NO vienen de los manuales. En
+"fuente" escribe "Decisión de diseño del equipo (costos)" cuando dependan de
+ellas. Usa los términos "orden de trabajo", "Contador de costos" y "tarifa por
+hora". No introduzcas centros de costo, costeo por procesos ni costo estándar.
+
+1. Orden y estados: abierta, en desarrollo, terminada, cerrada y cedida. No se
+   cargan costos a órdenes terminadas, cerradas o cedidas. Reabrir exige rol
+   Administrador, justificación y registro en bitácora.
+2. Presupuesto: al abrir la orden se registran las horas presupuestadas por
+   programador; el costo presupuestado de mano de obra es horas × tarifa y el de
+   indirectos es horas × tasa. El presupuesto se estima por juicio de expertos
+   del equipo técnico; el sistema NO calcula la estimación, solo guarda las
+   horas, el método (campo informativo y configurable: juicio de expertos,
+   analogía, COSMIC, puntos de función u otro), quién estimó y la fecha. No
+   fijes un método.
+3. Mano de obra directa (4101): el programador llena su hoja de tiempo (no es
+   usuario del sistema); el Contador de costos captura las horas por
+   programador, orden y fecha, y las aprueba. Costo = horas aprobadas × tarifa
+   por hora vigente del programador en esa fecha. Cada programador tiene tarifa
+   propia con fecha de vigencia. Los porcentajes de cargas laborales y
+   prestaciones no se inventan: [PENDIENTE DE VERIFICAR]. Las horas registradas
+   se concilian con la planilla. Toda hora pagada se asigna a una orden o se
+   clasifica como costo indirecto o gasto del período: ninguna se pierde ni se
+   cuenta dos veces.
+4. Costos indirectos (4103): se aplican a la orden con base en horas de mano de
+   obra directa aprobadas, con tasa predeterminada = costos indirectos
+   presupuestados / horas presupuestadas. Al cierre de cada período se compara
+   el costo indirecto real contra el aplicado y se liquida la sobre o
+   subaplicación. Base y tasa son parámetros.
+5. Servicios profesionales de terceros (voces, música y similares, incluidos
+   los honorarios de expertos externos que estimen): son gasto del período y
+   NO se asignan a órdenes. Si el manual aún los lleva a la cuenta 4102
+   (servicios directos), repórtalo como discrepancia una sola vez.
+6. Acumulación y traslados: al cierre de cada período el sistema genera una
+   partida automática vinculada a la orden: Debe 1204 Videojuegos en desarrollo
+   / Haber 4101 y 4103. Al pasar la orden a terminada: Debe 1205 Videojuegos
+   terminados / Haber 1204. Ambas cuentas son activo corriente.
+7. Cesión (venta del título completo): Debe Bancos o Cuentas por cobrar / Haber
+   Ingresos por cesión de videojuegos; y Debe costo por cesión / Haber 1205 por
+   el costo acumulado de la orden. La orden pasa a cedida. La cuenta de costo
+   por cesión no está definida: [PENDIENTE DE VERIFICAR].
+8. Variaciones: por orden y por programador, al cierre: horas reales contra
+   presupuestadas, variación de tarifa, variación de costo total y de costos
+   indirectos.
+9. Trazabilidad: todo movimiento de costo guarda orden, programador (si
+   aplica), período, usuario y fecha, y queda en la bitácora.
+10. Pendientes que NO se resuelven aquí: (a) costo que sale de 1205 por cada
+    licencia vendida; no lo automatices; (b) amortización de videojuegos: no la
+    generes mientras sean activo corriente. Repórtalos en "vacios" una sola vez,
+    en el lote donde corresponda.
+
+Al ajustar un lote existente, conserva lo que siga siendo válido, modifica lo
+que contradiga estas decisiones y elimina lo que ya no aplique.
+
+## Decisiones técnicas del equipo
+- Framework: Django (Python) con templates; interfaz en HTML y CSS sencillos.
+- Base de datos: PostgreSQL alojado en Supabase, usado desde Django con su ORM
+  y migraciones versionadas. La autenticación y los permisos por rol los maneja
+  Django (usuarios, grupos y permisos); no se usa Supabase Auth ni su API REST.
+- Soft delete: ningún registro se elimina físicamente por acción del usuario;
+  se marca como eliminado con fecha y usuario (deleted_at, deleted_by) y se
+  excluye de las consultas normales. Restaurar y consultar eliminados es una
+  función del Administrador. Excepción: las partidas contabilizadas nunca se
+  eliminan; solo se anulan o revierten con una partida inversa vinculada.
+- Estándares de código: el código Python cumple PEP 8, verificado con una
+  herramienta de análisis (ruff o flake8) sin errores; tablas y campos en
+  snake_case.
+- Secretos: llaves y credenciales en variables de entorno, nunca en el
+  repositorio.
+- Seguridad web: protección CSRF de Django, contraseñas con el hash de Django
+  (nunca en texto plano) y HTTPS.
+- Pruebas automatizadas de las reglas de partida doble y de costos; la
+  cobertura mínima es [PENDIENTE DE DEFINIR].

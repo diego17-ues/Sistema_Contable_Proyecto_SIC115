@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#102b45" />
+    <title>SunGames | Prototipo contable</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <section id="loginView" class="login-layout" aria-label="Inicio de sesión">
+      <div class="login-brand-panel">
+        <div class="brand-logo-card">
+          <img src="assets/SunGames_Logo.png" alt="SunGames Interactive Worlds" />
+        </div>
+        <div class="login-brand-copy">
+          <span class="eyebrow eyebrow-gold">SUN GAMES · CONTABILIDAD</span>
+          <h1>Información clara para cada decisión.</h1>
+          <p>Contabilidad general y de costos para SunGames S.A. de C.V.</p>
+        </div>
+        <div class="login-brand-footer">Prototipo de pantallas · SIC115</div>
+      </div>
+      <div class="login-form-panel">
+        <form id="loginForm" class="login-card">
+          <span class="eyebrow">ACCESO AL SISTEMA</span>
+          <h2>Iniciar sesión</h2>
+          <p class="muted">Ingresa con tu usuario del sistema.</p>
+          <label for="loginUser">Usuario</label>
+          <input id="loginUser" name="user" autocomplete="username" required placeholder="Nombre de usuario" />
+          <label for="loginPassword">Contraseña</label>
+          <input id="loginPassword" name="password" type="password" autocomplete="current-password" required placeholder="Contraseña" />
+          <p id="loginError" class="form-error" role="alert"></p>
+          <button class="button button-primary button-wide" type="submit">Iniciar sesión <span aria-hidden="true">→</span></button>
+          <p class="login-note">Prototipo visual · el acceso se simula localmente</p>
+        </form>
+      </div>
+    </section>
+
+    <div id="appShell" class="app-shell is-hidden">
+      <aside id="sidebar" class="sidebar">
+        <div class="sidebar-brand">
+          <img src="assets/SunGames_Logo.png" alt="SunGames" />
+        </div>
+        <div class="sidebar-company">
+          <span class="company-dot"></span>
+          <span>SunGames S.A. de C.V.</span>
+        </div>
+        <nav id="navigation" class="navigation" aria-label="Navegación principal"></nav>
+        <div class="sidebar-bottom">
+          <div class="sidebar-period"><span class="status-dot"></span><span>Período abierto</span></div>
+          <button id="logoutButton" class="logout-button" type="button">Cerrar sesión <span aria-hidden="true">↗</span></button>
+        </div>
+      </aside>
+
+      <main class="main-area">
+        <header class="topbar">
+          <button id="menuToggle" class="icon-button mobile-menu" type="button" aria-label="Abrir menú">☰</button>
+          <div class="breadcrumbs"><span>SunGames</span><span class="crumb-separator">/</span><strong id="breadcrumb">Panel</strong></div>
+          <div class="topbar-actions">
+            <span class="topbar-period"><span class="status-dot"></span>Período abierto</span>
+            <button id="userMenu" class="user-menu" type="button" aria-label="Usuario activo">
+              <span class="avatar">CG</span>
+              <span class="user-meta"><strong id="activeUser">Contador General</strong><small>Contador General</small></span>
+              <span class="chevron">⌄</span>
+            </button>
+          </div>
+        </header>
+        <div id="appContent" class="page-content"></div>
+      </main>
+    </div>
+
+    <div id="modalRoot"></div>
+    <div id="toastRoot" class="toast-root" aria-live="polite"></div>
+    <script src="app.js"></script>
+  </body>
+</html>

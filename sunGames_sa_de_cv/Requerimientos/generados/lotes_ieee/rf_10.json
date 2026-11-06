@@ -2,150 +2,161 @@
  "requerimientos": [
   {
    "nombre": "Balance general por fecha",
-   "descripcion": "El sistema deberá generar el balance general a una fecha seleccionada usando los saldos del libro mayor y la clasificación del catálogo de cuentas.",
+   "descripcion": "El sistema deberá generar el balance general a una fecha de corte con los saldos del libro mayor clasificados conforme al catálogo de cuentas y a las decisiones de clasificación de videojuegos de SunGames.",
    "prioridad": "Alta",
    "actores": [
-    "Contador",
-    "Administrador"
+    "Contador general"
    ],
-   "fuente": "Manual_aplicación_catálogo_SunGames.docx, relación con los estados financieros; libro mayor",
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, relación con los estados financieros y libro mayor; Decisión de diseño del equipo (costos)",
    "entradas": [
     "fecha_corte (date, formato AAAA-MM-DD)"
    ],
    "validacion_entradas": [
-    "La fecha de corte es obligatoria y debe ser una fecha válida.",
-    "El usuario debe tener rol Contador o Administrador.",
-    "El período contable que contiene la fecha debe existir."
+    "La fecha de corte es obligatoria y debe ser válida.",
+    "El usuario debe tener el rol Contador general.",
+    "La fecha debe pertenecer a un período contable consultable."
    ],
    "validacion_salidas": [
-    "Presenta por separado activo corriente (grupo 11), activo no corriente (grupo 12), pasivo corriente (grupo 21), pasivo no corriente (grupo 22) y patrimonio.",
-    "Presenta las cuentas 1203, 1206 y 1208 restando de los activos relacionados para mostrar el valor en libros.",
-    "Incluye el resultado del ejercicio en patrimonio y excluye las cuentas de orden de los rubros 6 y 7.",
-    "El total de activos es igual al total de pasivos más patrimonio; si no coincide, el reporte identifica la diferencia y no se presenta como cuadrado."
+    "Presenta por separado activo corriente, activo no corriente, pasivo corriente, pasivo no corriente y patrimonio, de acuerdo con la clasificación del catálogo.",
+    "Presenta los saldos de las cuentas 1204 Videojuegos en desarrollo y 1205 Videojuegos terminados como activo corriente.",
+    "Incluye en patrimonio el resultado del ejercicio disponible en los registros contables y excluye las cuentas de orden de los rubros 6 y 7.",
+    "El total de activos debe ser igual al total de pasivos más patrimonio; si existe diferencia, el reporte la identifica y no se marca como cuadrado.",
+    "Los saldos presentados corresponden a los saldos del libro mayor a la fecha de corte; el reporte no genera traslados ni amortizaciones."
    ],
    "secuencia": [
-    "El usuario selecciona la fecha de corte.",
-    "El sistema obtiene del libro mayor los saldos de las cuentas a esa fecha.",
-    "El sistema clasifica las cuentas conforme a los grupos y rubros del catálogo.",
-    "El sistema presenta el balance con saldos y totales, y verifica la igualdad entre activos y pasivos más patrimonio."
+    "El Contador general selecciona la fecha de corte.",
+    "El sistema consulta los saldos del libro mayor a esa fecha.",
+    "El sistema clasifica las cuentas según el catálogo y presenta 1204 y 1205 como activo corriente.",
+    "El sistema calcula los totales y verifica la igualdad entre activos y pasivos más patrimonio.",
+    "El sistema presenta el reporte con su estado de cuadre."
    ],
    "situaciones_anormales": [
     "Fecha no válida: muestra «La fecha de corte no es válida.» y no genera el reporte.",
-    "No existen saldos para la fecha: muestra «No hay saldos contables para la fecha seleccionada.» y no genera el reporte.",
-    "Descuadre entre activos y pasivos más patrimonio: muestra «El balance general no cuadra. Diferencia: [importe].» y marca el reporte como no cuadrado.",
+    "No existen saldos contables para la fecha: muestra «No hay saldos contables para la fecha seleccionada.» y no genera el reporte.",
+    "Diferencia entre activos y pasivos más patrimonio: muestra «El balance general no cuadra. Diferencia: [importe].» y marca el reporte como no cuadrado.",
     "Error al consultar el libro mayor: muestra «No fue posible generar el balance general. Intente nuevamente.» y no presenta datos parciales."
    ],
    "parametros": [
-    "La moneda y la precisión de presentación corresponden a la configuración contable de la empresa; el valor predeterminado de decimales no está especificado en los manuales."
+    "Moneda predeterminada: USD, configurable por el Administrador.",
+    "Decimales predeterminados: 2, configurables por el Administrador.",
+    "Tolerancia de cuadre predeterminada: 0.00, configurable por el Administrador.",
+    "La clasificación de 1204 y 1205 como activo corriente sigue la decisión de diseño de costos; el reporte no automatiza traslados entre cuentas."
    ],
    "salidas": [
     "Balance general en pantalla con fecha de corte, cuentas, saldos agrupados, totales y estado de cuadre."
    ],
    "almacenamiento_bd": [
-    "No aplica: el reporte se calcula a partir de los saldos existentes en el libro mayor y no requiere guardar una copia del reporte."
+    "No aplica: el reporte se calcula con datos del libro mayor y no requiere guardar una copia.",
+    "La consulta debe usar una lectura consistente de los saldos a la fecha de corte."
    ]
   },
   {
    "nombre": "Estado de resultados por período",
-   "descripcion": "El sistema deberá generar el estado de resultados de un período usando los saldos de las cuentas de ingresos y egresos del libro mayor.",
+   "descripcion": "El sistema deberá generar el estado de resultados de un período a partir de los movimientos contabilizados en las cuentas de ingresos y egresos.",
    "prioridad": "Alta",
    "actores": [
-    "Contador",
-    "Administrador"
+    "Contador general"
    ],
-   "fuente": "Manual_aplicación_catálogo_SunGames.docx, relación con los estados financieros; cuentas de ingresos y egresos",
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, relación con los estados financieros y cuentas de ingresos y egresos",
    "entradas": [
     "fecha_inicio (date, formato AAAA-MM-DD)",
     "fecha_fin (date, formato AAAA-MM-DD)"
    ],
    "validacion_entradas": [
-    "Las dos fechas son obligatorias y válidas.",
+    "Ambas fechas son obligatorias y válidas.",
     "La fecha de inicio debe ser igual o anterior a la fecha de fin.",
-    "El usuario debe tener rol Contador o Administrador.",
-    "El período solicitado debe corresponder a fechas con registros contables consultables."
+    "El usuario debe tener el rol Contador general.",
+    "El rango debe corresponder a fechas contables consultables."
    ],
    "validacion_salidas": [
-    "Calcula ventas netas = ingresos de 5101 + ingresos de 5102 − descuentos y devoluciones de 5103.",
-    "Calcula utilidad bruta = ventas netas − costo de ventas de 4104.",
-    "Calcula utilidad de operación = utilidad bruta − egresos del grupo 42 − egresos del grupo 43.",
-    "Calcula el resultado final incorporando egresos del grupo 44, ingresos de 5104 y 5105, egresos de 4501 e impuesto sobre la renta de 4502.",
-    "Los importes del reporte concilian con los saldos de las cuentas incluidas para el período solicitado."
+    "Calcula ventas netas = saldo acreedor de 5101 + saldo acreedor de 5102 − saldo deudor de 5103.",
+    "Calcula la utilidad bruta = ventas netas − saldo de 4104 Costo de ventas.",
+    "Calcula la utilidad de operación = utilidad bruta − egresos de los grupos 42 y 43.",
+    "Presenta el resultado después de incorporar las cuentas de gastos financieros, ingresos financieros y otros ingresos, otros gastos, gastos por servicios profesionales de terceros e impuesto sobre la renta, usando los movimientos contabilizados en las cuentas aplicables, incluidas 4401, 4402, 5104, 5105, 4501, 4502 y 4503.",
+    "Los saldos de 4101 y 4103 se presentan según su tratamiento y los movimientos contabilizados conforme al parámetro de capitalización; el reporte no genera traslados, costo por licencia ni amortización de videojuegos.",
+    "El reporte no calcula tasas ni importes fiscales; presenta únicamente los registros contabilizados.",
+    "Los importes presentados concilian con los movimientos del libro mayor comprendidos entre las fechas seleccionadas."
    ],
    "secuencia": [
-    "El usuario indica las fechas de inicio y fin.",
-    "El sistema consulta los movimientos y saldos de las cuentas aplicables dentro del período.",
-    "El sistema calcula ventas netas, utilidad bruta, utilidad de operación y resultado final conforme a las fórmulas definidas.",
-    "El sistema presenta las cuentas y subtotales del estado de resultados."
+    "El Contador general indica las fechas de inicio y fin.",
+    "El sistema valida el rango y consulta los movimientos de las cuentas de resultados dentro del período, inclusive.",
+    "El sistema calcula y presenta ventas netas, utilidad bruta, utilidad de operación y resultado final.",
+    "El sistema muestra las cuentas y los importes que componen cada subtotal."
    ],
    "situaciones_anormales": [
     "Rango de fechas inválido: muestra «La fecha de inicio debe ser igual o anterior a la fecha de fin.» y no genera el reporte.",
     "No existen movimientos para el período: muestra «No hay movimientos contables para el período seleccionado.» y no genera el reporte.",
-    "Error al consultar los saldos: muestra «No fue posible generar el estado de resultados. Intente nuevamente.» y no presenta datos parciales."
+    "Error al consultar el libro mayor: muestra «No fue posible generar el estado de resultados. Intente nuevamente.» y no presenta datos parciales."
    ],
    "parametros": [
-    "La moneda y la precisión de presentación corresponden a la configuración contable de la empresa; el valor predeterminado de decimales no está especificado en los manuales."
+    "Moneda predeterminada: USD, configurable por el Administrador.",
+    "Decimales predeterminados: 2, configurables por el Administrador.",
+    "El tratamiento del desarrollo se determina mediante el parámetro configurable «capitalizar desarrollo: sí/no»; el reporte no crea asientos ni traslados.",
+    "No se calculan tasas fiscales ni amortizaciones de videojuegos."
    ],
    "salidas": [
     "Estado de resultados en pantalla con período, cuentas, ventas netas, utilidad bruta, utilidad de operación y resultado final."
    ],
    "almacenamiento_bd": [
-    "No aplica: el reporte se calcula a partir del libro mayor y no requiere guardar una copia del reporte."
+    "No aplica: el reporte se calcula con los movimientos del libro mayor y no requiere guardar una copia.",
+    "La consulta debe leer los movimientos del período de forma consistente."
    ]
   },
   {
    "nombre": "Estado de cambios en el patrimonio",
-   "descripcion": "El sistema deberá generar el estado de cambios en el patrimonio del ejercicio a partir de los movimientos de las cuentas 3101, 3102 y 3103.",
+   "descripcion": "El sistema deberá generar el estado de cambios en el patrimonio del período a partir de los movimientos de las cuentas patrimoniales y del resultado del ejercicio registrado.",
    "prioridad": "Alta",
    "actores": [
-    "Contador",
-    "Administrador"
+    "Contador general"
    ],
-   "fuente": "Manual_aplicación_catálogo_SunGames.docx, relación con los estados financieros; cuentas 3101 Capital social, 3102 Reserva legal y 3103 Utilidades acumuladas",
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, relación con los estados financieros; cuentas 3101 a 3104",
    "entradas": [
     "fecha_inicio (date, formato AAAA-MM-DD)",
     "fecha_fin (date, formato AAAA-MM-DD)"
    ],
    "validacion_entradas": [
-    "Las dos fechas son obligatorias y válidas.",
+    "Ambas fechas son obligatorias y válidas.",
     "La fecha de inicio debe ser igual o anterior a la fecha de fin.",
-    "El usuario debe tener rol Contador o Administrador.",
-    "El período debe corresponder a un ejercicio contable existente."
+    "El usuario debe tener el rol Contador general.",
+    "El período debe pertenecer a un ejercicio contable consultable."
    ],
    "validacion_salidas": [
-    "Presenta los saldos iniciales, movimientos del período y saldos finales de las cuentas 3101, 3102 y 3103.",
-    "Para cada cuenta, el saldo final coincide con el saldo inicial más los abonos del período menos los cargos del período.",
-    "Los totales presentados concilian con los movimientos y saldos del libro mayor para las cuentas incluidas."
+    "Presenta saldos iniciales, movimientos del período y saldos finales de las cuentas 3101 Capital social, 3102 Reserva legal y 3103 Utilidades acumuladas, y presenta el resultado del ejercicio registrado en 3104 cuando corresponda.",
+    "Para cada cuenta, el saldo final se reconcilia con el saldo inicial y los débitos y créditos del período, respetando la naturaleza de la cuenta.",
+    "Los totales concilian con el libro mayor para las cuentas incluidas.",
+    "El reporte presenta solo movimientos registrados y no calcula una reserva legal ni otros importes sujetos a reglas fiscales o legales."
    ],
    "secuencia": [
-    "El usuario selecciona el período del ejercicio.",
-    "El sistema obtiene los saldos al inicio del período y los movimientos de las cuentas 3101, 3102 y 3103.",
-    "El sistema calcula el saldo final de cada cuenta aplicando su naturaleza acreedora.",
-    "El sistema presenta los cambios y saldos por cuenta para el período."
+    "El Contador general selecciona el período.",
+    "El sistema consulta los saldos iniciales y movimientos de las cuentas patrimoniales y de la cuenta de resultado del ejercicio.",
+    "El sistema calcula los saldos finales con base en los débitos y créditos registrados.",
+    "El sistema presenta los cambios, saldos iniciales y finales y sus totales."
    ],
    "situaciones_anormales": [
     "Rango de fechas inválido: muestra «La fecha de inicio debe ser igual o anterior a la fecha de fin.» y no genera el reporte.",
-    "No existen saldos o movimientos de patrimonio para el período: muestra «No hay movimientos patrimoniales para el período seleccionado.» y no genera el reporte.",
+    "No existen saldos ni movimientos patrimoniales para el período: muestra «No hay movimientos patrimoniales para el período seleccionado.» y no genera el reporte.",
     "Error al consultar el libro mayor: muestra «No fue posible generar el estado de cambios en el patrimonio. Intente nuevamente.» y no presenta datos parciales."
    ],
    "parametros": [
-    "La moneda y la precisión de presentación corresponden a la configuración contable de la empresa; el valor predeterminado de decimales no está especificado en los manuales."
+    "Moneda predeterminada: USD, configurable por el Administrador.",
+    "Decimales predeterminados: 2, configurables por el Administrador."
    ],
    "salidas": [
     "Estado de cambios en el patrimonio en pantalla con período, saldos iniciales, movimientos y saldos finales de las cuentas incluidas."
    ],
    "almacenamiento_bd": [
-    "No aplica: el reporte se calcula a partir de los saldos y movimientos del libro mayor y no requiere guardar una copia del reporte."
+    "No aplica: el reporte se calcula con los saldos y movimientos del libro mayor y no requiere guardar una copia.",
+    "La consulta debe usar una lectura consistente de los saldos y movimientos."
    ]
   },
   {
-   "nombre": "Reporte de costos por videojuego",
-   "descripcion": "El sistema deberá presentar los costos registrados por videojuego y orden de trabajo para el período seleccionado.",
+   "nombre": "Costos presupuestados y reales por orden de trabajo",
+   "descripcion": "El sistema deberá presentar por orden de trabajo el presupuesto de costos y los costos reales registrados, desglosados por mano de obra directa y costos indirectos aplicados.",
    "prioridad": "Alta",
    "actores": [
-    "Contador",
     "Contador de costos"
    ],
-   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuentas 4101 a 4103 y cuenta 1204; Modelo_de_Negocio_SunGames.docx, ficha de videojuego y cada videojuego como unidad de negocio",
+   "fuente": "Decisión de diseño del equipo (costos); Manual_aplicación_catálogo_SunGames.docx, cuentas 4101 y 4103; Modelo_de_Negocio_SunGames.docx, cada videojuego como unidad de negocio",
    "entradas": [
     "fecha_inicio (date, formato AAAA-MM-DD)",
     "fecha_fin (date, formato AAAA-MM-DD)",
@@ -155,141 +166,211 @@
    "validacion_entradas": [
     "Las fechas son obligatorias, válidas y la fecha de inicio no puede ser posterior a la fecha de fin.",
     "Si se informa videojuego_id, el videojuego debe existir.",
-    "Si se informa orden_trabajo_id, la orden debe existir y corresponder al videojuego indicado, si también se informó uno.",
-    "El usuario debe tener rol Contador o Contador de costos."
+    "Si se informa orden_trabajo_id, la orden debe existir y corresponder al videojuego indicado, si ambos filtros se proporcionan.",
+    "El usuario debe tener el rol Contador de costos.",
+    "El reporte incluye horas presupuestadas y horas aprobadas como reales; las horas reales proceden de registros aprobados."
    ],
    "validacion_salidas": [
-    "Desglosa los importes registrados en 4101 Mano de obra directa de desarrollo, 4102 Servicios directos de desarrollo y 4103 Costos indirectos de desarrollo.",
-    "Calcula el costo total del período por videojuego u orden de trabajo = suma de los importes de 4101 + 4102 + 4103 atribuibles a esa unidad.",
-    "Los importes y el desglose concilian con los registros contables y auxiliares de costos correspondientes al período.",
-    "No presenta como costo de desarrollo del período importes de otros títulos u órdenes que no correspondan a los filtros seleccionados."
+    "Presenta las horas presupuestadas y reales por programador y orden de trabajo.",
+    "Costo presupuestado de mano de obra directa por programador = horas presupuestadas × tarifa por hora presupuestada.",
+    "Costo presupuestado de costos indirectos por orden = horas presupuestadas × tasa predeterminada; tasa predeterminada = costos indirectos presupuestados / horas presupuestadas, cuando las horas presupuestadas sean mayores que cero.",
+    "Costo real de mano de obra directa por programador = horas aprobadas × tarifa por hora vigente del programador en la fecha de cada registro.",
+    "Costos indirectos aplicados a la orden = horas aprobadas de mano de obra directa × tasa predeterminada vigente para la orden y período.",
+    "Costo presupuestado total por orden = costo presupuestado de mano de obra directa + costo presupuestado de costos indirectos. Costo real acumulado presentado = costo real de mano de obra directa + costos indirectos aplicados.",
+    "No incluye servicios profesionales de terceros cargados a 4502 ni servicios directos de terceros cargados a 4102; estos no se asignan a órdenes conforme a la decisión de diseño de costos.",
+    "Los totales se concilian con los registros aprobados de costos y con los movimientos contables disponibles; el reporte no crea asientos ni traslados."
    ],
    "secuencia": [
-    "El usuario selecciona el período y, opcionalmente, un videojuego o una orden de trabajo.",
-    "El sistema consulta los registros de costos asociados a las órdenes de trabajo y las cuentas 4101 a 4103.",
-    "El sistema agrupa los importes por videojuego y orden, y calcula los subtotales y el costo total.",
-    "El sistema presenta el desglose y los totales de los resultados encontrados."
+    "El Contador de costos selecciona el período y, opcionalmente, un videojuego o una orden de trabajo.",
+    "El sistema valida los filtros y consulta presupuestos, horas aprobadas, tarifas vigentes y tasas predeterminadas.",
+    "El sistema calcula los costos presupuestados y los costos reales conforme a las fórmulas de validación.",
+    "El sistema agrupa los resultados por videojuego, orden y programador, y presenta subtotales y totales."
    ],
    "situaciones_anormales": [
     "Rango de fechas inválido: muestra «La fecha de inicio debe ser igual o anterior a la fecha de fin.» y no genera el reporte.",
     "Videojuego u orden inexistente o no relacionada: muestra «El videojuego o la orden de trabajo seleccionados no existen o no corresponden.» y no genera el reporte.",
-    "Sin costos para los filtros seleccionados: muestra «No hay costos registrados para los filtros seleccionados.» y no genera el reporte.",
-    "Error al consultar los costos: muestra «No fue posible generar el reporte de costos. Intente nuevamente.» y no presenta datos parciales."
+    "Horas presupuestadas iguales a cero al calcular la tasa predeterminada: muestra «No se puede calcular la tasa predeterminada porque las horas presupuestadas son cero.» y no presenta un costo indirecto presupuestado calculado.",
+    "No hay presupuestos ni costos para los filtros seleccionados: muestra «No hay presupuestos ni costos registrados para los filtros seleccionados.» y no genera el reporte.",
+    "Error al consultar los costos: muestra «No fue posible generar el reporte de costos por orden de trabajo. Intente nuevamente.» y no presenta datos parciales."
    ],
    "parametros": [
-    "La moneda y la precisión de presentación corresponden a la configuración contable de la empresa; el valor predeterminado de decimales no está especificado en los manuales.",
-    "El reporte se limita a costos efectivamente registrados y asociados al título u orden; no estima costos futuros."
+    "Moneda predeterminada: USD, configurable por el Administrador.",
+    "Decimales predeterminados: 2, configurables por el Administrador.",
+    "La tasa predeterminada de costos indirectos se calcula como costos indirectos presupuestados / horas presupuestadas, con base de aplicación en horas aprobadas de mano de obra directa; base y tasa son configurables.",
+    "El parámetro «capitalizar desarrollo: sí/no» es configurable por el Administrador y determina el tratamiento contable configurado; el reporte no automatiza traslados entre cuentas.",
+    "El presupuesto se basa en horas introducidas por programador, tarifa y tasa registradas; el sistema no estima las horas presupuestadas."
    ],
    "salidas": [
-    "Reporte de costos en pantalla, desglosado por videojuego, orden de trabajo y cuentas 4101 a 4103, con subtotales y costo total del período."
+    "Reporte en pantalla por videojuego, orden y programador, con horas presupuestadas y reales, tarifas, costos presupuestados, costos reales, costos indirectos aplicados y totales."
    ],
    "almacenamiento_bd": [
-    "No aplica: el reporte consulta los datos de costos y contabilidad existentes y no requiere guardar una copia del reporte."
+    "No aplica: el reporte consulta presupuestos y registros de costos existentes.",
+    "La consulta debe leer de forma consistente las órdenes, presupuestos, horas aprobadas, tarifas vigentes, tasas y movimientos contables relacionados."
    ]
   },
   {
-   "nombre": "Filtros de período para reportes financieros",
-   "descripcion": "El sistema deberá aplicar el período indicado por el usuario a los reportes financieros y de costos que admiten consulta temporal.",
+   "nombre": "Costo y variaciones por programador",
+   "descripcion": "El sistema deberá presentar por programador y orden de trabajo las horas presupuestadas y aprobadas, el costo presupuestado de mano de obra directa, el costo real y sus variaciones.",
    "prioridad": "Alta",
    "actores": [
-    "Contador",
-    "Contador de costos",
-    "Administrador"
+    "Contador de costos"
    ],
-   "fuente": "Manual_aplicación_catálogo_SunGames.docx, libros contables y cierre contable mensual; Modelo_de_Negocio_SunGames.docx, control de costos por título",
+   "fuente": "Decisión de diseño del equipo (costos); Manual_aplicación_catálogo_SunGames.docx, cuenta 4101 Mano de obra directa de desarrollo",
    "entradas": [
-    "tipo_reporte (enumeración: balance_general, estado_resultados, cambios_patrimonio, costos)",
+    "fecha_inicio (date, formato AAAA-MM-DD)",
+    "fecha_fin (date, formato AAAA-MM-DD)",
+    "programador_id (identificador, opcional)",
+    "orden_trabajo_id (identificador, opcional)"
+   ],
+   "validacion_entradas": [
+    "Las fechas son obligatorias, válidas y la fecha de inicio no puede ser posterior a la fecha de fin.",
+    "Si se informa programador_id, el programador debe existir.",
+    "Si se informa orden_trabajo_id, la orden debe existir.",
+    "El usuario debe tener el rol Contador de costos.",
+    "Las horas reales usadas en el reporte deben estar aprobadas y las tarifas deben tener vigencia aplicable a las fechas de las horas."
+   ],
+   "validacion_salidas": [
+    "Costo presupuestado por programador y orden = horas presupuestadas × tarifa por hora presupuestada.",
+    "Costo real por programador y orden = suma de horas aprobadas por fecha × tarifa por hora vigente en cada fecha.",
+    "Variación de horas = horas aprobadas − horas presupuestadas.",
+    "Variación de tarifa = suma de horas aprobadas × (tarifa vigente en la fecha − tarifa por hora presupuestada).",
+    "Variación de costo total = costo real − costo presupuestado; el reporte presenta el signo y el importe de la variación sin inferir si es favorable o desfavorable.",
+    "Los resultados concilian con las hojas de tiempo aprobadas y los registros de costo de mano de obra directa; ninguna hora se cuenta más de una vez en el reporte.",
+    "El reporte no incorpora porcentajes de cargas laborales o prestaciones no definidos ni horas no aprobadas."
+   ],
+   "secuencia": [
+    "El Contador de costos indica el período y, opcionalmente, un programador o una orden de trabajo.",
+    "El sistema valida los filtros y consulta las horas presupuestadas, las horas aprobadas y las tarifas aplicables por fecha.",
+    "El sistema calcula costos y variaciones por programador y orden.",
+    "El sistema presenta resultados y totales para los filtros seleccionados."
+   ],
+   "situaciones_anormales": [
+    "Rango de fechas inválido: muestra «La fecha de inicio debe ser igual o anterior a la fecha de fin.» y no genera el reporte.",
+    "Programador u orden inexistente: muestra «El programador o la orden de trabajo seleccionados no existen.» y no genera el reporte.",
+    "Falta tarifa vigente para una fecha con horas aprobadas: muestra «No se puede calcular el costo real: falta una tarifa vigente para el programador en la fecha indicada.» y no presenta totales incompletos.",
+    "No hay horas presupuestadas o aprobadas para los filtros seleccionados: muestra «No hay horas registradas para los filtros seleccionados.» y no genera el reporte.",
+    "Error al consultar las horas o tarifas: muestra «No fue posible generar el reporte de costo por programador. Intente nuevamente.» y no presenta datos parciales."
+   ],
+   "parametros": [
+    "Moneda predeterminada: USD, configurable por el Administrador.",
+    "Decimales predeterminados: 2, configurables por el Administrador.",
+    "Las tarifas por hora son propias de cada programador y se aplican según su fecha de vigencia.",
+    "Los porcentajes de cargas laborales y prestaciones no se incluyen en los cálculos hasta que sean verificados."
+   ],
+   "salidas": [
+    "Reporte en pantalla por programador y orden de trabajo con horas presupuestadas y aprobadas, tarifas, costos presupuestados y reales, y variaciones de horas, tarifa y costo total."
+   ],
+   "almacenamiento_bd": [
+    "No aplica: el reporte consulta horas, presupuestos, tarifas y aprobaciones existentes.",
+    "La consulta debe leer de forma consistente los registros de horas y las tarifas vigentes."
+   ]
+  },
+  {
+   "nombre": "Filtros temporales de reportes",
+   "descripcion": "El sistema deberá limitar cada reporte financiero o de costos a la fecha de corte o al período seleccionado, según el tipo de reporte.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, libros contables y cierre contable mensual; Decisión de diseño del equipo (costos)",
+   "entradas": [
+    "tipo_reporte (enumeración: balance_general, estado_resultados, cambios_patrimonio, costos_orden, costo_programador)",
     "fecha_inicio (date, formato AAAA-MM-DD, para reportes por período)",
     "fecha_fin (date, formato AAAA-MM-DD, para reportes por período)",
     "fecha_corte (date, formato AAAA-MM-DD, para balance general)",
-    "filtros_del_reporte (campos aplicables al reporte seleccionado)"
+    "filtros_del_reporte (campos opcionales aplicables al tipo de reporte)"
    ],
    "validacion_entradas": [
-    "tipo_reporte debe ser uno de los reportes disponibles.",
+    "tipo_reporte debe corresponder a uno de los reportes disponibles para el rol del usuario.",
     "Para reportes por período, fecha_inicio y fecha_fin son obligatorias, válidas y fecha_inicio debe ser igual o anterior a fecha_fin.",
-    "Para balance general, fecha_corte es obligatoria y válida; las fechas de período no sustituyen la fecha de corte.",
-    "Solo se aceptan filtros correspondientes al tipo de reporte seleccionado.",
-    "El usuario debe tener el rol habilitado para el tipo de reporte solicitado."
+    "Para balance_general, fecha_corte es obligatoria y válida; no se acepta un rango de fechas como sustituto.",
+    "Solo se aceptan filtros compatibles con el tipo de reporte seleccionado.",
+    "El usuario debe tener el rol habilitado para consultar el reporte: Contador general para reportes financieros y Contador de costos para reportes de costos."
    ],
    "validacion_salidas": [
-    "Los movimientos de reportes por período incluyen únicamente fechas comprendidas entre fecha_inicio y fecha_fin, inclusive.",
-    "El balance general usa saldos a fecha_corte y no suma movimientos de un rango como si fueran saldos a una fecha.",
-    "El sistema muestra el período o fecha de corte aplicado en el resultado.",
-    "Los filtros opcionales de videojuego y orden de trabajo limitan los resultados al videojuego u orden indicados."
+    "Los movimientos de reportes por período incluyen únicamente fechas contables entre fecha_inicio y fecha_fin, inclusive.",
+    "El balance general utiliza saldos a fecha_corte y no suma movimientos de un rango como si fueran saldos a una fecha.",
+    "Los filtros opcionales de videojuego, orden o programador limitan los resultados a las entidades seleccionadas.",
+    "El reporte muestra el período o fecha de corte y los demás filtros aplicados."
    ],
    "secuencia": [
-    "El usuario selecciona el tipo de reporte y sus fechas o fecha de corte.",
-    "El sistema valida el tipo de fecha requerido y la coherencia del rango.",
-    "El sistema aplica el filtro temporal y los filtros opcionales antes de calcular el reporte.",
-    "El sistema muestra los criterios aplicados junto con los resultados."
+    "El usuario selecciona el tipo de reporte y las fechas requeridas.",
+    "El sistema valida el tipo de fecha, el rango y los filtros compatibles.",
+    "El sistema aplica los filtros antes de consultar y calcular los resultados.",
+    "El sistema presenta los criterios aplicados junto con el reporte."
    ],
    "situaciones_anormales": [
     "Falta una fecha requerida: muestra «Complete las fechas requeridas para el reporte seleccionado.» y no ejecuta la consulta.",
-    "Rango de fechas invertido: muestra «La fecha de inicio debe ser igual o anterior a la fecha de fin.» y no ejecuta la consulta.",
-    "Se envía una fecha incompatible con el reporte: muestra «Las fechas indicadas no corresponden al tipo de reporte seleccionado.» y no ejecuta la consulta.",
-    "El usuario no está autorizado para el tipo de reporte: muestra «No tiene permisos para consultar este reporte.» y no ejecuta la consulta."
+    "Rango invertido: muestra «La fecha de inicio debe ser igual o anterior a la fecha de fin.» y no ejecuta la consulta.",
+    "Fecha incompatible con el reporte: muestra «Las fechas indicadas no corresponden al tipo de reporte seleccionado.» y no ejecuta la consulta.",
+    "Filtro no compatible con el tipo de reporte: muestra «El filtro indicado no corresponde al reporte seleccionado.» y no ejecuta la consulta.",
+    "Rol no habilitado para el reporte: muestra «No tiene permisos para consultar este reporte.» y no ejecuta la consulta."
    ],
    "parametros": [
-    "Los límites temporales se interpretan usando las fechas contables registradas; no se establece zona horaria porque los reportes se filtran por fecha contable, no por hora."
+    "Los límites temporales se interpretan con la fecha contable registrada, sin aplicar zona horaria.",
+    "Los roles disponibles para reportes son Contador general para reportes financieros y Contador de costos para reportes de costos."
    ],
    "salidas": [
-    "Criterios de período aplicados al reporte y resultados limitados a las fechas y filtros seleccionados."
+    "Reporte con criterios temporales y filtros aplicados visibles."
    ],
    "almacenamiento_bd": [
-    "No aplica: los filtros se procesan en la consulta y no modifican los registros contables."
+    "No aplica: los filtros se procesan en la consulta y no modifican los registros contables ni de costos."
    ]
   },
   {
-   "nombre": "Exportación de reportes financieros",
-   "descripcion": "El sistema deberá exportar a PDF o Excel el reporte financiero o de costos generado con sus criterios de consulta aplicados.",
+   "nombre": "Exportación de reportes financieros y de costos",
+   "descripcion": "El sistema deberá exportar un reporte financiero o de costos generado correctamente a PDF o Excel en formato .xlsx.",
    "prioridad": "Media",
    "actores": [
-    "Contador",
-    "Contador de costos",
-    "Administrador"
+    "Contador general",
+    "Contador de costos"
    ],
-   "fuente": "Manual_aplicación_catálogo_SunGames.docx, relación con los estados financieros y libros contables; reportes financieros incluidos en el alcance del sistema",
+   "fuente": "Decisión de diseño del equipo (parámetros por defecto)",
    "entradas": [
-    "reporte_generado (identificador de la consulta y sus resultados)",
-    "formato (enumeración: PDF, Excel)"
+    "reporte_generado (identificador de consulta y resultados, tipo genérico)",
+    "formato (enumeración: PDF, Excel .xlsx)"
    ],
    "validacion_entradas": [
-    "reporte_generado debe corresponder a un reporte disponible y generado correctamente.",
-    "formato es obligatorio y solo admite PDF o Excel.",
-    "El usuario debe tener permiso para consultar y exportar el tipo de reporte solicitado."
+    "reporte_generado debe corresponder a un reporte disponible generado correctamente por el usuario.",
+    "formato es obligatorio y debe ser PDF o Excel .xlsx.",
+    "El usuario debe tener el rol habilitado para consultar el reporte que pretende exportar."
    ],
    "validacion_salidas": [
-    "El archivo contiene los datos y totales que aparecen en el reporte generado.",
-    "El archivo conserva el nombre del reporte, el período o fecha de corte y los filtros aplicados.",
-    "El archivo Excel presenta los datos en celdas y el archivo PDF presenta el reporte en formato de documento legible."
+    "El archivo contiene los importes, cuentas, subtotales, estado de cuadre y demás datos que aparecen en el reporte generado.",
+    "El archivo conserva el tipo de reporte, el período o fecha de corte y los filtros aplicados.",
+    "El archivo Excel .xlsx presenta datos tabulares en celdas; el PDF presenta un documento legible.",
+    "Los totales exportados coinciden con los del reporte en pantalla."
    ],
    "secuencia": [
-    "El usuario selecciona el reporte generado y el formato PDF o Excel.",
-    "El sistema verifica que el reporte y el formato sean válidos y que el usuario tenga permiso.",
-    "El sistema genera el archivo con los resultados y criterios aplicados.",
-    "El sistema entrega el archivo al usuario para su descarga."
+    "El usuario selecciona un reporte generado y el formato de exportación.",
+    "El sistema valida el reporte, el formato y el rol del usuario.",
+    "El sistema genera el archivo con los resultados y criterios de consulta.",
+    "El sistema entrega el archivo para su descarga."
    ],
    "situaciones_anormales": [
-    "Formato no admitido: muestra «Seleccione PDF o Excel para exportar el reporte.» y no genera archivo.",
+    "Formato no admitido: muestra «Seleccione PDF o Excel (.xlsx) para exportar el reporte.» y no genera archivo.",
     "Reporte no disponible o inválido: muestra «No se puede exportar un reporte que no se generó correctamente.» y no genera archivo.",
-    "Permiso insuficiente: muestra «No tiene permisos para exportar este reporte.» y no genera archivo.",
+    "Rol no habilitado: muestra «No tiene permisos para exportar este reporte.» y no genera archivo.",
     "Falla al generar el archivo: muestra «No fue posible exportar el reporte. Intente nuevamente.» y no entrega un archivo incompleto."
    ],
    "parametros": [
-    "Formatos disponibles: PDF y Excel.",
-    "El nombre de archivo incluye el tipo de reporte y el período o fecha de corte; no se fija una convención adicional en los manuales."
+    "Formatos de exportación de reportes: PDF y Excel (.xlsx), configurados como valores predeterminados por decisión de diseño del equipo.",
+    "El archivo se entrega para descarga; no se establece una convención adicional para el nombre."
    ],
    "salidas": [
-    "Archivo PDF o Excel descargable con los datos, totales y criterios del reporte seleccionado."
+    "Archivo descargable PDF o Excel (.xlsx) con los datos, totales, período o fecha de corte y filtros del reporte."
    ],
    "almacenamiento_bd": [
-    "No aplica: el archivo se entrega al usuario y los manuales no definen conservación de exportaciones en la base de datos."
+    "No aplica: el archivo se entrega al usuario y no se conserva una copia en la base de datos."
    ]
   }
  ],
  "vacios": [
-  "El Manual_aplicación_catálogo_SunGames.docx contiene una incompatibilidad entre la política que capitaliza costos internos de desarrollo en 1204 y 1205 y la política que indica que, si SunGames informa bajo NIIF para las PYMES, esos desembolsos se reconocen como gasto. Debe confirmarse el marco contable aplicable antes de definir cómo presentar en reportes los costos capitalizados frente a los costos llevados a gasto.",
-  "Los manuales no especifican el formato visual, las columnas comparativas ni los requisitos de firma o aprobación del balance general, estado de resultados y estado de cambios en el patrimonio.",
-  "Los manuales no especifican la precisión decimal predeterminada para la presentación de importes en los reportes."
+  "El tratamiento contable definitivo del desarrollo de videojuegos sigue pendiente. Se utilizará el parámetro configurable «capitalizar desarrollo: sí/no» y no se automatizarán traslados entre cuentas hasta que se defina la política.",
+  "El costo que sale de 1205 por cada licencia vendida no está definido; no se calcula ni se automatiza en los reportes.",
+  "La amortización de videojuegos no se genera mientras se clasifiquen como activo corriente; cualquier política posterior de amortización requiere definición.",
+  "El Manual_aplicación_catálogo_SunGames.docx presenta una discrepancia al clasificar servicios directos de desarrollo en 4102, mientras que la decisión vigente establece que los servicios profesionales de terceros son gasto del período y no se asignan a órdenes. Los reportes de costos excluyen esos importes de las órdenes.",
+  "El catálogo del manual utiliza denominaciones y códigos distintos para videojuegos en desarrollo y terminados frente a la decisión de diseño que establece las cuentas 1204 y 1205 como activos corrientes; se requiere armonizar el catálogo y el manual para evitar ambigüedades."
  ]
 }

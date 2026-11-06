@@ -1,0 +1,376 @@
+{
+ "requerimientos": [
+  {
+   "nombre": "Borrado lógico de registros",
+   "descripcion": "El sistema deberá conservar los registros eliminados por usuarios mediante marcado lógico y excluirlos de las consultas ordinarias.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Decisiones técnicas del equipo, política de soft delete",
+   "entradas": [
+    "registro_id (identificador del registro, tipo según entidad)",
+    "usuario_id (identificador de usuario, entero)",
+    "fecha_eliminacion (fecha y hora)"
+   ],
+   "validacion_entradas": [
+    "El registro debe existir y no estar marcado como eliminado.",
+    "El usuario debe estar autenticado.",
+    "La consulta de registros eliminados y su restauración requieren el rol Administrador."
+   ],
+   "validacion_salidas": [
+    "El registro conserva sus datos y recibe deleted_at y deleted_by.",
+    "Las consultas ordinarias no devuelven registros con deleted_at distinto de nulo.",
+    "La restauración deja deleted_at y deleted_by sin valor y vuelve a incluir el registro en consultas ordinarias."
+   ],
+   "secuencia": [
+    "El usuario solicita eliminar un registro.",
+    "El sistema valida que la entidad admita borrado lógico y que el usuario esté autenticado.",
+    "El sistema marca el registro con deleted_at y deleted_by, sin eliminarlo físicamente.",
+    "El sistema excluye el registro de las consultas ordinarias."
+   ],
+   "situaciones_anormales": [
+    "Si el registro no existe o ya está eliminado, el sistema no modifica datos y muestra «No se puede eliminar el registro solicitado».",
+    "Si un usuario que no es Administrador intenta consultar o restaurar registros eliminados, el sistema rechaza la operación y muestra «Permiso insuficiente»."
+   ],
+   "parametros": [
+    "El borrado físico por acción del usuario está deshabilitado.",
+    "deleted_at almacena fecha y hora; deleted_by referencia al usuario que realizó la eliminación."
+   ],
+   "salidas": [
+    "Confirmación de registro marcado como eliminado.",
+    "Listado ordinario sin registros eliminados.",
+    "Para el Administrador, consulta de registros eliminados y resultado de restauración."
+   ],
+   "almacenamiento_bd": [
+    "Las tablas de entidades eliminables incluyen deleted_at timestamp nullable y deleted_by integer nullable como FK a usuarios.",
+    "Índice sobre deleted_at para filtrar registros activos y eliminados.",
+    "Las operaciones de marcado y restauración se ejecutan en una transacción."
+   ]
+  },
+  {
+   "nombre": "Cumplimiento de PEP 8",
+   "descripcion": "El sistema deberá mantener el código Python conforme a PEP 8, verificado mediante una herramienta de análisis sin errores.",
+   "prioridad": "Media",
+   "actores": [
+    "Equipo de desarrollo"
+   ],
+   "fuente": "Decisiones técnicas del equipo, estándares de código",
+   "entradas": [
+    "Código fuente Python versionado (archivos .py)",
+    "Resultado de análisis de ruff o flake8 (informe de ejecución)"
+   ],
+   "validacion_entradas": [
+    "La herramienta configurada debe analizar el código Python del proyecto.",
+    "La ejecución debe abarcar los archivos Python incluidos en el repositorio."
+   ],
+   "validacion_salidas": [
+    "La herramienta termina con cero errores de estilo PEP 8.",
+    "El informe identifica la herramienta y el resultado de la ejecución."
+   ],
+   "secuencia": [
+    "El equipo ejecuta ruff o flake8 sobre el código Python.",
+    "La herramienta analiza los archivos incluidos en el proyecto.",
+    "El equipo corrige los errores detectados antes de integrar los cambios."
+   ],
+   "situaciones_anormales": [
+    "Si la herramienta reporta errores, la integración del cambio se rechaza y se informa el archivo y la regla incumplida.",
+    "Si la herramienta no puede ejecutarse, el resultado se considera fallido y el cambio no se integra."
+   ],
+   "parametros": [
+    "Herramienta permitida: ruff o flake8.",
+    "Umbral de errores permitido: cero."
+   ],
+   "salidas": [
+    "Informe de análisis estático con resultado y errores, si existen.",
+    "Estado de validación aprobado o rechazado."
+   ],
+   "almacenamiento_bd": [
+    "No aplica; el código fuente y su configuración se conservan en el repositorio versionado."
+   ]
+  },
+  {
+   "nombre": "Ejecución bloqueante de pruebas contables",
+   "descripcion": "El sistema deberá ejecutar automáticamente las pruebas de las reglas de partida doble y costos antes de aceptar una integración del código.",
+   "prioridad": "Alta",
+   "actores": [
+    "Equipo de desarrollo"
+   ],
+   "fuente": "Decisiones técnicas del equipo, pruebas automatizadas de las reglas de partida doble y de costos",
+   "entradas": [
+    "Código Python modificado (archivos versionados)",
+    "Casos de prueba automatizados (código de pruebas)",
+    "Resultado de ejecución (estado e informe)"
+   ],
+   "validacion_entradas": [
+    "Los cambios que afecten reglas contables o de costos deben incluir o ejecutar las pruebas correspondientes.",
+    "La ejecución debe utilizar el conjunto de pruebas automatizadas del proyecto."
+   ],
+   "validacion_salidas": [
+    "La integración se acepta únicamente si todas las pruebas ejecutadas terminan correctamente.",
+    "El informe identifica las pruebas aprobadas y fallidas.",
+    "El umbral de cobertura se mantiene como [PENDIENTE DE DEFINIR]."
+   ],
+   "secuencia": [
+    "El sistema de integración ejecuta las pruebas automatizadas del proyecto.",
+    "Las pruebas verifican las reglas de partida doble y de costos.",
+    "El sistema de integración permite la integración si todas las pruebas pasan; de lo contrario, la bloquea."
+   ],
+   "situaciones_anormales": [
+    "Si falla una prueba, la integración se bloquea y se informa el nombre de la prueba fallida.",
+    "Si no se puede ejecutar el conjunto de pruebas, la integración se bloquea y se informa «No fue posible validar las pruebas automatizadas»."
+   ],
+   "parametros": [
+    "Resultado requerido para integrar: todas las pruebas ejecutadas aprobadas.",
+    "Cobertura mínima de pruebas: [PENDIENTE DE DEFINIR]."
+   ],
+   "salidas": [
+    "Informe de ejecución de pruebas.",
+    "Estado de integración aprobado o bloqueado."
+   ],
+   "almacenamiento_bd": [
+    "No aplica; el código de pruebas y los informes de integración se conservan en el repositorio o servicio de integración versionado."
+   ]
+  },
+  {
+   "nombre": "Protección de secretos mediante variables de entorno",
+   "descripcion": "El sistema deberá obtener llaves y credenciales desde variables de entorno y evitar su almacenamiento en el repositorio de código.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Equipo de desarrollo"
+   ],
+   "fuente": "Decisiones técnicas del equipo, gestión de secretos",
+   "entradas": [
+    "Variables de entorno requeridas (pares nombre y valor de tipo texto)",
+    "Archivos versionados del proyecto (archivos de texto)"
+   ],
+   "validacion_entradas": [
+    "Las variables requeridas deben estar definidas en el entorno antes de iniciar la aplicación.",
+    "Los valores de secretos no deben estar incluidos en los archivos versionados."
+   ],
+   "validacion_salidas": [
+    "La aplicación obtiene las credenciales desde el entorno de ejecución.",
+    "El repositorio no contiene valores de llaves ni credenciales."
+   ],
+   "secuencia": [
+    "El entorno de ejecución proporciona las variables requeridas.",
+    "La aplicación lee las variables al iniciar.",
+    "La aplicación utiliza los valores sin escribirlos en el código fuente ni en archivos versionados."
+   ],
+   "situaciones_anormales": [
+    "Si falta una variable obligatoria, la aplicación no inicia y muestra «Falta una variable de configuración requerida», sin revelar valores secretos.",
+    "Si se detecta un secreto en un cambio propuesto, la integración se rechaza y se identifica el archivo afectado sin imprimir el valor."
+   ],
+   "parametros": [
+    "Llaves y credenciales se suministran exclusivamente mediante variables de entorno.",
+    "Los secretos están excluidos del repositorio."
+   ],
+   "salidas": [
+    "Aplicación iniciada con configuración obtenida del entorno, o mensaje de configuración incompleta.",
+    "Resultado de revisión del cambio por presencia de secretos."
+   ],
+   "almacenamiento_bd": [
+    "No aplica; las credenciales no se almacenan en tablas de la aplicación ni en archivos versionados."
+   ]
+  },
+  {
+   "nombre": "Configuración de seguridad web de Django",
+   "descripcion": "El sistema deberá aplicar la protección CSRF de Django, el hash de Django para contraseñas y el uso de HTTPS en las interacciones web.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Decisiones técnicas del equipo, seguridad web de Django",
+   "entradas": [
+    "Solicitud web (método, encabezados y datos del formulario)",
+    "Contraseña capturada (texto en tránsito)",
+    "Configuración de despliegue web (parámetros de Django y HTTPS)"
+   ],
+   "validacion_entradas": [
+    "Las solicitudes que modifican datos deben incluir un token CSRF válido.",
+    "La configuración de autenticación debe utilizar el mecanismo de hash de contraseñas de Django.",
+    "Las interacciones web deben utilizar HTTPS."
+   ],
+   "validacion_salidas": [
+    "Las solicitudes de modificación sin token CSRF válido no producen cambios.",
+    "Las contraseñas se verifican mediante el mecanismo de hash de Django y no se persisten en texto plano.",
+    "Las solicitudes HTTP se redirigen a HTTPS o se rechazan, según la configuración del despliegue."
+   ],
+   "secuencia": [
+    "Django recibe la solicitud web.",
+    "Django valida el token CSRF antes de procesar una solicitud que modifica datos.",
+    "Django procesa la autenticación utilizando su mecanismo de hash de contraseñas.",
+    "El despliegue entrega las interacciones web mediante HTTPS."
+   ],
+   "situaciones_anormales": [
+    "Si falta el token CSRF o es inválido, Django rechaza la solicitud y no guarda cambios.",
+    "Si la conexión no cumple HTTPS, el sistema redirige a HTTPS o rechaza la solicitud según la configuración desplegada.",
+    "Si ocurre un error de autenticación, el sistema no revela si la contraseña almacenada coincide ni expone su hash."
+   ],
+   "parametros": [
+    "Protección CSRF de Django habilitada para operaciones que modifican datos.",
+    "Mecanismo de hash de contraseñas proporcionado por Django.",
+    "HTTPS obligatorio en el despliegue."
+   ],
+   "salidas": [
+    "Respuesta web segura o rechazo de la solicitud inválida.",
+    "Resultado de autenticación sin exposición de contraseña ni hash."
+   ],
+   "almacenamiento_bd": [
+    "Las credenciales se conservan mediante el mecanismo de hash de Django en el almacenamiento de usuarios.",
+    "No se almacena el token CSRF como dato contable."
+   ]
+  },
+  {
+   "nombre": "Conexión cifrada con PostgreSQL",
+   "descripcion": "El sistema deberá establecer las conexiones de Django con PostgreSQL mediante un canal TLS con validación del certificado del servidor.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Equipo de desarrollo"
+   ],
+   "fuente": "Decisiones técnicas del equipo, PostgreSQL alojado en Supabase y conexión desde Django",
+   "entradas": [
+    "Parámetros de conexión PostgreSQL (host, puerto, base de datos y modo TLS)",
+    "Certificado de confianza (archivo o almacén de certificados)"
+   ],
+   "validacion_entradas": [
+    "La configuración debe exigir TLS para la conexión.",
+    "La validación del certificado del servidor debe estar habilitada.",
+    "La configuración no debe aceptar una conexión sin cifrado."
+   ],
+   "validacion_salidas": [
+    "La conexión de Django con PostgreSQL se establece con TLS activo y certificado validado.",
+    "Una conexión sin TLS o con certificado no válido no se considera una conexión válida."
+   ],
+   "secuencia": [
+    "Django lee los parámetros de conexión del entorno de ejecución.",
+    "Django solicita una conexión TLS al servicio PostgreSQL alojado.",
+    "El cliente valida el certificado del servidor.",
+    "Django utiliza la conexión únicamente si la negociación y la validación concluyen correctamente."
+   ],
+   "situaciones_anormales": [
+    "Si TLS no está disponible, el sistema rechaza la conexión y no intenta continuar sin cifrado.",
+    "Si el certificado es inválido o no confiable, el sistema rechaza la conexión y registra el fallo sin exponer credenciales."
+   ],
+   "parametros": [
+    "Conexión TLS obligatoria.",
+    "Validación del certificado del servidor obligatoria."
+   ],
+   "salidas": [
+    "Conexión cifrada establecida o error de conexión segura."
+   ],
+   "almacenamiento_bd": [
+    "No aplica a las tablas de negocio; la configuración de conexión se obtiene del entorno y no se guarda como dato contable."
+   ]
+  },
+  {
+   "nombre": "Migraciones versionadas de esquema",
+   "descripcion": "El sistema deberá conservar como migraciones versionadas todos los cambios de esquema de PostgreSQL administrados desde Django.",
+   "prioridad": "Alta",
+   "actores": [
+    "Equipo de desarrollo",
+    "Administrador"
+   ],
+   "fuente": "Decisiones técnicas del equipo, ORM de Django y migraciones versionadas",
+   "entradas": [
+    "Cambio de esquema (definición de tablas, campos, restricciones o índices)",
+    "Archivo de migración Django (código Python versionado)",
+    "Versión de esquema actual (identificador de migración)"
+   ],
+   "validacion_entradas": [
+    "Todo cambio de esquema debe contar con una migración Django versionada.",
+    "La migración debe declarar sus dependencias y operaciones de forma que Django pueda aplicarla en orden."
+   ],
+   "validacion_salidas": [
+    "El esquema resultante coincide con las operaciones declaradas en las migraciones aplicadas.",
+    "Las migraciones versionadas permiten construir el esquema desde una base de datos vacía.",
+    "No se aplican cambios manuales de esquema fuera del historial de migraciones."
+   ],
+   "secuencia": [
+    "El equipo genera una migración para el cambio de esquema.",
+    "El archivo de migración se incorpora al repositorio versionado.",
+    "El despliegue aplica las migraciones pendientes mediante Django.",
+    "El sistema registra la migración como aplicada."
+   ],
+   "situaciones_anormales": [
+    "Si una migración falla, el despliegue informa la migración afectada y no continúa como si el cambio hubiera sido aplicado.",
+    "Si un cambio de esquema no tiene migración versionada, la integración o el despliegue se rechaza."
+   ],
+   "parametros": [
+    "ORM y migraciones de Django como mecanismo de cambios de esquema.",
+    "Archivos de migración almacenados en el repositorio versionado."
+   ],
+   "salidas": [
+    "Historial de migraciones aplicadas.",
+    "Esquema actualizado o informe del error de migración."
+   ],
+   "almacenamiento_bd": [
+    "Django conserva el historial de migraciones aplicadas en su tabla de control de migraciones.",
+    "Las definiciones de migración se conservan como archivos Python versionados en el repositorio.",
+    "Las operaciones de migración deben respetar las dependencias declaradas entre versiones."
+   ]
+  },
+  {
+   "nombre": "Respaldo y disponibilidad del servicio PostgreSQL alojado",
+   "descripcion": "El sistema deberá conservar respaldos recuperables de la base de datos alojada y medir la disponibilidad mensual del servicio PostgreSQL utilizado por Django.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Equipo de desarrollo"
+   ],
+   "fuente": "Decisiones de diseño del equipo (parámetros por defecto); decisiones técnicas del equipo, PostgreSQL alojado en Supabase",
+   "entradas": [
+    "Base de datos PostgreSQL alojada (instancia de servicio)",
+    "Resultado de ejecución del respaldo (fecha, estado y referencia)",
+    "Comprobación periódica del servicio (fecha, hora y resultado de conexión)"
+   ],
+   "validacion_entradas": [
+    "Cada ejecución de respaldo debe registrar fecha, estado y referencia recuperable.",
+    "Cada comprobación de disponibilidad debe registrar fecha, hora y resultado de conexión.",
+    "El umbral objetivo de disponibilidad mensual queda como [PENDIENTE DE DEFINIR]."
+   ],
+   "validacion_salidas": [
+    "Se genera un respaldo diario y se conservan respaldos de los últimos 30 días.",
+    "El sistema calcula disponibilidad mensual como (minutos en que PostgreSQL estuvo accesible / minutos totales del mes) × 100.",
+    "La pérdida máxima tolerable de datos es de 24 horas y la restauración debe completarse en 4 horas."
+   ],
+   "secuencia": [
+    "El servicio de respaldo genera una copia diaria de la base de datos alojada.",
+    "El sistema conserva las copias según el período configurado.",
+    "El sistema comprueba periódicamente la conexión de Django con PostgreSQL y registra el resultado.",
+    "El Administrador consulta el resultado de respaldos y la disponibilidad mensual."
+   ],
+   "situaciones_anormales": [
+    "Si falla la generación de un respaldo, el sistema registra el fallo y notifica al Administrador.",
+    "Si PostgreSQL no está accesible, el sistema registra la interrupción y no presenta las operaciones fallidas como completadas.",
+    "Si la restauración supera las 4 horas o la pérdida potencial de datos supera las 24 horas, el sistema informa incumplimiento del objetivo de recuperación."
+   ],
+   "parametros": [
+    "Frecuencia de respaldo: diaria.",
+    "Retención de respaldos: 30 días.",
+    "Pérdida máxima tolerable: 24 horas.",
+    "Tiempo objetivo de restauración: 4 horas.",
+    "Objetivo de disponibilidad mensual: [PENDIENTE DE DEFINIR]."
+   ],
+   "salidas": [
+    "Registro de ejecución y resultado de cada respaldo.",
+    "Disponibilidad mensual calculada para PostgreSQL.",
+    "Notificación de fallos de respaldo o de acceso al servicio."
+   ],
+   "almacenamiento_bd": [
+    "No aplica a las tablas de negocio; los respaldos y sus referencias se conservan en el servicio de respaldo configurado.",
+    "El registro operativo incluye identificador, fecha, estado y referencia del respaldo, y fecha, hora y resultado de las comprobaciones del servicio."
+   ]
+  }
+ ],
+ "vacios": [
+  "Cobertura mínima exigida para las pruebas automatizadas contables: [PENDIENTE DE DEFINIR].",
+  "Objetivo numérico de disponibilidad mensual del servicio PostgreSQL alojado: [PENDIENTE DE DEFINIR]."
+ ]
+}

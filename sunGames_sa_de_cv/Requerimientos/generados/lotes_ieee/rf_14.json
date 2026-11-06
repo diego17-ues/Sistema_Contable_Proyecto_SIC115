@@ -1,0 +1,411 @@
+{
+ "requerimientos": [
+  {
+   "nombre": "Configuración de base y tasa indirecta",
+   "descripcion": "El sistema deberá calcular y conservar por período la tasa predeterminada de costos indirectos a partir de la base de aplicación configurada.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador de costos"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos); Manual_aplicación_catálogo_SunGames.docx, cuenta 4103 Costos indirectos de desarrollo",
+   "entradas": [
+    "período (fecha de inicio y fecha de fin, formato date)",
+    "base de aplicación (texto configurable)",
+    "costos indirectos presupuestados (decimal)",
+    "horas presupuestadas de la base (decimal)",
+    "fecha de vigencia (date)"
+   ],
+   "validacion_entradas": [
+    "El período, la base, los costos presupuestados, las horas presupuestadas y la fecha de vigencia son obligatorios.",
+    "Los costos indirectos presupuestados son mayores o iguales a cero.",
+    "La base identifica las horas presupuestadas que se usarán para aplicar costos indirectos; por defecto, horas de mano de obra directa aprobadas.",
+    "La tasa se calcula únicamente cuando las horas presupuestadas de la base son mayores que cero."
+   ],
+   "validacion_salidas": [
+    "Tasa predeterminada = costos indirectos presupuestados / horas presupuestadas de la base.",
+    "La tasa resultante conserva el período, la base y la fecha de vigencia usados en el cálculo.",
+    "El resultado se presenta con los decimales configurados para la moneda contable."
+   ],
+   "secuencia": [
+    "El Administrador registra la base y los valores presupuestados para el período.",
+    "El sistema valida los datos y calcula la tasa predeterminada.",
+    "El sistema guarda la configuración y la presenta al Contador de costos para su uso en los cálculos de costos."
+   ],
+   "situaciones_anormales": [
+    "Si las horas presupuestadas son cero, el sistema muestra «No se puede calcular la tasa: las horas presupuestadas de la base deben ser mayores que cero» y no guarda la tasa.",
+    "Si los costos presupuestados son negativos, el sistema muestra «Los costos indirectos presupuestados no pueden ser negativos» y rechaza el registro.",
+    "Si falla el guardado, el sistema revierte la operación y muestra «No se guardó la configuración de la tasa indirecta»."
+   ],
+   "parametros": [
+    "Base de aplicación configurable; valor por defecto: horas de mano de obra directa aprobadas.",
+    "La tasa predeterminada se calcula por período y no se fija un valor numérico por defecto.",
+    "Moneda por defecto USD, 2 decimales y tolerancia de cuadre 0.00; configurables por el Administrador."
+   ],
+   "salidas": [
+    "Configuración de base y tasa predeterminada por período.",
+    "Mensaje de confirmación o de validación."
+   ],
+   "almacenamiento_bd": [
+    "configuraciones_indirectos: id, periodo_inicio date, periodo_fin date, base_aplicacion varchar, costos_presupuestados decimal(14,2), horas_base_presupuestadas decimal(14,2), tasa_predeterminada decimal(14,6), fecha_vigencia date, usuario_id FK usuarios.id, created_at timestamp; CHECK costos_presupuestados >= 0 y horas_base_presupuestadas > 0.",
+    "Índice por periodo_inicio, periodo_fin y fecha_vigencia.",
+    "Guardar entradas y tasa calculada en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Validación de configuración indirecta",
+   "descripcion": "El sistema deberá rechazar una configuración de costos indirectos que no permita aplicar una tasa predeterminada válida al período indicado.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos); Manual_aplicación_catálogo_SunGames.docx, cuenta 4103 Costos indirectos de desarrollo",
+   "entradas": [
+    "período (fecha de inicio y fecha de fin, formato date)",
+    "base de aplicación (texto configurable)",
+    "costos indirectos presupuestados (decimal)",
+    "horas presupuestadas de la base (decimal)"
+   ],
+   "validacion_entradas": [
+    "La fecha de inicio debe ser anterior o igual a la fecha de fin.",
+    "La base de aplicación debe estar definida y corresponder a la base configurada para el cálculo.",
+    "Los costos presupuestados deben ser mayores o iguales a cero y las horas presupuestadas deben ser mayores que cero.",
+    "El Administrador debe estar autorizado para configurar parámetros."
+   ],
+   "validacion_salidas": [
+    "Solo se acepta la configuración cuando la fórmula costos indirectos presupuestados / horas presupuestadas produce una tasa válida.",
+    "El sistema conserva los valores ingresados sin sustituir horas o costos faltantes por valores estimados."
+   ],
+   "secuencia": [
+    "El Administrador solicita guardar la configuración.",
+    "El sistema valida período, base y valores presupuestados.",
+    "El sistema guarda la configuración válida o informa el primer conjunto de errores detectados."
+   ],
+   "situaciones_anormales": [
+    "Si la fecha de inicio es posterior a la fecha de fin, muestra «El período indicado no es válido» y rechaza la configuración.",
+    "Si falta la base, muestra «Seleccione una base de aplicación» y no guarda.",
+    "Si el usuario no tiene permiso, muestra «No tiene permiso para modificar los parámetros de costos indirectos» y registra el intento en la bitácora."
+   ],
+   "parametros": [
+    "Validaciones de período y de dominio numérico aplicadas a cada configuración.",
+    "Los parámetros de costos indirectos son configurables por el Administrador."
+   ],
+   "salidas": [
+    "Configuración aceptada o errores de validación.",
+    "Registro de intento no autorizado en la bitácora."
+   ],
+   "almacenamiento_bd": [
+    "configuraciones_indirectos: id, periodo_inicio date, periodo_fin date, base_aplicacion varchar, costos_presupuestados decimal(14,2), horas_base_presupuestadas decimal(14,2), tasa_predeterminada decimal(14,6), usuario_id FK usuarios.id.",
+    "CHECK periodo_inicio <= periodo_fin, costos_presupuestados >= 0 y horas_base_presupuestadas > 0.",
+    "Registrar intentos no autorizados en bitacora_operaciones dentro de la misma transacción que registra el evento."
+   ]
+  },
+  {
+   "nombre": "Cálculo del costo presupuestado por orden",
+   "descripcion": "El sistema deberá calcular el costo presupuestado de mano de obra directa y de costos indirectos de una orden a partir de las horas presupuestadas capturadas, las tarifas correspondientes y la tasa indirecta vigente.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos); Manual_aplicación_catálogo_SunGames.docx, cuentas 4101 y 4103",
+   "entradas": [
+    "orden de trabajo (identificador)",
+    "programador (identificador)",
+    "horas presupuestadas por programador (decimal)",
+    "tarifa por hora aplicable al presupuesto (decimal)",
+    "tasa indirecta predeterminada vigente (decimal)",
+    "fecha del presupuesto (date)"
+   ],
+   "validacion_entradas": [
+    "La orden y el programador deben existir.",
+    "Las horas presupuestadas deben ser mayores o iguales a cero.",
+    "La tarifa por hora y la tasa indirecta deben corresponder a la fecha o período del presupuesto.",
+    "El Contador de costos debe tener autorización para registrar datos y cálculos de costos."
+   ],
+   "validacion_salidas": [
+    "Costo presupuestado de mano de obra por programador = horas presupuestadas × tarifa por hora.",
+    "Costo indirecto presupuestado atribuible a las horas = horas presupuestadas × tasa indirecta predeterminada.",
+    "El costo presupuestado total de la orden corresponde a la suma de los costos presupuestados de mano de obra directa e indirectos.",
+    "Los importes calculados se presentan con la precisión monetaria configurada."
+   ],
+   "secuencia": [
+    "El Contador de costos registra las horas presupuestadas por programador para la orden.",
+    "El sistema obtiene la tarifa por hora y la tasa indirecta aplicables al presupuesto.",
+    "El sistema calcula los importes de mano de obra e indirectos y el total presupuestado.",
+    "El sistema guarda los datos de origen y los importes calculados vinculados a la orden."
+   ],
+   "situaciones_anormales": [
+    "Si no existe una tarifa aplicable, muestra «No existe una tarifa por hora aplicable a la fecha del presupuesto» y no calcula el costo de mano de obra.",
+    "Si no existe una tasa indirecta vigente, muestra «No existe una tasa indirecta vigente para el período del presupuesto» y no calcula el costo indirecto.",
+    "Si falla el guardado, revierte los datos y cálculos de la operación y muestra «No se guardó el costo presupuestado de la orden»."
+   ],
+   "parametros": [
+    "El sistema guarda horas y calcula los costos; no estima las horas presupuestadas.",
+    "Moneda por defecto USD y 2 decimales; configurables por el Administrador."
+   ],
+   "salidas": [
+    "Costos presupuestados de mano de obra directa e indirectos por orden y programador.",
+    "Total presupuestado calculado para la orden.",
+    "Mensajes de confirmación o de error."
+   ],
+   "almacenamiento_bd": [
+    "presupuestos_orden: id, orden_trabajo_id FK ordenes_trabajo.id, programador_id FK programadores.id, horas_presupuestadas decimal(10,2), tarifa_hora decimal(14,6), tasa_indirecta decimal(14,6), costo_mano_obra_presupuestado decimal(14,2), costo_indirecto_presupuestado decimal(14,2), fecha_presupuesto date.",
+    "CHECK horas_presupuestadas >= 0 y los importes calculados >= 0.",
+    "Índice por orden_trabajo_id y programador_id; persistir entradas y resultados en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Validación de datos de estimación presupuestaria",
+   "descripcion": "El sistema deberá exigir los datos de procedencia de la estimación de horas presupuestadas sin calcular ni seleccionar automáticamente el método de estimación.",
+   "prioridad": "Media",
+   "actores": [
+    "Contador de costos"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos)",
+   "entradas": [
+    "método de estimación (texto configurable)",
+    "persona que estimó (identificador o texto)",
+    "fecha de estimación (date)",
+    "horas presupuestadas por programador (decimal)"
+   ],
+   "validacion_entradas": [
+    "El método, la persona que estimó y la fecha de estimación son obligatorios para documentar el presupuesto.",
+    "El método es informativo y configurable; puede registrar juicio de expertos, analogía, COSMIC, puntos de función u otro método definido por la empresa.",
+    "Las horas presupuestadas deben ser mayores o iguales a cero.",
+    "El sistema no genera las horas ni propone un método de estimación."
+   ],
+   "validacion_salidas": [
+    "Los datos de método, persona y fecha quedan asociados al presupuesto de la orden.",
+    "La cantidad de horas guardada coincide con la capturada por programador."
+   ],
+   "secuencia": [
+    "El Contador de costos captura el método, quién estimó, la fecha y las horas presupuestadas.",
+    "El sistema valida que los datos obligatorios estén presentes.",
+    "El sistema guarda los datos informativos junto con el presupuesto, sin recalcular la estimación."
+   ],
+   "situaciones_anormales": [
+    "Si falta el método, la persona o la fecha, muestra «Complete el método, quién estimó y la fecha de estimación» y no guarda el presupuesto.",
+    "Si las horas son negativas, muestra «Las horas presupuestadas no pueden ser negativas» y rechaza el registro.",
+    "Si falla el guardado, muestra «No se guardaron los datos de estimación» y revierte la operación."
+   ],
+   "parametros": [
+    "El catálogo de métodos es configurable y no tiene un método único predeterminado.",
+    "No se automatiza la estimación de horas."
+   ],
+   "salidas": [
+    "Datos de procedencia de la estimación asociados al presupuesto.",
+    "Mensaje de confirmación o de validación."
+   ],
+   "almacenamiento_bd": [
+    "presupuestos_orden: id, orden_trabajo_id FK ordenes_trabajo.id, metodo_estimacion varchar, persona_estimadora varchar, fecha_estimacion date, programador_id FK programadores.id, horas_presupuestadas decimal(10,2).",
+    "Restricciones NOT NULL para metodo_estimacion, persona_estimadora y fecha_estimacion; CHECK horas_presupuestadas >= 0.",
+    "Guardar metadatos y horas de forma transaccional."
+   ]
+  },
+  {
+   "nombre": "Clasificación de servicios profesionales de terceros",
+   "descripcion": "El sistema deberá registrar los servicios profesionales de terceros recibidos como gasto del período y rechazar su asignación como costo de una orden de trabajo.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos); Manual_aplicación_catálogo_SunGames.docx, cuenta 4502 Gastos por servicios profesionales y Política 8",
+   "entradas": [
+    "proveedor (identificador)",
+    "fecha de recepción y aceptación del servicio (date)",
+    "importe bruto del servicio (decimal)",
+    "cuenta contable (código)",
+    "orden de trabajo (identificador opcional)",
+    "documento soporte (referencia de texto)"
+   ],
+   "validacion_entradas": [
+    "El proveedor, la fecha, el importe, la cuenta y el documento soporte son obligatorios.",
+    "El importe debe ser mayor o igual a cero.",
+    "La cuenta para estos servicios es 4502 Gastos por servicios profesionales.",
+    "La orden de trabajo debe quedar vacía; el servicio no puede asignarse a una orden."
+   ],
+   "validacion_salidas": [
+    "El importe queda clasificado como gasto del período y no se incorpora al costo presupuestado ni al costo acumulado de una orden.",
+    "El movimiento conserva la fecha de recepción y aceptación y el documento soporte."
+   ],
+   "secuencia": [
+    "El contador registra el servicio recibido y aceptado, su importe y documento soporte.",
+    "El sistema valida la cuenta de gasto y comprueba que no haya una orden de trabajo asociada.",
+    "El sistema guarda la clasificación del gasto y la información de soporte."
+   ],
+   "situaciones_anormales": [
+    "Si se informa una orden de trabajo, muestra «Los servicios profesionales de terceros se registran como gasto del período y no se asignan a órdenes de trabajo» y rechaza la clasificación.",
+    "Si se selecciona una cuenta distinta de 4502, muestra «Seleccione la cuenta 4502 Gastos por servicios profesionales» y no guarda.",
+    "Si falla el guardado, revierte el registro y muestra «No se guardó el servicio profesional»."
+   ],
+   "parametros": [
+    "Cuenta de gasto prevista para servicios profesionales: 4502, conforme al manual.",
+    "No se configura porcentaje de retención ni se automatiza un cálculo fiscal en este requerimiento."
+   ],
+   "salidas": [
+    "Registro del servicio profesional como gasto del período.",
+    "Mensaje de confirmación o de rechazo de asignación a orden."
+   ],
+   "almacenamiento_bd": [
+    "gastos_servicios_profesionales: id, proveedor_id FK proveedores.id, fecha_recepcion date, importe_bruto decimal(14,2), cuenta_id FK cuentas.id, documento_soporte varchar, orden_trabajo_id FK ordenes_trabajo.id nullable, usuario_id FK usuarios.id, created_at timestamp.",
+    "CHECK importe_bruto >= 0 y CHECK orden_trabajo_id IS NULL; referencia de cuenta restringida al código 4502.",
+    "Guardar el gasto en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Cálculo de variaciones por orden",
+   "descripcion": "El sistema deberá calcular al cierre del período las variaciones de horas, tarifa y costo de mano de obra, además de la variación entre costos indirectos reales y aplicados, por orden y programador cuando corresponda.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos)",
+   "entradas": [
+    "período cerrado (identificador o fechas)",
+    "orden de trabajo (identificador)",
+    "horas presupuestadas y reales aprobadas (decimal)",
+    "tarifa presupuestada y tarifa aplicable a las horas reales (decimal)",
+    "costos indirectos reales y aplicados (decimal)"
+   ],
+   "validacion_entradas": [
+    "El período y la orden deben existir.",
+    "Las horas reales consideradas deben estar aprobadas.",
+    "Deben existir datos presupuestados para comparar horas, tarifas y costos.",
+    "Los datos de costos indirectos reales y aplicados deben corresponder al mismo período y orden."
+   ],
+   "validacion_salidas": [
+    "Variación de horas = (horas reales aprobadas − horas presupuestadas) × tarifa presupuestada.",
+    "Variación de tarifa = horas reales aprobadas × (tarifa aplicable a las horas reales − tarifa presupuestada).",
+    "Variación total de mano de obra = costo real de mano de obra − costo presupuestado de mano de obra.",
+    "Variación de costos indirectos = costos indirectos reales − costos indirectos aplicados; un resultado positivo se identifica como subaplicación y uno negativo como sobreaplicación.",
+    "La variación total de mano de obra concilia con la suma de las variaciones de horas y tarifa usando las mismas bases de cálculo."
+   ],
+   "secuencia": [
+    "El Contador de costos selecciona el período cerrado y las órdenes que desea analizar.",
+    "El sistema obtiene los datos presupuestados, horas aprobadas, tarifas y costos indirectos reales y aplicados.",
+    "El sistema calcula las variaciones por orden y, para mano de obra, por programador.",
+    "El sistema conserva el resultado vinculado al período y a los datos usados."
+   ],
+   "situaciones_anormales": [
+    "Si el período no está cerrado, muestra «Las variaciones definitivas solo se calculan al cierre del período» y no guarda resultados definitivos.",
+    "Si faltan datos presupuestados, horas aprobadas o costos indirectos del período, muestra «No se pueden calcular las variaciones: faltan datos para la comparación» e identifica la orden afectada.",
+    "Si ocurre un error al guardar los resultados, revierte el cálculo del lote y muestra «No se guardaron las variaciones del período»."
+   ],
+   "parametros": [
+    "El cálculo de variaciones se ejecuta al cierre de cada período.",
+    "Moneda por defecto USD, 2 decimales y tolerancia de cuadre 0.00; configurables por el Administrador."
+   ],
+   "salidas": [
+    "Variaciones de horas, tarifa, costo total de mano de obra y costos indirectos por orden y programador cuando corresponda.",
+    "Identificación de costos indirectos sobreaplicados o subaplicados.",
+    "Mensajes de validación con la orden afectada."
+   ],
+   "almacenamiento_bd": [
+    "variaciones_costos: id, periodo_id FK periodos.id, orden_trabajo_id FK ordenes_trabajo.id, programador_id FK programadores.id nullable, horas_presupuestadas decimal(10,2), horas_reales decimal(10,2), tarifa_presupuestada decimal(14,6), tarifa_real decimal(14,6), variacion_horas decimal(14,2), variacion_tarifa decimal(14,2), variacion_mano_obra_total decimal(14,2), indirectos_reales decimal(14,2), indirectos_aplicados decimal(14,2), variacion_indirectos decimal(14,2), usuario_id FK usuarios.id, created_at timestamp.",
+    "Clave única por periodo_id, orden_trabajo_id y programador_id; programador_id puede ser nulo para variación indirecta por orden.",
+    "Guardar resultados del período en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Acceso a parámetros y variaciones de costos",
+   "descripcion": "El sistema deberá limitar la modificación de parámetros de costos indirectos al Administrador y las operaciones y consultas de costos del submódulo al Contador de costos.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador",
+    "Contador de costos"
+   ],
+   "fuente": "Decisión de diseño del equipo (parámetros por defecto); Decisión de diseño del equipo (costos)",
+   "entradas": [
+    "usuario autenticado (identificador)",
+    "rol asignado (texto)",
+    "operación solicitada (texto: modificar parámetros, registrar costos o consultar variaciones)"
+   ],
+   "validacion_entradas": [
+    "El usuario debe estar autenticado.",
+    "El rol debe corresponder a una función definida: Administrador para parámetros y Contador de costos para operaciones y consultas de costos.",
+    "El sistema no asigna permisos adicionales no definidos para estos roles."
+   ],
+   "validacion_salidas": [
+    "Solo el Administrador puede modificar parámetros de base y tasa indirecta.",
+    "Solo el Contador de costos puede ejecutar las operaciones y consultas de costos del submódulo.",
+    "Los accesos autorizados y los intentos rechazados quedan asociados al usuario y la operación solicitada."
+   ],
+   "secuencia": [
+    "El usuario solicita una operación del submódulo.",
+    "El sistema verifica su rol frente a la función solicitada.",
+    "El sistema autoriza la operación o la rechaza y registra el resultado del control de acceso."
+   ],
+   "situaciones_anormales": [
+    "Si el usuario no está autenticado, muestra «Inicie sesión para continuar» y no ejecuta la operación.",
+    "Si el rol no corresponde a la operación, muestra «No tiene permiso para realizar esta operación» y registra el intento en la bitácora."
+   ],
+   "parametros": [
+    "Roles por defecto: Administrador (parámetros) y Contador de costos (órdenes y costos), configurables por el Administrador.",
+    "No se fija una matriz de permisos más detallada que las funciones definidas para estos roles."
+   ],
+   "salidas": [
+    "Acceso concedido o denegado.",
+    "Evento de autorización o rechazo en la bitácora."
+   ],
+   "almacenamiento_bd": [
+    "bitacora_operaciones: id, usuario_id FK usuarios.id, rol varchar, operacion varchar, resultado varchar, fecha_hora timestamp.",
+    "Índices por usuario_id, fecha_hora y operacion.",
+    "Registrar el evento de control de acceso aun cuando la operación solicitada sea rechazada."
+   ]
+  },
+  {
+   "nombre": "Reporte de variaciones de costos",
+   "descripcion": "El sistema deberá presentar un reporte de variaciones de costos por período, orden de trabajo y programador cuando corresponda.",
+   "prioridad": "Media",
+   "actores": [
+    "Contador de costos"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos)",
+   "entradas": [
+    "período cerrado (identificador o fechas)",
+    "orden de trabajo (identificador opcional)",
+    "programador (identificador opcional)",
+    "formato de salida (texto: pantalla, PDF o XLSX)"
+   ],
+   "validacion_entradas": [
+    "El período debe existir y estar cerrado.",
+    "Si se informa una orden o un programador, debe existir.",
+    "El formato solicitado debe ser pantalla, PDF o XLSX."
+   ],
+   "validacion_salidas": [
+    "El reporte muestra, para cada fila, período, orden, programador si aplica, horas presupuestadas y reales, variaciones de horas, tarifa y costo total de mano de obra, y costos indirectos reales, aplicados y su variación.",
+    "Los subtotales por orden coinciden con las variaciones calculadas para sus programadores y costos indirectos.",
+    "El reporte identifica las variaciones indirectas positivas como subaplicación y las negativas como sobreaplicación."
+   ],
+   "secuencia": [
+    "El Contador de costos selecciona período y filtros opcionales.",
+    "El sistema consulta las variaciones definitivas del período.",
+    "El sistema presenta el reporte en pantalla o genera el archivo solicitado."
+   ],
+   "situaciones_anormales": [
+    "Si el período no está cerrado, muestra «No hay variaciones definitivas disponibles para un período abierto» y no genera el reporte.",
+    "Si no existen resultados para los filtros, muestra «No se encontraron variaciones para los criterios seleccionados».",
+    "Si falla la generación del archivo, muestra «No se pudo generar el reporte» y conserva disponibles los resultados en pantalla cuando sea posible."
+   ],
+   "parametros": [
+    "Formatos por defecto para reportes: PDF y Excel (.xlsx); configurables por el Administrador.",
+    "La consulta permite filtrar por período, orden y programador."
+   ],
+   "salidas": [
+    "Reporte en pantalla o archivo PDF o XLSX con variaciones de costos.",
+    "Mensaje de consulta sin resultados o de error de generación."
+   ],
+   "almacenamiento_bd": [
+    "variaciones_costos: id, periodo_id FK periodos.id, orden_trabajo_id FK ordenes_trabajo.id, programador_id FK programadores.id nullable, horas_presupuestadas decimal(10,2), horas_reales decimal(10,2), variacion_horas decimal(14,2), tarifa_presupuestada decimal(14,6), tarifa_real decimal(14,6), variacion_tarifa decimal(14,2), variacion_mano_obra_total decimal(14,2), indirectos_reales decimal(14,2), indirectos_aplicados decimal(14,2), variacion_indirectos decimal(14,2).",
+    "Índices por periodo_id, orden_trabajo_id y programador_id.",
+    "La generación del reporte es de consulta y no modifica los registros de costos."
+   ]
+  }
+ ],
+ "vacios": [
+  "El tratamiento contable del desarrollo de videojuegos continúa sin decidirse: se requiere el parámetro configurable «capitalizar desarrollo: sí/no» y no se automatiza el traslado entre cuentas de desarrollo y terminados.",
+  "El manual incluye los servicios creativos de terceros en 4102 Servicios directos de desarrollo, mientras la decisión de diseño establece que los servicios profesionales de terceros son gasto del período y no se asignan a órdenes; debe confirmarse la discrepancia. Este lote los clasifica según la decisión de diseño en 4502 Gastos por servicios profesionales.",
+  "Los porcentajes de cargas laborales y prestaciones aplicables a los costos de mano de obra son [PENDIENTE DE VERIFICAR]; no se incorporan a las fórmulas presupuestarias de este lote."
+ ]
+}

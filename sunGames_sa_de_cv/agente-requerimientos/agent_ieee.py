@@ -29,19 +29,23 @@ TOTAL = {"in": 0, "out": 0}
 client = OpenAI()
 
 # ---- Qué se genera: (nombre, cantidad, alcance). Edita libremente. ----
+# IMPORTANTE: los lotes se guardan por posición (rf_01, rf_02...). No insertes
+# lotes en medio de la lista: agrega los nuevos siempre al final.
 MODULOS_RF = [
-    ("Usuarios, roles y acceso", 4, "alta, baja y bloqueo de usuarios, asignación de rol (administrador y contador; costeador solo si los manuales lo respaldan), inicio y cierre de sesión, cambio de contraseña"),
+    ("Usuarios, roles y acceso", 4, "alta, baja y bloqueo de usuarios, asignación de rol (Administrador, Contador general y Contador de costos), inicio y cierre de sesión, cambio de contraseña"),
     ("Catálogo de cuentas", 6, "alta, modificación, desactivación y consulta de cuentas según el manual de aplicación del catálogo, rubros, código y naturaleza, sin subcuentas, carga inicial"),
     ("Parámetros y períodos contables", 5, "datos de la empresa, ejercicio y períodos contables, apertura y cierre de período, moneda, correlativos y parámetros fiscales que respalden los manuales"),
     ("Partidas y libro diario", 7, "registro, validación de partida doble, edición antes de mayorizar, anulación y reversión, partidas modelo, consulta y filtros del libro diario"),
     ("Libro mayor y balance de comprobación", 5, "mayorización, saldos por cuenta, consulta por rango de fechas, balance de comprobación, exportación"),
     ("Ingresos por venta de licencias", 6, "registro de ventas digitales de pago único por Steam, comisión de la plataforma, impuestos según los manuales, conciliación de liquidaciones, partida automática"),
     ("Egresos, compras y gastos", 5, "registro de compras y gastos de desarrollo, proveedores, cuentas por pagar, pagos, partida automática"),
-    ("Inventario", 5, "lo que los manuales definan como inventario o activos de la empresa, entradas, salidas, valuación y consulta de existencias"),
-    ("Contabilidad de costos por órdenes de trabajo", 8, "apertura de orden, asignación de materiales, mano de obra y costos indirectos, aplicación de costos indirectos, cierre de orden, costo unitario y total del videojuego, integración con la contabilidad general"),
-    ("Reportes financieros", 6, "balance general, estado de resultados, estado de cambios en el patrimonio, reportes de costos, filtros por período, exportación a PDF y Excel"),
-    ("Ajustes y cierre contable", 4, "partidas de ajuste, cierre de período y de ejercicio, reapertura controlada"),
+    ("Activos fijos y depreciación", 5, "alta y baja de mobiliario y equipo (1201, 1202), depreciación, control de activos totalmente depreciados en uso; los videojuegos NO son parte de este submódulo porque son activo corriente"),
+    ("Órdenes de trabajo y costeo de videojuegos", 10, "apertura de orden por videojuego con presupuesto de horas y costo, estados de la orden, acumulación de costos 4101 a 4103, traslado a 1204 y 1205, cierre, reapertura controlada, baja del costo por cesión del título, consulta de costo acumulado frente al presupuesto, integración con la contabilidad general"),
+    ("Reportes financieros", 6, "balance general con videojuegos en desarrollo y terminados como activo corriente, estado de resultados, estado de cambios en el patrimonio, reporte de costo por orden (presupuesto frente a real), costo por programador, filtros por período, exportación a PDF y Excel"),
+    ("Ajustes y cierre contable", 4, "partidas de ajuste, traslado de costos a 1204 al cierre de cada período, liquidación de sobre y subaplicación de costos indirectos, cierre de período y de ejercicio, reapertura controlada; sin amortización de videojuegos mientras sean activo corriente"),
     ("Bitácora y respaldo", 3, "consulta y exportación de la bitácora de operaciones, respaldo y restauración de datos"),
+    ("Mano de obra por programador", 10, "alta de programadores y tarifa por hora con vigencia, captura de horas por programador, orden y fecha, validaciones (orden abierta, límite diario de horas como parámetro), horas no asignables a órdenes, cálculo del costo, aprobación y corrección de horas, conciliación con planilla, reportes por programador y por orden"),
+    ("Costos indirectos, servicios de terceros y variaciones", 8, "base y tasa predeterminada de aplicación de costos indirectos, aplicación a órdenes, sobre y subaplicación al cierre, servicios profesionales de terceros como gasto del período, presupuesto de horas y costo por orden con método de estimación configurable, variaciones de horas, tarifa y costo, reportes de costos"),
 ]
 MODULOS_RNF = [
     ("Seguridad y privacidad", 14, "autenticación, contraseñas, bloqueo por intentos, sesiones, autorización por rol, cifrado en tránsito y en reposo, protección contra inyección y XSS, protección de datos"),
@@ -51,6 +55,7 @@ MODULOS_RNF = [
     ("Usabilidad, accesibilidad y localización", 12, "facilidad de uso para un contador, mensajes de error claros, navegación, accesibilidad, diseño adaptable, español, moneda USD, formato de fechas y números"),
     ("Mantenibilidad, portabilidad e interoperabilidad", 12, "arquitectura y código, pruebas, documentación, versionado, despliegue, compatibilidad de navegadores y bases de datos, exportación e importación de datos"),
     ("Cumplimiento legal y normativo", 8, "conservación de libros y registros, normativa mercantil, tributaria y contable de El Salvador, solo con respaldo de los manuales"),
+    ("Estándares de desarrollo, Django y PostgreSQL", 8, "soft delete y conservación de registros, cumplimiento de PEP 8 con herramienta de análisis, pruebas automatizadas de las reglas contables, gestión de secretos y variables de entorno, seguridad web de Django (CSRF, hash de contraseñas, HTTPS), conexión cifrada a PostgreSQL, migraciones versionadas, respaldo y disponibilidad del servicio alojado"),
 ]
 TAREA = {
     "rf": ("Tarea: genera EXACTAMENTE {n} requerimientos funcionales para el submódulo «{nombre}». "
@@ -60,6 +65,15 @@ TAREA = {
             "Temas: {alcance}. Pueden ser generales de cualquier sistema contable, cada uno con una "
             "métrica o criterio verificable. Ya existen estos (no los repitas): {previos}."),
 }
+TAREA_AJUSTE = (
+    "Tarea: ajusta el lote «{nombre}» a las decisiones de diseño vigentes, en especial las de "
+    "contabilidad de costos. Estos son sus requerimientos actuales (JSON):\n{actuales}\n\n"
+    "Para cada uno: consérvalo igual si sigue siendo válido; modifícalo si contradice las decisiones "
+    "(por ejemplo, servicios de terceros cargados a órdenes, amortización de videojuegos o costo por "
+    "licencia); elimínalo si ya no aplica o queda fuera del alcance indicado. Luego agrega los "
+    "requerimientos nuevos necesarios para cubrir: {alcance}. Entrega el lote COMPLETO ya ajustado, "
+    "con al menos {n} requerimientos. Ya existen estos en otros submódulos (no los repitas): {previos}."
+)
 
 # ---- Esquema del JSON ----
 LISTA = {"type": "array", "items": {"type": "string"}}
@@ -175,7 +189,7 @@ def pedir(instrucciones: str, contexto: str, tarea: str) -> dict:
     sys.exit("El modelo no devolvió JSON válido dos veces.")
 
 
-def generar(tipo, modulos, instrucciones, contexto, rehacer, solo_lote=None):
+def generar(tipo, modulos, instrucciones, contexto, rehacer, solo_lote=None, ajustar=False):
     LOTES.mkdir(parents=True, exist_ok=True)
     previos = []
     for i, (nombre, n, alcance) in enumerate(modulos, 1):
@@ -184,12 +198,17 @@ def generar(tipo, modulos, instrucciones, contexto, rehacer, solo_lote=None):
             if archivo.exists():
                 previos.extend(r["nombre"] for r in json.loads(archivo.read_text(encoding="utf-8"))["requerimientos"])
             continue
-        if archivo.exists() and not rehacer:
+        if archivo.exists() and not rehacer and not ajustar:
             datos = json.loads(archivo.read_text(encoding="utf-8"))
             print(f"[{tipo.upper()} {i}/{len(modulos)}] {nombre}: reutilizado ({len(datos['requerimientos'])})")
         else:
             print(f"[{tipo.upper()} {i}/{len(modulos)}] {nombre}...")
-            tarea = TAREA[tipo].format(n=n, nombre=nombre, alcance=alcance, previos="; ".join(previos) or "(ninguno)")
+            lista_previos = "; ".join(previos) or "(ninguno)"
+            if ajustar and archivo.exists():
+                actuales = json.dumps(json.loads(archivo.read_text(encoding="utf-8"))["requerimientos"], ensure_ascii=False)
+                tarea = TAREA_AJUSTE.format(nombre=nombre, n=n, alcance=alcance, actuales=actuales, previos=lista_previos)
+            else:
+                tarea = TAREA[tipo].format(n=n, nombre=nombre, alcance=alcance, previos=lista_previos)
             datos = pedir(instrucciones, contexto, tarea)
             archivo.write_text(json.dumps(datos, ensure_ascii=False, indent=1), encoding="utf-8")
             print(f"  generados: {len(datos['requerimientos'])}")
@@ -324,20 +343,26 @@ def construir(rf, rnf):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--solo", choices=["rf", "rnf"], help="genera solo esa parte")
-    ap.add_argument("--lote", type=int, help="genera solo ese número de lote (úsalo junto con --solo)")
+    ap.add_argument("--lote", type=int, help="genera solo ese número de lote (requiere --solo)")
+    ap.add_argument("--ajustar", action="store_true", help="modifica un lote existente (requiere --lote)")
     ap.add_argument("--rehacer", action="store_true", help="vuelve a generar los lotes ya guardados")
     ap.add_argument("--todo", action="store_true", help="incluye también el resto de documentos")
     ap.add_argument("--sin-generar", action="store_true", help="solo arma el Word con los lotes guardados")
     args = ap.parse_args()
+
+    if args.lote and not args.solo:
+        sys.exit("--lote requiere --solo rf o --solo rnf")
+    if args.ajustar and not args.lote:
+        sys.exit("--ajustar requiere --lote N")
 
     if not args.sin_generar:
         instrucciones = Path("instrucciones_ieee.md").read_text(encoding="utf-8")
         print("Documentos leídos:")
         contexto = cargar_contexto(args.todo)
         if args.solo != "rnf":
-            generar("rf", MODULOS_RF, instrucciones, contexto, args.rehacer, args.lote)
+            generar("rf", MODULOS_RF, instrucciones, contexto, args.rehacer, args.lote, args.ajustar)
         if args.solo != "rf":
-            generar("rnf", MODULOS_RNF, instrucciones, contexto, args.rehacer, args.lote)
+            generar("rnf", MODULOS_RNF, instrucciones, contexto, args.rehacer, args.lote, args.ajustar)
         print(f"Tokens totales de esta corrida: entrada={TOTAL['in']}, salida={TOTAL['out']}")
         if PRECIO_IN:
             print(f"Gasto estimado de esta corrida: ${gastado():.3f}")

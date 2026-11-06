@@ -2,88 +2,86 @@
  "requerimientos": [
   {
    "nombre": "Clasificación de bienes inventariables",
-   "descripcion": "El sistema deberá permitir inventario de mercancías únicamente para bienes físicos tangibles y excluir del inventario comercial las licencias digitales de videojuegos.",
+   "descripcion": "El sistema deberá clasificar los bienes como mercancía física, licencia digital o activo fijo, excluyendo las licencias digitales y los activos fijos del inventario comercial.",
    "prioridad": "Alta",
    "actores": [
-    "Contador",
-    "Administrador"
+    "Contador general"
    ],
-   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Política 5.1, Inexistencia de método de inventarios de mercancías; cuentas 1201 y 1202",
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Política 5.1, Manejo Exclusivo de Inventario; cuentas 1201 y 1202",
    "entradas": [
     "tipo_bien (enum: mercancia_fisica, licencia_digital, activo_fijo)",
-    "descripcion (texto, longitud máxima [PENDIENTE DE VERIFICAR])"
+    "descripcion (texto)"
    ],
    "validacion_entradas": [
-    "tipo_bien es obligatorio y pertenece al catálogo permitido",
-    "Las licencias digitales no pueden clasificarse como mercancía inventariable",
-    "El mobiliario, equipo de oficina y equipo de cómputo se clasifican como activos fijos y no como mercancía para la venta"
+    "tipo_bien es obligatorio y debe pertenecer a los valores permitidos",
+    "descripcion es obligatoria",
+    "Los videojuegos digitales no pueden clasificarse como mercancía inventariable",
+    "El mobiliario y el equipo de oficina o cómputo se clasifican como activos fijos"
    ],
    "validacion_salidas": [
-    "Las licencias digitales no generan existencia de mercancía",
-    "Los activos fijos quedan diferenciados de las mercancías inventariables"
+    "Las licencias digitales y los activos fijos no generan existencias de mercancía",
+    "La clasificación diferencia mercancías físicas de activos fijos"
    ],
    "secuencia": [
-    "El usuario selecciona el tipo de bien",
-    "El sistema valida su clasificación",
-    "El sistema permite continuar únicamente con los flujos correspondientes a la categoría del bien"
+    "El usuario ingresa la descripción y selecciona el tipo de bien",
+    "El sistema valida los datos y la clasificación",
+    "El sistema registra la clasificación si es válida"
    ],
    "situaciones_anormales": [
     "Si se intenta registrar una licencia digital como mercancía, el sistema rechaza la operación y muestra: «Las licencias digitales no se controlan como inventario de mercancías.»",
-    "Si se intenta clasificar mobiliario o equipo como mercancía, el sistema rechaza la operación y muestra: «Clasifique el bien como activo fijo.»"
+    "Si se intenta clasificar mobiliario o equipo como mercancía, el sistema rechaza la operación y muestra: «Clasifique el bien como activo fijo.»",
+    "Si ocurre un error al guardar, el sistema no crea el registro y muestra: «No se registró la clasificación; vuelva a intentarlo.»"
    ],
    "parametros": [
-    "Longitud máxima de descripcion: [PENDIENTE DE VERIFICAR]"
+    "El inventario de mercancías físicas se utiliza únicamente si SunGames incorpora su comercialización"
    ],
    "salidas": [
-    "Clasificación del bien",
-    "Mensaje de aceptación o rechazo de clasificación"
+    "Clasificación registrada",
+    "Mensaje de confirmación o rechazo"
    ],
    "almacenamiento_bd": [
     "bienes: id (PK), tipo_bien (enum), descripcion (texto), activo (boolean), created_at (timestamp)",
     "tipo_bien restringido a mercancia_fisica, licencia_digital o activo_fijo",
-    "No se crean movimientos de existencias para licencias_digitales ni activos_fijos"
+    "No se crean movimientos de existencias para licencias digitales ni activos fijos"
    ]
   },
   {
-   "nombre": "Registro de entrada de mercancía física",
-   "descripcion": "El sistema deberá registrar la entrada de unidades de mercancía física tangible y aumentar su existencia disponible.",
-   "prioridad": "Alta",
+   "nombre": "Entrada de mercancía física",
+   "descripcion": "El sistema deberá registrar la entrada de unidades de mercancía física y aumentar su existencia disponible.",
+   "prioridad": "Media",
    "actores": [
-    "Contador",
-    "Administrador"
+    "Contador general"
    ],
    "fuente": "Manual_aplicación_catálogo_SunGames.docx, Política 5.1, Manejo Exclusivo de Inventario",
    "entradas": [
-    "bien_id (identificador, entero)",
+    "bien_id (identificador entero)",
     "fecha (date, formato AAAA-MM-DD)",
-    "cantidad (decimal, precisión y unidad de medida [PENDIENTE DE VERIFICAR])",
-    "documento_soporte (texto, tipo y formato [PENDIENTE DE VERIFICAR])",
-    "concepto (texto, longitud máxima [PENDIENTE DE VERIFICAR])"
+    "cantidad (decimal, unidad de medida configurable)",
+    "documento_soporte (texto)",
+    "concepto (texto)"
    ],
    "validacion_entradas": [
-    "bien_id es obligatorio y debe corresponder a una mercancía física activa",
-    "fecha es obligatoria y debe pertenecer a un período abierto",
+    "bien_id es obligatorio y debe identificar una mercancía física activa",
+    "fecha es obligatoria y corresponde a un período abierto",
     "cantidad es obligatoria y mayor que cero",
-    "documento_soporte es obligatorio; los tipos de documento admitidos están [PENDIENTE DE VERIFICAR]"
+    "documento_soporte es obligatorio"
    ],
    "validacion_salidas": [
     "La existencia resultante es igual a la existencia anterior más la cantidad recibida",
-    "El movimiento queda asociado al bien y a su documento de soporte"
+    "El movimiento queda asociado al bien y al documento de soporte"
    ],
    "secuencia": [
-    "El usuario selecciona la mercancía física e ingresa los datos de la entrada",
+    "El usuario selecciona una mercancía física e ingresa los datos de entrada",
     "El sistema valida el bien, la fecha y la cantidad",
-    "El sistema registra el movimiento de entrada",
-    "El sistema actualiza la existencia disponible"
+    "El sistema registra el movimiento y actualiza la existencia disponible en una transacción"
    ],
    "situaciones_anormales": [
     "Si el bien no está clasificado como mercancía física activa, el sistema rechaza la operación y muestra: «Seleccione una mercancía física activa.»",
-    "Si la cantidad es cero o negativa, el sistema rechaza la operación y muestra: «La cantidad de entrada debe ser mayor que cero.»",
+    "Si la cantidad no es mayor que cero, el sistema rechaza la operación y muestra: «La cantidad de entrada debe ser mayor que cero.»",
     "Si ocurre un error al guardar, el sistema revierte el movimiento y la actualización de existencia y muestra: «No se registró la entrada; vuelva a intentarlo.»"
    ],
    "parametros": [
-    "Precisión decimal y unidad de medida de las cantidades: [PENDIENTE DE VERIFICAR]",
-    "Tipos de documentos de soporte admitidos: [PENDIENTE DE VERIFICAR]"
+    "Unidad de medida y precisión de las cantidades: [PENDIENTE DE VERIFICAR]"
    ],
    "salidas": [
     "Movimiento de entrada registrado",
@@ -91,32 +89,31 @@
     "Mensaje de confirmación o error"
    ],
    "almacenamiento_bd": [
-    "movimientos_inventario: id (PK), bien_id (FK a bienes.id), fecha (date), tipo_movimiento (enum), cantidad (decimal([PENDIENTE DE VERIFICAR])), documento_soporte (texto), concepto (texto), usuario_id (FK a usuarios.id), created_at (timestamp)",
-    "tipo_movimiento restringido a entrada o salida; para este requerimiento debe ser entrada",
+    "movimientos_inventario: id (PK), bien_id (FK a bienes.id), fecha (date), tipo_movimiento (enum), cantidad (decimal), documento_soporte (texto), concepto (texto), usuario_id (FK a usuarios.id), created_at (timestamp)",
+    "tipo_movimiento restringido a entrada o salida; este requerimiento registra entrada",
     "El registro del movimiento y la actualización de existencias se ejecutan en una transacción atómica"
    ]
   },
   {
-   "nombre": "Registro de salida de mercancía física",
-   "descripcion": "El sistema deberá registrar la salida de unidades de mercancía física tangible y disminuir su existencia disponible sin permitir existencias negativas.",
-   "prioridad": "Alta",
+   "nombre": "Salida de mercancía física",
+   "descripcion": "El sistema deberá registrar la salida de unidades de mercancía física sin permitir que su existencia disponible resulte negativa.",
+   "prioridad": "Media",
    "actores": [
-    "Contador",
-    "Administrador"
+    "Contador general"
    ],
-   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Política 5.1, Manejo Exclusivo de Inventario; procedimiento de baja de las cuentas de orden 6103 y 6104, únicamente como referencia de documentación de movimientos de control",
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Política 5.1, Manejo Exclusivo de Inventario",
    "entradas": [
-    "bien_id (identificador, entero)",
+    "bien_id (identificador entero)",
     "fecha (date, formato AAAA-MM-DD)",
-    "cantidad (decimal, precisión y unidad de medida [PENDIENTE DE VERIFICAR])",
-    "motivo_salida (texto, valores permitidos [PENDIENTE DE VERIFICAR])",
-    "documento_soporte (texto, tipo y formato [PENDIENTE DE VERIFICAR])"
+    "cantidad (decimal, unidad de medida configurable)",
+    "motivo_salida (texto)",
+    "documento_soporte (texto)"
    ],
    "validacion_entradas": [
-    "bien_id es obligatorio y debe corresponder a una mercancía física activa",
-    "fecha es obligatoria y debe pertenecer a un período abierto",
-    "cantidad es obligatoria, mayor que cero y no puede superar la existencia disponible",
-    "motivo_salida es obligatorio; los motivos admitidos están [PENDIENTE DE VERIFICAR]"
+    "bien_id es obligatorio y debe identificar una mercancía física activa",
+    "fecha es obligatoria y corresponde a un período abierto",
+    "cantidad es obligatoria, mayor que cero y no supera la existencia disponible",
+    "motivo_salida y documento_soporte son obligatorios"
    ],
    "validacion_salidas": [
     "La existencia resultante es igual a la existencia anterior menos la cantidad de salida",
@@ -124,134 +121,441 @@
     "El movimiento queda asociado al bien y a su documento de soporte"
    ],
    "secuencia": [
-    "El usuario selecciona la mercancía física e ingresa los datos de la salida",
-    "El sistema valida la cantidad solicitada contra la existencia disponible",
-    "Si hay unidades suficientes, el sistema registra la salida y actualiza la existencia",
+    "El usuario selecciona una mercancía física e ingresa los datos de salida",
+    "El sistema valida la mercancía y compara la cantidad solicitada con la existencia disponible",
+    "Si hay unidades suficientes, el sistema registra la salida y actualiza la existencia en una transacción",
     "Si no hay unidades suficientes, el sistema no registra el movimiento"
    ],
    "situaciones_anormales": [
-    "Si la cantidad solicitada supera la existencia, el sistema rechaza la operación y muestra: «Existencia insuficiente. Disponible: [cantidad].»",
-    "Si la cantidad es cero o negativa, el sistema rechaza la operación y muestra: «La cantidad de salida debe ser mayor que cero.»",
+    "Si la cantidad supera la existencia disponible, el sistema rechaza la operación y muestra: «Existencia insuficiente. Disponible: [cantidad].»",
+    "Si la cantidad no es mayor que cero, el sistema rechaza la operación y muestra: «La cantidad de salida debe ser mayor que cero.»",
     "Si ocurre un error al guardar, el sistema revierte el movimiento y la actualización de existencia y muestra: «No se registró la salida; vuelva a intentarlo.»"
    ],
    "parametros": [
-    "Precisión decimal y unidad de medida de las cantidades: [PENDIENTE DE VERIFICAR]",
-    "Motivos y tipos de documentos de soporte admitidos: [PENDIENTE DE VERIFICAR]"
+    "Unidad de medida y precisión de las cantidades: [PENDIENTE DE VERIFICAR]"
    ],
    "salidas": [
     "Movimiento de salida registrado",
     "Existencia disponible actualizada",
-    "Mensaje de confirmación o error con la cantidad disponible cuando corresponda"
+    "Mensaje de confirmación o error"
    ],
    "almacenamiento_bd": [
-    "movimientos_inventario: id (PK), bien_id (FK a bienes.id), fecha (date), tipo_movimiento (enum), cantidad (decimal([PENDIENTE DE VERIFICAR])), motivo_salida (texto), documento_soporte (texto), usuario_id (FK a usuarios.id), created_at (timestamp)",
-    "tipo_movimiento restringido a entrada o salida; para este requerimiento debe ser salida",
+    "movimientos_inventario: id (PK), bien_id (FK a bienes.id), fecha (date), tipo_movimiento (enum), cantidad (decimal), motivo_salida (texto), documento_soporte (texto), usuario_id (FK a usuarios.id), created_at (timestamp)",
+    "tipo_movimiento restringido a entrada o salida; este requerimiento registra salida",
     "La validación de existencia, el registro del movimiento y la actualización de existencias se ejecutan en una transacción atómica"
    ]
   },
   {
-   "nombre": "Bloqueo de valuación sin política aprobada",
-   "descripcion": "El sistema deberá impedir la valuación contable de mercancías físicas mientras SunGames no defina y apruebe el método de valuación aplicable.",
-   "prioridad": "Alta",
+   "nombre": "Bloqueo de valuación de mercancías",
+   "descripcion": "El sistema deberá impedir la valuación contable de mercancías físicas mientras SunGames no tenga definido y aprobado un método de valuación.",
+   "prioridad": "Media",
    "actores": [
-    "Contador",
-    "Administrador"
+    "Contador general"
    ],
-   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Política 5.1, Exención de Valuación de Inventarios Físicos (PEPS / Promedio) y Manejo Exclusivo de Inventario",
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Política 5.1, Exención de Valuación de Inventarios Físicos y Manejo Exclusivo de Inventario",
    "entradas": [
-    "solicitud_valuacion (acción del usuario)",
-    "metodo_valuacion (enum, valores y método aprobado: [PENDIENTE DE VERIFICAR])",
-    "fecha_corte (date, formato AAAA-MM-DD)"
+    "fecha_corte (date, formato AAAA-MM-DD)",
+    "solicitud_valuacion (acción del usuario)"
    ],
    "validacion_entradas": [
-    "La fecha de corte es obligatoria y válida",
-    "El sistema solo permite valuar si existe un método de valuación definido y aprobado por SunGames",
-    "No se permite aplicar PEPS, promedio u otro método por defecto sin aprobación documentada"
+    "fecha_corte es obligatoria y válida",
+    "El sistema permite calcular una valuación solo cuando existe un método definido y aprobado"
    ],
    "validacion_salidas": [
-    "Si no existe método aprobado, no se calcula ni registra valor contable de existencias",
-    "Si se define un método aprobado, la fórmula, criterios de costo y tratamiento contable deben corresponder a la política aprobada, actualmente [PENDIENTE DE VERIFICAR]"
+    "Sin método aprobado, el sistema no calcula ni registra valor contable de existencias",
+    "Si existe una política aprobada, el cálculo aplica la fórmula y el tratamiento establecidos en ella"
    ],
    "secuencia": [
     "El usuario solicita la valuación a una fecha de corte",
-    "El sistema verifica si hay un método de valuación aprobado",
-    "Si no existe, bloquea la operación y muestra el mensaje indicado",
-    "Si existe, aplica el método aprobado y presenta el resultado sin alterar movimientos ya registrados"
+    "El sistema verifica si existe un método de valuación aprobado",
+    "Si no existe, bloquea la operación",
+    "Si existe, calcula y presenta el resultado sin alterar los movimientos registrados"
    ],
    "situaciones_anormales": [
     "Si no existe método aprobado, el sistema bloquea la valuación y muestra: «Valuación no disponible: SunGames debe definir y aprobar el método de valuación de inventarios.»",
     "Si falla la lectura de movimientos, el sistema no genera resultados parciales y muestra: «No se pudo completar la valuación; vuelva a intentarlo.»"
    ],
    "parametros": [
-    "Método, fórmula, componentes del costo y tratamiento contable: [PENDIENTE DE VERIFICAR]",
-    "Precisión monetaria: [PENDIENTE DE VERIFICAR]"
+    "Método, fórmula, componentes del costo y tratamiento contable: [PENDIENTE DE VERIFICAR]"
    ],
    "salidas": [
-    "Resultado de valuación únicamente cuando exista política aprobada",
+    "Resultado de valuación únicamente cuando exista una política aprobada",
     "Mensaje de bloqueo cuando el método no esté definido"
    ],
    "almacenamiento_bd": [
     "politica_inventario: id (PK), metodo_valuacion (texto), formula (texto), fecha_aprobacion (date), estado (enum), aprobado_por (FK a usuarios.id)",
-    "estado restringido a pendiente, aprobado o inactivo; los valores autorizados y el aprobador competente están [PENDIENTE DE VERIFICAR]",
-    "No se almacena ni publica una valuación como definitiva si no existe una política en estado aprobado"
+    "estado restringido a pendiente, aprobado o inactivo",
+    "No se almacena ni publica una valuación definitiva si no existe una política aprobada"
    ]
   },
   {
    "nombre": "Consulta de existencias por mercancía",
-   "descripcion": "El sistema deberá mostrar la existencia disponible de cada mercancía física a una fecha de consulta, calculada a partir de sus entradas y salidas registradas.",
-   "prioridad": "Alta",
+   "descripcion": "El sistema deberá mostrar la existencia disponible de cada mercancía física a una fecha de corte, calculada a partir de sus entradas y salidas registradas.",
+   "prioridad": "Media",
    "actores": [
-    "Contador",
-    "Administrador"
+    "Contador general"
    ],
-   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Política 5.1, Manejo Exclusivo de Inventario; no se establece en los manuales un reporte de existencias específico",
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Política 5.1, Manejo Exclusivo de Inventario",
    "entradas": [
-    "bien_id (identificador, entero, opcional)",
-    "fecha_corte (date, formato AAAA-MM-DD, obligatoria)",
-    "tipo_bien (enum: mercancia_fisica)"
+    "bien_id (identificador entero, opcional)",
+    "fecha_corte (date, formato AAAA-MM-DD, obligatorio)"
    ],
    "validacion_entradas": [
     "fecha_corte es obligatoria y válida",
-    "Si se proporciona bien_id, debe corresponder a una mercancía física activa",
-    "La consulta no incluye licencias digitales ni activos fijos como existencias de mercancía"
+    "Si se proporciona bien_id, debe identificar una mercancía física activa",
+    "La consulta excluye licencias digitales y activos fijos"
    ],
    "validacion_salidas": [
-    "Para cada mercancía, existencia disponible = suma de cantidades de entradas hasta fecha_corte − suma de cantidades de salidas hasta fecha_corte",
-    "El resultado muestra el bien, la unidad de medida y la cantidad disponible; la unidad de medida está [PENDIENTE DE VERIFICAR]",
-    "El resultado distingue la existencia cero de un bien sin movimientos"
+    "Existencia disponible = suma de cantidades de entradas hasta la fecha de corte − suma de cantidades de salidas hasta la fecha de corte",
+    "El resultado distingue una existencia igual a cero de un bien sin movimientos"
    ],
    "secuencia": [
     "El usuario indica la fecha de corte y, opcionalmente, una mercancía",
-    "El sistema consulta los movimientos de inventario hasta la fecha indicada",
-    "El sistema calcula la existencia por mercancía",
-    "El sistema presenta el resultado ordenado por descripción"
+    "El sistema consulta sus movimientos hasta la fecha indicada",
+    "El sistema calcula y presenta las existencias por descripción"
    ],
    "situaciones_anormales": [
     "Si bien_id no corresponde a una mercancía física activa, el sistema no ejecuta la consulta y muestra: «La mercancía seleccionada no existe o no está activa.»",
-    "Si existen movimientos que producen una existencia negativa, el sistema muestra el bien afectado como inconsistencia y no presenta esa cantidad como existencia válida",
+    "Si los movimientos producen una existencia negativa, el sistema identifica el bien como inconsistencia y no presenta esa cantidad como existencia válida",
     "Si ocurre un error de consulta, el sistema muestra: «No se pudieron consultar las existencias; vuelva a intentarlo.»"
    ],
    "parametros": [
-    "Orden de presentación predeterminado: descripción ascendente",
+    "Orden predeterminado de presentación: descripción ascendente",
     "Unidad de medida y precisión de cantidades: [PENDIENTE DE VERIFICAR]"
    ],
    "salidas": [
     "Listado de mercancías físicas con existencias disponibles a la fecha de corte",
-    "Detalle de entradas y salidas que sustentan la existencia, si el usuario selecciona una mercancía"
+    "Detalle de entradas y salidas que sustentan la existencia seleccionada"
    ],
    "almacenamiento_bd": [
     "La consulta se calcula desde bienes y movimientos_inventario; no requiere almacenar saldos derivados",
     "Índices recomendados: movimientos_inventario (bien_id, fecha) y bienes (tipo_bien, activo)",
     "La consulta excluye bienes clasificados como licencia_digital o activo_fijo"
    ]
+  },
+  {
+   "nombre": "Alta de mobiliario y equipo",
+   "descripcion": "El sistema deberá registrar cada mobiliario o equipo de cómputo capitalizado como activo fijo en la cuenta contable que corresponda.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuentas 1201 Mobiliario y equipo de oficina y 1202 Equipo de cómputo; Política 9, Depreciación de activos fijos",
+   "entradas": [
+    "tipo_activo (enum: mobiliario_equipo_oficina, equipo_computo)",
+    "descripcion (texto)",
+    "fecha_adquisicion (date, formato AAAA-MM-DD)",
+    "fecha_puesta_en_uso (date, formato AAAA-MM-DD)",
+    "costo_adquisicion (decimal(14,2), USD)",
+    "valor_residual (decimal(14,2), USD)",
+    "vida_util_meses (entero positivo)",
+    "uso (enum: administrativo, produccion_videojuegos)",
+    "documento_soporte (texto)",
+    "referencia_partida_compra (identificador, opcional)"
+   ],
+   "validacion_entradas": [
+    "Todos los datos requeridos deben estar presentes y tener formato válido",
+    "tipo_activo determina la cuenta: mobiliario_equipo_oficina se asocia a 1201 y equipo_computo a 1202",
+    "El costo debe ser mayor que cero; el valor residual debe ser mayor o igual que cero y no superar el costo",
+    "La fecha de puesta en uso no puede ser anterior a la fecha de adquisición",
+    "La vida útil debe ser positiva y el activo debe superar el umbral de capitalización configurado"
+   ],
+   "validacion_salidas": [
+    "El activo queda vinculado a 1201 o 1202 según su tipo",
+    "El registro auxiliar no duplica la partida de compra ya registrada en contabilidad"
+   ],
+   "secuencia": [
+    "El contador captura los datos del activo y el uso asignado",
+    "El sistema valida los datos y el umbral de capitalización",
+    "El sistema registra el activo y su vínculo con la cuenta y, si existe, con la partida de compra"
+   ],
+   "situaciones_anormales": [
+    "Si el umbral de capitalización no está configurado, el sistema rechaza la evaluación y muestra: «No se puede registrar el activo: configure el umbral de capitalización.»",
+    "Si el valor residual supera el costo o las fechas son inválidas, el sistema rechaza el registro y señala el campo que debe corregirse",
+    "Si ocurre un error al guardar, el sistema revierte el registro y muestra: «No se registró el activo; vuelva a intentarlo.»"
+   ],
+   "parametros": [
+    "Umbral de capitalización definido por la Gerencia: [PENDIENTE DE VERIFICAR]",
+    "Moneda y decimales: USD y 2 decimales, configurables",
+    "Vida útil inicial, configurable: equipo de cómputo 3 años; mobiliario 5 años, según política inicial sujeta a aprobación",
+    "Valor residual por defecto: cero, configurable si existe evidencia distinta"
+   ],
+   "salidas": [
+    "Ficha auxiliar del activo fijo",
+    "Cuenta contable asociada y datos de depreciación",
+    "Mensaje de confirmación o error"
+   ],
+   "almacenamiento_bd": [
+    "activos_fijos: id (PK), tipo_activo (enum), descripcion (texto), cuenta_id (FK a cuentas.id), fecha_adquisicion (date), fecha_puesta_en_uso (date), costo_adquisicion decimal(14,2), valor_residual decimal(14,2), vida_util_meses (integer), uso (enum), documento_soporte (texto), partida_compra_id (FK a partidas.id, nullable), estado (enum), created_at (timestamp)",
+    "tipo_activo restringido a mobiliario_equipo_oficina o equipo_computo; uso restringido a administrativo o produccion_videojuegos",
+    "costo_adquisicion > 0; 0 <= valor_residual <= costo_adquisicion; vida_util_meses > 0",
+    "La creación del auxiliar se ejecuta en una transacción atómica"
+   ]
+  },
+  {
+   "nombre": "Cálculo de depreciación contable",
+   "descripcion": "El sistema deberá calcular la depreciación mensual de cada activo fijo depreciable mediante el método de línea recta desde el mes de su puesta en uso.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Política 9, Depreciación de activos fijos",
+   "entradas": [
+    "activo_id (identificador entero)",
+    "periodo (año y mes, formato AAAA-MM)",
+    "costo_adquisicion (decimal(14,2), USD)",
+    "valor_residual (decimal(14,2), USD)",
+    "vida_util_meses (entero positivo)",
+    "fecha_puesta_en_uso (date, formato AAAA-MM-DD)"
+   ],
+   "validacion_entradas": [
+    "activo_id debe identificar un activo fijo activo asociado a 1201 o 1202",
+    "El período debe ser válido y no anterior al mes de puesta en uso",
+    "El costo debe ser mayor que cero, el residual no negativo ni superior al costo y la vida útil positiva",
+    "No se calcula depreciación para un activo totalmente depreciado o dado de baja"
+   ],
+   "validacion_salidas": [
+    "Depreciación mensual = (costo de adquisición − valor residual) / vida útil en meses",
+    "La depreciación acumulada no supera el costo de adquisición menos el valor residual",
+    "El cálculo comienza en el mes en que el activo se pone en uso"
+   ],
+   "secuencia": [
+    "El contador selecciona el activo y el período",
+    "El sistema recupera costo, residual, vida útil y fecha de puesta en uso",
+    "El sistema calcula la cuota mensual por línea recta",
+    "El sistema presenta el importe calculado para su registro contable"
+   ],
+   "situaciones_anormales": [
+    "Si el activo no es depreciable o está dado de baja, el sistema no calcula y muestra: «No se puede depreciar el activo seleccionado.»",
+    "Si el resultado excedería el valor depreciable pendiente, el sistema limita la cuota al saldo pendiente y muestra: «La depreciación del activo quedó limitada al valor depreciable pendiente.»",
+    "Si falta un dato requerido, el sistema no calcula y señala el dato faltante"
+   ],
+   "parametros": [
+    "Método contable: línea recta",
+    "Vida útil inicial, configurable: equipo de cómputo 3 años y mobiliario 5 años, sujetas a aprobación",
+    "Valor residual por defecto: cero salvo evidencia distinta",
+    "Decimales: 2; moneda: USD, configurables"
+   ],
+   "salidas": [
+    "Cuota mensual calculada",
+    "Saldo de valor depreciable pendiente",
+    "Detalle de los valores y fórmula usados"
+   ],
+   "almacenamiento_bd": [
+    "depreciaciones: id (PK), activo_fijo_id (FK a activos_fijos.id), periodo (char(7)), costo_base decimal(14,2), valor_residual decimal(14,2), vida_util_meses (integer), cuota decimal(14,2), created_at (timestamp)",
+    "Restricción única sobre (activo_fijo_id, periodo) para evitar cálculos duplicados",
+    "El cálculo no modifica el libro diario hasta que se ejecute el registro contable"
+   ]
+  },
+  {
+   "nombre": "Registro contable de depreciación",
+   "descripcion": "El sistema deberá generar para cada depreciación mensual una partida que debite la cuenta de gasto correspondiente y acredite la cuenta 1203 Depreciación acumulada.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general",
+    "Contador de costos"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuentas 1203, 4103 y 4207; Política 9, Depreciación de activos fijos; Decisión de diseño del equipo (costos)",
+   "entradas": [
+    "activo_id (identificador entero)",
+    "periodo (año y mes, formato AAAA-MM)",
+    "cuota_depreciacion (decimal(14,2), USD)",
+    "uso (enum: administrativo, produccion_videojuegos)"
+   ],
+   "validacion_entradas": [
+    "El activo debe estar activo y asociado a una depreciación calculada para el período",
+    "La cuota debe ser mayor que cero y no superar el valor depreciable pendiente",
+    "Para uso administrativo, la cuenta de gasto es 4207; para equipo usado directamente en producción de videojuegos, la cuenta de gasto es 4103",
+    "No se registra dos veces la depreciación del mismo activo y período"
+   ],
+   "validacion_salidas": [
+    "Debe de la cuenta 4207 o 4103 = Haber de la cuenta 1203 = cuota de depreciación",
+    "El equipo de producción se registra como costo indirecto de desarrollo y se asigna a órdenes mediante el proceso de costeo por órdenes, no como depreciación administrativa",
+    "La partida conserva vínculo con el activo y el período"
+   ],
+   "secuencia": [
+    "El contador revisa la cuota calculada",
+    "El sistema determina la cuenta de gasto por el uso del activo",
+    "El sistema genera una partida por el importe calculado, con abono a 1203",
+    "El sistema guarda la partida y el vínculo al activo en una transacción"
+   ],
+   "situaciones_anormales": [
+    "Si ya existe una partida de depreciación para el activo y período, el sistema no genera otra y muestra: «La depreciación del activo ya fue registrada para este período.»",
+    "Si la partida no cuadra, el sistema no la guarda y muestra: «No se registró la depreciación: la partida no está cuadrada.»",
+    "Si ocurre un error al guardar, el sistema revierte la partida y el vínculo y muestra: «No se registró la depreciación; vuelva a intentarlo.»"
+   ],
+   "parametros": [
+    "Cuenta de gasto administrativo: 4207",
+    "Cuenta de costo indirecto de desarrollo para equipo usado directamente en producción: 4103",
+    "Cuenta de depreciación acumulada: 1203",
+    "La depreciación de producción se distribuye a órdenes de trabajo mediante las reglas configuradas para costeo por órdenes"
+   ],
+   "salidas": [
+    "Partida de depreciación vinculada al activo y al período",
+    "Actualización del auxiliar de depreciación acumulada",
+    "Mensaje de confirmación o error"
+   ],
+   "almacenamiento_bd": [
+    "partidas: registro del asiento generado, fecha, concepto, estado y usuario_id",
+    "partida_lineas: líneas de debe a cuenta 4207 o 4103 y de haber a cuenta 1203, con importes decimal(14,2)",
+    "depreciaciones: partida_id (FK a partidas.id), activo_fijo_id (FK a activos_fijos.id), periodo (char(7)), cuota decimal(14,2)",
+    "La creación de la partida, sus líneas y el vínculo con la depreciación se ejecutan en una transacción atómica"
+   ]
+  },
+  {
+   "nombre": "Baja de mobiliario y equipo",
+   "descripcion": "El sistema deberá registrar la baja de un activo fijo y vincularla con la partida contable que retira el costo del activo y su depreciación acumulada.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador general"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuentas 1201, 1202 y 1203; procedimiento de baja y Política 9, Depreciación de activos fijos",
+   "entradas": [
+    "activo_id (identificador entero)",
+    "fecha_baja (date, formato AAAA-MM-DD)",
+    "motivo_baja (texto)",
+    "documento_soporte (texto)",
+    "partida_baja_id (identificador entero)"
+   ],
+   "validacion_entradas": [
+    "activo_id debe identificar un activo fijo activo",
+    "fecha_baja y motivo_baja son obligatorios",
+    "partida_baja_id debe identificar una partida contabilizada relacionada con la baja",
+    "La partida debe retirar el costo de la cuenta 1201 o 1202 y la depreciación acumulada correspondiente de 1203"
+   ],
+   "validacion_salidas": [
+    "El activo cambia a estado dado_de_baja y no admite depreciaciones posteriores",
+    "La ficha conserva la fecha, el motivo, el documento soporte y el vínculo a la partida",
+    "La baja no elimina el historial del activo ni sus depreciaciones"
+   ],
+   "secuencia": [
+    "El contador selecciona el activo e ingresa los datos de baja",
+    "El sistema valida la partida contable vinculada y las cuentas afectadas",
+    "El sistema marca el activo como dado de baja y conserva su historial"
+   ],
+   "situaciones_anormales": [
+    "Si el activo ya está dado de baja, el sistema rechaza la operación y muestra: «El activo ya está dado de baja.»",
+    "Si no existe una partida contabilizada que retire el activo y su depreciación acumulada, el sistema rechaza la baja y muestra: «Vincule la partida contabilizada de retiro del activo.»",
+    "Si ocurre un error al guardar, el sistema no cambia el estado del activo y muestra: «No se registró la baja; vuelva a intentarlo.»"
+   ],
+   "parametros": [
+    "La baja requiere una partida contable contabilizada y vinculada al activo",
+    "No se automatiza la determinación de ganancia o pérdida por disposición si la partida vinculada no la especifica conforme al tratamiento contable aprobado"
+   ],
+   "salidas": [
+    "Activo marcado como dado de baja",
+    "Historial del activo conservado",
+    "Mensaje de confirmación o error"
+   ],
+   "almacenamiento_bd": [
+    "activos_fijos: estado (enum), fecha_baja (date, nullable), motivo_baja (texto, nullable), documento_baja (texto, nullable), partida_baja_id (FK a partidas.id, nullable)",
+    "estado restringido a activo o dado_de_baja",
+    "La actualización del estado y el vínculo contable se ejecutan en una transacción atómica"
+   ]
+  },
+  {
+   "nombre": "Control de activos totalmente depreciados en uso",
+   "descripcion": "El sistema deberá registrar en las cuentas de orden 6101 y 7101 los activos fijos totalmente depreciados que continúen en uso y reversar el control cuando sean retirados.",
+   "prioridad": "Media",
+   "actores": [
+    "Contador general"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuentas 6101 y 7101; Política 9, Depreciación de activos fijos",
+   "entradas": [
+    "activo_id (identificador entero)",
+    "estado_uso (enum: en_uso, retirado)",
+    "fecha_evento (date, formato AAAA-MM-DD)",
+    "partida_control_id (identificador entero, generado por el sistema)"
+   ],
+   "validacion_entradas": [
+    "activo_id debe identificar un activo fijo que alcanzó depreciación acumulada igual a costo de adquisición menos valor residual",
+    "Para el alta de control, el activo debe continuar en uso y no estar dado de baja",
+    "Para el retiro, debe existir un registro de control previo"
+   ],
+   "validacion_salidas": [
+    "El alta de control genera una partida balanceada entre las cuentas 6101 y 7101",
+    "El retiro genera el asiento inverso por el importe de control registrado",
+    "El activo permanece en el auxiliar de activos fijos y no recibe depreciación adicional"
+   ],
+   "secuencia": [
+    "El sistema detecta que el activo alcanzó el valor depreciable total",
+    "El contador confirma si continúa en uso",
+    "Si sigue en uso, el sistema registra el control en 6101 y 7101",
+    "Al registrarse su retiro, el sistema genera la reversión del control"
+   ],
+   "situaciones_anormales": [
+    "Si el activo no está totalmente depreciado, el sistema rechaza el control y muestra: «El activo aún no está totalmente depreciado.»",
+    "Si se solicita retirar un control inexistente, el sistema rechaza la operación y muestra: «No existe un control vigente para el activo.»",
+    "Si la partida de control no cuadra, el sistema no la guarda y muestra: «No se registró el control: la partida no está cuadrada.»"
+   ],
+   "parametros": [
+    "La base de valoración del importe para las cuentas de orden 6101 y 7101: [PENDIENTE DE VERIFICAR]"
+   ],
+   "salidas": [
+    "Partida de control o reversión vinculada al activo",
+    "Estado de control vigente o retirado",
+    "Mensaje de confirmación o error"
+   ],
+   "almacenamiento_bd": [
+    "controles_activos: id (PK), activo_fijo_id (FK a activos_fijos.id), fecha_alta (date), fecha_retiro (date, nullable), importe_control decimal(14,2), partida_alta_id (FK a partidas.id), partida_retiro_id (FK a partidas.id, nullable), estado (enum)",
+    "estado restringido a vigente o retirado; un solo control vigente por activo",
+    "partida_lineas: partida de alta con debe a 6101 y haber a 7101; partida de retiro con el asiento inverso",
+    "El control y sus líneas contables se guardan en transacciones atómicas"
+   ]
+  },
+  {
+   "nombre": "Consulta de activos fijos",
+   "descripcion": "El sistema deberá presentar el auxiliar de mobiliario y equipo con costo, depreciación acumulada, valor en libros, uso y estado a una fecha de corte.",
+   "prioridad": "Media",
+   "actores": [
+    "Contador general"
+   ],
+   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuentas 1201, 1202 y 1203; relación con los estados financieros",
+   "entradas": [
+    "fecha_corte (date, formato AAAA-MM-DD, obligatoria)",
+    "tipo_activo (enum: mobiliario_equipo_oficina, equipo_computo, opcional)",
+    "estado (enum: activo, dado_de_baja, opcional)"
+   ],
+   "validacion_entradas": [
+    "fecha_corte es obligatoria y válida",
+    "Si se especifica tipo_activo o estado, debe pertenecer a los valores permitidos",
+    "La consulta considera las partidas y depreciaciones contabilizadas hasta la fecha de corte"
+   ],
+   "validacion_salidas": [
+    "Valor en libros = costo de adquisición − depreciación acumulada a la fecha de corte",
+    "Los resultados distinguen activos activos de activos dados de baja",
+    "El saldo del auxiliar concilia con las cuentas 1201, 1202 y 1203 según las partidas vinculadas"
+   ],
+   "secuencia": [
+    "El contador ingresa la fecha de corte y filtros opcionales",
+    "El sistema consulta fichas, partidas de adquisición, depreciaciones y bajas hasta la fecha indicada",
+    "El sistema calcula el valor en libros y presenta el auxiliar"
+   ],
+   "situaciones_anormales": [
+    "Si no hay activos que cumplan los filtros, el sistema presenta un resultado vacío con el mensaje: «No se encontraron activos fijos para los filtros indicados.»",
+    "Si los saldos auxiliares no concilian con las cuentas contables, el sistema identifica la diferencia y no presenta la conciliación como correcta",
+    "Si ocurre un error de consulta, el sistema muestra: «No se pudo consultar el auxiliar de activos fijos; vuelva a intentarlo.»"
+   ],
+   "parametros": [
+    "Moneda y decimales: USD y 2 decimales, configurables",
+    "Orden predeterminado: cuenta contable y descripción"
+   ],
+   "salidas": [
+    "Auxiliar de activos fijos a la fecha de corte",
+    "Costo, depreciación acumulada, valor en libros, uso, estado y referencias de partidas",
+    "Diferencias de conciliación, si existen"
+   ],
+   "almacenamiento_bd": [
+    "La consulta obtiene datos de activos_fijos, depreciaciones, partidas y partida_lineas; no requiere almacenar valores derivados",
+    "Índices recomendados: activos_fijos (cuenta_id, estado, tipo_activo) y depreciaciones (activo_fijo_id, periodo)"
+   ]
   }
  ],
  "vacios": [
-  "Los manuales establecen que el inventario comercial solo aplica si SunGames incorpora mercancías físicas tangibles; no identifican mercancías físicas actualmente comercializadas ni describen un flujo operativo aprobado de recepción o despacho.",
-  "No se define catálogo de productos o SKU, unidad de medida, precisión de cantidades, documentos de soporte admitidos, motivos de salida, tratamiento de devoluciones, ajustes, mermas ni autorización de movimientos.",
-  "No se define método de valuación para mercancías físicas ni componentes del costo; el manual únicamente descarta aplicar métodos comerciales de inventario a las licencias digitales. La valuación debe permanecer bloqueada hasta que SunGames apruebe una política.",
-  "No se especifica la cuenta contable que se utilizaría para mercancías físicas, su integración con compras y ventas, ni el asiento contable de las entradas y salidas.",
-  "No se define un registro auxiliar de detalle por bien para mobiliario, equipo de cómputo u otros activos fijos, ni sus campos de identificación. El manual solo establece las cuentas 1201 y 1202, su adquisición o baja y el control de activos totalmente depreciados o amortizados en uso mediante 6101 y 7101.",
-  "No se especifican permisos particulares del submódulo de inventario, aprobadores de políticas, plazos de conservación documental ni criterios de auditoría específicos."
+  "Unidad de medida y precisión de las cantidades del inventario de mercancías físicas: [PENDIENTE DE VERIFICAR].",
+  "Método, fórmula, componentes del costo y tratamiento contable para la valuación de mercancías físicas: [PENDIENTE DE VERIFICAR].",
+  "Umbral de capitalización de mobiliario y equipo definido por la Gerencia: [PENDIENTE DE VERIFICAR].",
+  "Tasas y reglas de depreciación fiscal: [PENDIENTE DE VERIFICAR].",
+  "Base de valoración del importe para los controles en las cuentas de orden 6101 y 7101: [PENDIENTE DE VERIFICAR]."
  ]
 }

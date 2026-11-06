@@ -1,0 +1,451 @@
+{
+ "requerimientos": [
+  {
+   "nombre": "Alta de programador",
+   "descripcion": "El sistema deberá registrar los datos de identificación interna y el nombre de cada programador para asociarlos con sus horas de trabajo y tarifas vigentes.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos), mano de obra directa por programador",
+   "entradas": [
+    "nombre (texto, hasta 150 caracteres)"
+   ],
+   "validacion_entradas": [
+    "El nombre es obligatorio y no puede contener únicamente espacios.",
+    "El sistema genera un identificador interno único para el programador."
+   ],
+   "validacion_salidas": [
+    "El registro conserva el nombre ingresado y un identificador interno único."
+   ],
+   "secuencia": [
+    "El Contador de costos ingresa el nombre del programador.",
+    "El sistema valida la entrada y genera el identificador interno.",
+    "El sistema guarda el registro y confirma el alta."
+   ],
+   "situaciones_anormales": [
+    "Nombre vacío: el sistema rechaza el alta y muestra «Ingrese el nombre del programador».",
+    "Falla al guardar: el sistema revierte la operación y muestra «No se pudo registrar el programador; no se guardaron cambios»."
+   ],
+   "parametros": [
+    "Longitud máxima del nombre: 150 caracteres."
+   ],
+   "salidas": [
+    "Registro de programador con identificador interno y nombre.",
+    "Mensaje de confirmación o de error."
+   ],
+   "almacenamiento_bd": [
+    "programadores: programador_id (clave primaria, entero o UUID), nombre (texto, no nulo), created_at (fecha-hora).",
+    "El identificador interno debe ser único."
+   ]
+  },
+  {
+   "nombre": "Selección de tarifa vigente por fecha",
+   "descripcion": "El sistema deberá identificar la tarifa por hora del programador cuya vigencia corresponda a la fecha de las horas registradas.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos), mano de obra directa; tarifas por hora con fecha de vigencia",
+   "entradas": [
+    "programador_id (identificador interno)",
+    "fecha_trabajo (date, AAAA-MM-DD)"
+   ],
+   "validacion_entradas": [
+    "El programador debe existir.",
+    "La fecha debe ser válida.",
+    "Debe existir exactamente una tarifa vigente para el programador en la fecha de trabajo."
+   ],
+   "validacion_salidas": [
+    "La tarifa seleccionada pertenece al programador indicado y su intervalo de vigencia incluye la fecha de trabajo."
+   ],
+   "secuencia": [
+    "El sistema recibe el programador y la fecha de trabajo.",
+    "El sistema busca la tarifa cuya fecha inicial sea menor o igual a la fecha de trabajo y cuya fecha final sea nula o mayor o igual a esa fecha.",
+    "El sistema devuelve la tarifa aplicable para las operaciones de costeo existentes."
+   ],
+   "situaciones_anormales": [
+    "No existe tarifa vigente: el sistema impide continuar y muestra «No existe una tarifa vigente para el programador en la fecha indicada».",
+    "Hay más de una tarifa vigente: el sistema impide continuar y muestra «Existe más de una tarifa vigente para el programador en la fecha indicada»."
+   ],
+   "parametros": [
+    "La tarifa por hora y sus fechas de vigencia se mantienen mediante la función existente «Tarifas por hora de programador»."
+   ],
+   "salidas": [
+    "Tarifa por hora vigente identificada para el programador y la fecha.",
+    "Mensaje de error cuando no puede determinarse una única tarifa."
+   ],
+   "almacenamiento_bd": [
+    "Consulta de tarifas del programador por programador_id y fecha_desde/fecha_hasta.",
+    "Se requiere impedir intervalos de vigencia superpuestos para un mismo programador.",
+    "Índice por programador_id, fecha_desde y fecha_hasta."
+   ]
+  },
+  {
+   "nombre": "Límite diario de horas",
+   "descripcion": "El sistema deberá rechazar una captura de horas que haga que el total diario registrado para el programador exceda el límite diario configurable.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos), validación de horas por programador",
+   "entradas": [
+    "programador_id (identificador interno)",
+    "fecha_trabajo (date, AAAA-MM-DD)",
+    "horas (decimal)"
+   ],
+   "validacion_entradas": [
+    "El programador debe existir.",
+    "Las horas deben ser mayores que cero.",
+    "La suma de las horas previamente registradas para el programador y la fecha, más las horas ingresadas, no debe superar el límite diario configurado."
+   ],
+   "validacion_salidas": [
+    "El sistema compara horas ya registradas + horas ingresadas con el límite diario y solo acepta el registro si el total no lo excede."
+   ],
+   "secuencia": [
+    "El sistema obtiene el límite diario configurado.",
+    "El sistema suma las horas registradas para el programador en la fecha con las horas ingresadas.",
+    "Si el total está dentro del límite, permite continuar con la captura existente; en caso contrario, la rechaza."
+   ],
+   "situaciones_anormales": [
+    "El total supera el límite: el sistema rechaza la captura y muestra «Las horas del programador para esta fecha exceden el límite diario configurado».",
+    "El límite diario no está configurado: el sistema impide registrar horas y muestra «Configure el límite diario de horas antes de continuar»."
+   ],
+   "parametros": [
+    "Límite diario de horas: configurable por el Administrador; valor por defecto: [PENDIENTE DE VERIFICAR]."
+   ],
+   "salidas": [
+    "Resultado de validación que permite o rechaza continuar con la captura de horas."
+   ],
+   "almacenamiento_bd": [
+    "parametros_costos: parametro_id (clave primaria), clave (texto, única), valor_decimal (decimal(14,4)), actualizado_por (FK a usuarios), updated_at (fecha-hora).",
+    "La validación y la inserción de horas deben ejecutarse de forma transaccional para evitar superar el límite por capturas concurrentes."
+   ]
+  },
+  {
+   "nombre": "Validación del formato de horas",
+   "descripcion": "El sistema deberá aceptar únicamente cantidades de horas positivas y expresadas con la precisión decimal configurada para el registro de tiempo.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos), captura de horas de mano de obra directa",
+   "entradas": [
+    "horas (decimal)"
+   ],
+   "validacion_entradas": [
+    "El valor es obligatorio.",
+    "El valor debe ser numérico y mayor que cero.",
+    "El número de decimales no puede exceder la precisión configurada."
+   ],
+   "validacion_salidas": [
+    "El valor almacenado coincide con las horas ingresadas y no se redondea silenciosamente."
+   ],
+   "secuencia": [
+    "El sistema valida presencia, tipo, signo y precisión del valor.",
+    "Si todas las reglas se cumplen, permite continuar con la captura existente.",
+    "Si alguna regla falla, rechaza el valor sin guardar horas."
+   ],
+   "situaciones_anormales": [
+    "Valor vacío, no numérico o menor o igual a cero: el sistema muestra «Ingrese una cantidad de horas numérica mayor que cero».",
+    "Precisión decimal excedida: el sistema muestra «La cantidad de horas excede la precisión decimal permitida»."
+   ],
+   "parametros": [
+    "La precisión decimal para horas es configurable; valor por defecto: [PENDIENTE DE VERIFICAR].",
+    "La moneda y los importes derivados usan USD y 2 decimales, configurables, según los parámetros por defecto del equipo."
+   ],
+   "salidas": [
+    "Valor validado para la captura de horas o mensaje de rechazo."
+   ],
+   "almacenamiento_bd": [
+    "horas_trabajo: horas (decimal(14,4), CHECK horas > 0).",
+    "La precisión efectiva debe validarse antes de persistir el dato."
+   ]
+  },
+  {
+   "nombre": "Clasificación de horas no asignables a órdenes",
+   "descripcion": "El sistema deberá permitir clasificar las horas pagadas que no se asignan a una orden de trabajo como costo indirecto de desarrollo o como gasto del período.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos), conciliación de horas pagadas",
+   "entradas": [
+    "programador_id (identificador interno)",
+    "fecha_trabajo (date, AAAA-MM-DD)",
+    "horas (decimal)",
+    "clasificacion (enumeración: costo_indirecto, gasto_periodo)",
+    "periodo_id (identificador del período)"
+   ],
+   "validacion_entradas": [
+    "El programador y el período deben existir.",
+    "Las horas deben ser positivas.",
+    "La clasificación debe ser costo_indirecto o gasto_periodo.",
+    "Las horas clasificadas como no asignables no deben tener orden de trabajo asociada."
+   ],
+   "validacion_salidas": [
+    "Cada registro queda en una sola clasificación y no se contabiliza simultáneamente como hora directa de una orden y como hora indirecta o gasto del período.",
+    "La clasificación no genera por sí sola una partida contable."
+   ],
+   "secuencia": [
+    "El Contador de costos selecciona el programador, fecha, período y clasificación.",
+    "El sistema valida que el registro no esté asociado a una orden ni duplicado en otra clasificación.",
+    "El sistema guarda la clasificación y la deja disponible para la conciliación con planilla."
+   ],
+   "situaciones_anormales": [
+    "Se intenta asociar la hora a una orden y clasificarla también como no asignable: el sistema rechaza el registro y muestra «Las horas no pueden asignarse a una orden y clasificarse como no asignables al mismo tiempo».",
+    "Clasificación no permitida: el sistema rechaza el registro y muestra «Seleccione costo indirecto o gasto del período»."
+   ],
+   "parametros": [
+    "Las horas pagadas deben quedar asignadas a una orden, clasificadas como costo indirecto o clasificadas como gasto del período; no se permite omitir su clasificación."
+   ],
+   "salidas": [
+    "Registro de horas no asignables con su clasificación y período.",
+    "Información disponible para la conciliación con planilla."
+   ],
+   "almacenamiento_bd": [
+    "clasificaciones_horas: clasificacion_id (clave primaria), programador_id (FK), fecha_trabajo (date), periodo_id (FK), horas (decimal(14,4)), clasificacion (texto, CHECK en costo_indirecto/gasto_periodo), usuario_id (FK a usuarios), created_at (fecha-hora).",
+    "orden_id debe ser nulo para estos registros.",
+    "Restricción transaccional para impedir doble clasificación del mismo registro de horas."
+   ]
+  },
+  {
+   "nombre": "Corrección de horas aprobadas",
+   "descripcion": "El sistema deberá registrar una corrección de horas previamente aprobadas sin sobrescribir el valor aprobado original.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos), trazabilidad de movimientos de costo",
+   "entradas": [
+    "registro_horas_id (identificador)",
+    "horas_corregidas (decimal)",
+    "justificacion (texto, hasta 500 caracteres)"
+   ],
+   "validacion_entradas": [
+    "El registro de horas debe existir y estar aprobado.",
+    "Las horas corregidas deben ser mayores que cero y cumplir las validaciones de formato y límite diario.",
+    "La justificación es obligatoria.",
+    "La corrección debe conservar la asociación original a programador, orden o clasificación y fecha."
+   ],
+   "validacion_salidas": [
+    "El valor aprobado original permanece consultable.",
+    "La corrección queda vinculada al registro original y deja constancia del valor anterior y el corregido.",
+    "Los costos derivados quedan disponibles para la función existente de aprobación y costeo de horas, sin alterar silenciosamente partidas ya generadas."
+   ],
+   "secuencia": [
+    "El Contador de costos selecciona el registro aprobado e ingresa las horas corregidas y la justificación.",
+    "El sistema valida los datos y el límite diario resultante.",
+    "El sistema guarda una versión de corrección relacionada con el registro original.",
+    "El sistema registra la operación en la bitácora."
+   ],
+   "situaciones_anormales": [
+    "Registro inexistente o no aprobado: el sistema rechaza la operación y muestra «Solo se pueden corregir registros de horas aprobados».",
+    "Justificación vacía: el sistema rechaza la corrección y muestra «Ingrese la justificación de la corrección».",
+    "Falla al guardar: el sistema revierte la corrección completa y muestra «No se guardó la corrección; el registro original permanece sin cambios»."
+   ],
+   "parametros": [
+    "Justificación obligatoria, con máximo de 500 caracteres.",
+    "La corrección no sustituye el flujo existente de aprobación y costeo de horas."
+   ],
+   "salidas": [
+    "Versión corregida vinculada al registro original.",
+    "Confirmación o mensaje de rechazo.",
+    "Evento de bitácora con usuario y fecha."
+   ],
+   "almacenamiento_bd": [
+    "correcciones_horas: correccion_id (clave primaria), registro_horas_id (FK), horas_anteriores (decimal(14,4)), horas_corregidas (decimal(14,4)), justificacion (texto, no nulo), usuario_id (FK a usuarios), created_at (fecha-hora).",
+    "El registro original no se actualiza destructivamente.",
+    "La creación de la corrección y su evento de bitácora deben confirmarse en una transacción."
+   ]
+  },
+  {
+   "nombre": "Acceso a funciones de horas por rol",
+   "descripcion": "El sistema deberá permitir las operaciones de costos por programador únicamente a usuarios con el rol Contador de costos, conforme al alcance funcional asignado a ese rol.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos",
+    "Administrador"
+   ],
+   "fuente": "Decisión de diseño del equipo (parámetros por defecto), roles; Decisión de diseño del equipo (costos), operaciones de mano de obra",
+   "entradas": [
+    "usuario_id (identificador)",
+    "rol (enumeración de roles existentes)",
+    "operacion (enumeración: alta_programador, captura_horas, correccion_horas, consulta_reporte)"
+   ],
+   "validacion_entradas": [
+    "El usuario debe existir y tener una sesión autenticada.",
+    "El rol debe ser uno de los definidos por el sistema.",
+    "El usuario debe tener el rol Contador de costos para ejecutar las operaciones incluidas en este submódulo."
+   ],
+   "validacion_salidas": [
+    "Una operación autorizada solo se ejecuta para el rol Contador de costos.",
+    "Los programadores no acceden al sistema para ingresar sus propias hojas de tiempo; el Contador de costos captura la información."
+   ],
+   "secuencia": [
+    "El sistema identifica el usuario y rol autenticados.",
+    "El sistema verifica el rol al solicitar una operación del submódulo.",
+    "El sistema autoriza la operación o la rechaza antes de modificar datos."
+   ],
+   "situaciones_anormales": [
+    "Usuario sin el rol requerido: el sistema rechaza la operación y muestra «No tiene autorización para esta operación».",
+    "Usuario no autenticado: el sistema rechaza la operación y muestra «Inicie sesión para continuar»."
+   ],
+   "parametros": [
+    "Rol habilitado para las operaciones de este submódulo: Contador de costos, configurable conforme a la definición de roles del sistema."
+   ],
+   "salidas": [
+    "Acceso autorizado a la operación solicitada o mensaje de rechazo."
+   ],
+   "almacenamiento_bd": [
+    "La autorización consulta la relación existente de usuarios y roles; no se crea una matriz adicional de permisos.",
+    "Toda operación denegada puede registrarse en la bitácora de seguridad existente."
+   ]
+  },
+  {
+   "nombre": "Bitácora de cambios de horas",
+   "descripcion": "El sistema deberá conservar un historial de las operaciones que creen, aprueben o corrijan registros de horas por programador.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos",
+    "Administrador"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos), trazabilidad de movimientos de costo",
+   "entradas": [
+    "registro_horas_id (identificador)",
+    "operacion (enumeración: creación, aprobación, corrección)",
+    "usuario_id (identificador)",
+    "fecha_hora (timestamp)",
+    "valores_afectados (objeto estructurado)"
+   ],
+   "validacion_entradas": [
+    "El registro de horas y el usuario deben existir.",
+    "La operación debe corresponder a un evento realizado sobre el registro.",
+    "Los eventos de corrección deben incluir los valores anteriores y posteriores."
+   ],
+   "validacion_salidas": [
+    "Cada evento identifica el registro de horas, el usuario, la operación y la fecha-hora.",
+    "El historial conserva los eventos previos y no permite su modificación desde las funciones del submódulo."
+   ],
+   "secuencia": [
+    "El sistema confirma una operación sobre horas.",
+    "El sistema inserta el evento correspondiente en la bitácora dentro de la misma transacción.",
+    "El sistema conserva la secuencia cronológica de eventos."
+   ],
+   "situaciones_anormales": [
+    "No se puede guardar el evento de bitácora: el sistema revierte la operación asociada y muestra «No se realizó la operación porque no pudo registrarse en la bitácora»."
+   ],
+   "parametros": [
+    "Todo movimiento de costo conserva orden cuando aplique, programador cuando aplique, período, usuario y fecha."
+   ],
+   "salidas": [
+    "Evento de bitácora asociado al registro de horas."
+   ],
+   "almacenamiento_bd": [
+    "bitacora_horas: evento_id (clave primaria), registro_horas_id (FK), operacion (texto), valores_afectados (JSON o texto estructurado), usuario_id (FK a usuarios), fecha_hora (timestamp).",
+    "Índice por registro_horas_id y fecha_hora.",
+    "La operación de origen y el evento de bitácora se guardan transaccionalmente."
+   ]
+  },
+  {
+   "nombre": "Reporte de horas y costo por programador",
+   "descripcion": "El sistema deberá presentar las horas aprobadas y el costo de mano de obra directa agrupados por programador para el período solicitado.",
+   "prioridad": "Media",
+   "actores": [
+    "Contador de costos",
+    "Contador general"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos), variaciones y trazabilidad por programador",
+   "entradas": [
+    "fecha_desde (date, AAAA-MM-DD)",
+    "fecha_hasta (date, AAAA-MM-DD)",
+    "programador_id (identificador, opcional)",
+    "estado_horas (enumeración: aprobadas, todas, opcional)"
+   ],
+   "validacion_entradas": [
+    "Las fechas son válidas y fecha_desde no es posterior a fecha_hasta.",
+    "Si se indica programador_id, el programador debe existir.",
+    "El estado debe ser uno de los valores permitidos."
+   ],
+   "validacion_salidas": [
+    "El reporte incluye solo registros dentro del rango y del estado solicitados.",
+    "El costo mostrado corresponde a horas aprobadas multiplicadas por la tarifa por hora vigente en la fecha de trabajo.",
+    "Los totales son la suma de las filas incluidas y se presentan en USD con 2 decimales."
+   ],
+   "secuencia": [
+    "El usuario define el período y los filtros opcionales.",
+    "El sistema consulta las horas y tarifas aplicables.",
+    "El sistema presenta las horas y costos agrupados por programador y el total del período."
+   ],
+   "situaciones_anormales": [
+    "Rango de fechas inválido: el sistema muestra «La fecha inicial debe ser anterior o igual a la fecha final».",
+    "No existen registros: el sistema muestra «No hay horas para los filtros seleccionados» y presenta el reporte sin filas."
+   ],
+   "parametros": [
+    "Moneda de presentación: USD; decimales de importes: 2, configurables por el Administrador según los parámetros por defecto del equipo.",
+    "La tarifa aplicable se determina por la fecha de trabajo, usando la función existente de tarifas por hora."
+   ],
+   "salidas": [
+    "Reporte en pantalla de horas y costo por programador, con total del período."
+   ],
+   "almacenamiento_bd": [
+    "Consulta de horas aprobadas, programadores y tarifas vigentes por fecha.",
+    "Índices por fecha_trabajo, programador_id y estado.",
+    "El reporte es de consulta y no modifica registros."
+   ]
+  },
+  {
+   "nombre": "Reporte de horas y costo por orden",
+   "descripcion": "El sistema deberá presentar las horas aprobadas y el costo de mano de obra directa agrupados por orden de trabajo para el período solicitado.",
+   "prioridad": "Media",
+   "actores": [
+    "Contador de costos",
+    "Contador general"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos), variaciones por orden y trazabilidad de movimientos de costo",
+   "entradas": [
+    "fecha_desde (date, AAAA-MM-DD)",
+    "fecha_hasta (date, AAAA-MM-DD)",
+    "orden_id (identificador, opcional)",
+    "programador_id (identificador, opcional)"
+   ],
+   "validacion_entradas": [
+    "Las fechas son válidas y fecha_desde no es posterior a fecha_hasta.",
+    "Si se indica orden_id, la orden debe existir.",
+    "Si se indica programador_id, el programador debe existir."
+   ],
+   "validacion_salidas": [
+    "El reporte incluye únicamente horas aprobadas asociadas a órdenes y comprendidas en el rango solicitado.",
+    "El costo mostrado corresponde a horas aprobadas multiplicadas por la tarifa por hora vigente del programador en la fecha de trabajo.",
+    "Los subtotales por orden y el total general coinciden con la suma de las filas incluidas y se muestran en USD con 2 decimales."
+   ],
+   "secuencia": [
+    "El usuario define el período y, opcionalmente, la orden y el programador.",
+    "El sistema consulta las horas aprobadas vinculadas a órdenes y las tarifas aplicables.",
+    "El sistema agrupa los resultados por orden y presenta las horas y costos, con subtotales y total general."
+   ],
+   "situaciones_anormales": [
+    "Rango de fechas inválido: el sistema muestra «La fecha inicial debe ser anterior o igual a la fecha final».",
+    "No existen registros: el sistema muestra «No hay horas por orden para los filtros seleccionados» y presenta el reporte sin filas."
+   ],
+   "parametros": [
+    "Moneda de presentación: USD; decimales de importes: 2, configurables por el Administrador según los parámetros por defecto del equipo.",
+    "El reporte no incluye las horas clasificadas como costo indirecto o gasto del período."
+   ],
+   "salidas": [
+    "Reporte en pantalla de horas y costo por orden, con subtotales y total general."
+   ],
+   "almacenamiento_bd": [
+    "Consulta de horas aprobadas, órdenes, programadores y tarifas vigentes por fecha.",
+    "Índices por fecha_trabajo, orden_id, programador_id y estado.",
+    "El reporte es de consulta y no modifica registros."
+   ]
+  }
+ ],
+ "vacios": [
+  "Valor por defecto del límite diario de horas por programador: [PENDIENTE DE VERIFICAR].",
+  "Precisión decimal permitida para la captura de horas: [PENDIENTE DE VERIFICAR].",
+  "Porcentajes y reglas de cargas laborales y prestaciones aplicables al costo de mano de obra: [PENDIENTE DE VERIFICAR].",
+  "Cuenta contable específica para las horas pagadas clasificadas como gasto del período, cuando no corresponda a una orden ni a costos indirectos: [PENDIENTE DE VERIFICAR]."
+ ]
+}

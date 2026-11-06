@@ -1,432 +1,887 @@
 {
  "requerimientos": [
   {
-   "nombre": "Apertura de orden de trabajo",
-   "descripcion": "El sistema deberá abrir una orden de trabajo vinculada a un videojuego para acumular y consultar sus costos de desarrollo.",
+   "nombre": "Apertura de orden con presupuesto",
+   "descripcion": "El sistema deberá abrir una orden de trabajo por videojuego y guardar las horas presupuestadas por programador y los datos de estimación del presupuesto.",
    "prioridad": "Alta",
    "actores": [
-    "Contador de costos",
-    "Contador"
+    "Contador de costos"
    ],
-   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuenta 1204 y glosario «Orden de trabajo»; Modelo_de_Negocio_SunGames.docx, cada videojuego como unidad de negocio",
+   "fuente": "Decisión de diseño del equipo (costos); Modelo_de_Negocio_SunGames.docx, cada videojuego como unidad de negocio",
    "entradas": [
-    "código_orden (texto, formato definido por el sistema)",
-    "videojuego (texto, identificador o nombre del título)",
+    "codigo_orden (texto, identificador único)",
+    "videojuego_id (identificador de videojuego)",
     "fecha_apertura (date, AAAA-MM-DD)",
-    "responsable (identificador de usuario)",
-    "documento_soporte (texto, referencia opcional)"
+    "responsable_id (identificador de usuario)",
+    "programadores_presupuesto (lista de programador_id y horas_presupuestadas decimal)",
+    "metodo_estimacion (texto)",
+    "estimador_id (identificador de usuario o persona)",
+    "fecha_estimacion (date, AAAA-MM-DD)",
+    "costo_indirecto_presupuestado (decimal(14,2), USD)"
    ],
    "validacion_entradas": [
-    "El código de orden, el videojuego y la fecha de apertura son obligatorios.",
-    "El código de orden no puede estar previamente registrado.",
-    "El videojuego debe existir en el registro de títulos de SunGames.",
-    "El usuario debe tener permiso de contador o contador de costos."
+    "Código, videojuego, fecha de apertura, responsable, horas presupuestadas, método, estimador y fecha de estimación son obligatorios.",
+    "El código no debe estar registrado y el videojuego debe existir.",
+    "Cada programador debe estar identificado y tener horas presupuestadas mayores o iguales a cero; debe haber al menos un programador presupuestado.",
+    "El método es informativo y configurable; el sistema no estima ni calcula las horas presupuestadas.",
+    "El costo indirecto presupuestado debe ser mayor o igual a cero."
    ],
    "validacion_salidas": [
-    "La orden creada queda asociada a un único videojuego y comienza en estado abierta.",
-    "La orden puede recibir costos únicamente mientras permanezca abierta."
+    "La orden queda asociada a un único videojuego y comienza en estado abierta.",
+    "El presupuesto de mano de obra por programador es horas presupuestadas × tarifa por hora vigente seleccionada para la estimación.",
+    "El costo indirecto presupuestado queda almacenado sin que el sistema estime el presupuesto técnico."
    ],
    "secuencia": [
-    "El actor ingresa los datos de la orden.",
-    "El sistema valida obligatoriedad, unicidad, existencia del videojuego y permiso.",
-    "El sistema registra la orden abierta y confirma su código."
+    "El Contador de costos ingresa los datos de la orden, programadores, horas y estimación.",
+    "El sistema valida la existencia del videojuego, unicidad del código y datos obligatorios.",
+    "El sistema obtiene y muestra la tarifa vigente aplicable a cada programador para la fecha indicada.",
+    "El sistema calcula y muestra el presupuesto de mano de obra por programador y registra la orden y sus datos presupuestarios."
    ],
    "situaciones_anormales": [
     "Código duplicado: «No se pudo abrir la orden: el código ya existe.»",
     "Videojuego inexistente: «No se pudo abrir la orden: el videojuego no está registrado.»",
-    "Usuario sin permiso: «Acceso denegado: no tiene permiso para abrir órdenes de trabajo.»",
-    "Falla al guardar: revierte la operación y muestra «No se pudo abrir la orden; no se guardaron cambios.»"
+    "Falta una tarifa vigente para un programador: «No se pudo calcular el presupuesto de mano de obra: no existe una tarifa vigente para cada programador.»",
+    "Falla al guardar la orden o su presupuesto: revierte la operación y muestra «No se pudo abrir la orden; no se guardaron cambios.»"
    ],
    "parametros": [
-    "Formato del código de orden: [PENDIENTE DE VERIFICAR].",
-    "No se establece un máximo de órdenes por videojuego en las fuentes."
+    "Métodos informativos configurables: juicio de expertos, analogía, COSMIC, puntos de función u otro; no se fija un método por defecto.",
+    "Moneda por defecto USD y precisión de 2 decimales, configurables por el Administrador.",
+    "La estimación de horas corresponde al equipo técnico; el sistema solo guarda los datos proporcionados."
    ],
    "salidas": [
-    "Confirmación de apertura con código, videojuego, fecha y estado de la orden."
+    "Orden abierta con videojuego, código, responsable y fecha.",
+    "Presupuesto de horas por programador, costo presupuestado de mano de obra y costo indirecto presupuestado.",
+    "Método, estimador y fecha de estimación."
    ],
    "almacenamiento_bd": [
-    "ordenes_trabajo: id (clave primaria), codigo (texto, único), videojuego_id (texto, no nulo, FK a videojuegos), fecha_apertura (date, no nulo), responsable_id (texto, FK a usuarios), estado (texto, no nulo; valores abierta/cerrada), documento_soporte (texto, nullable), created_at (timestamp).",
-    "Índice por videojuego_id y estado.",
-    "Alta de la orden en una transacción atómica."
+    "ordenes_trabajo: id (clave primaria), codigo (texto, único, no nulo), videojuego_id (identificador, FK a videojuegos), fecha_apertura (date), responsable_id (identificador, FK a usuarios), estado (texto, CHECK en abierta/en_desarrollo/terminada/cerrada/cedida), costo_indirecto_presupuestado decimal(14,2), created_at (timestamp).",
+    "presupuestos_orden: id (clave primaria), orden_id (identificador, FK a ordenes_trabajo), metodo_estimacion (texto), estimador_id (identificador), fecha_estimacion (date), UNIQUE (orden_id, fecha_estimacion).",
+    "presupuesto_horas_programador: id (clave primaria), presupuesto_id (identificador, FK a presupuestos_orden), programador_id (identificador, FK a programadores), horas_presupuestadas decimal(10,2), tarifa_hora decimal(14,2), costo_presupuestado decimal(14,2), CHECK (horas_presupuestadas >= 0).",
+    "Índices por videojuego_id y estado. Alta de orden y presupuesto en una transacción atómica."
    ]
   },
   {
-   "nombre": "Asignación de mano de obra directa",
-   "descripcion": "El sistema deberá asociar a una orden abierta los costos de mano de obra directa de desarrollo respaldados por la planilla.",
+   "nombre": "Estados y elegibilidad de orden",
+   "descripcion": "El sistema deberá controlar los estados de la orden de trabajo y bloquear la carga de costos cuando su estado sea terminada, cerrada o cedida.",
    "prioridad": "Alta",
    "actores": [
     "Contador de costos",
-    "Contador"
+    "Administrador"
    ],
-   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuenta 4101 «Mano de obra directa de desarrollo»; Modelo_de_Negocio_SunGames.docx, estructura de costos por título",
+   "fuente": "Decisión de diseño del equipo (costos)",
    "entradas": [
-    "orden_id (identificador, FK)",
-    "periodo (date, mes contable AAAA-MM)",
-    "importe (decimal, moneda contable configurada)",
+    "orden_id (identificador de orden)",
+    "estado_destino (enum: abierta, en_desarrollo, terminada, cerrada, cedida)",
+    "usuario_id (identificador de usuario)"
+   ],
+   "validacion_entradas": [
+    "La orden y el usuario deben existir.",
+    "El estado destino debe pertenecer a los valores permitidos.",
+    "La transición a cedida debe corresponder al registro de una cesión del título.",
+    "La operación debe respetar los controles de reapertura establecidos en el requerimiento de reapertura controlada."
+   ],
+   "validacion_salidas": [
+    "La orden conserva uno de los cinco estados definidos.",
+    "No se permite cargar costos en órdenes terminadas, cerradas o cedidas.",
+    "Cada cambio de estado queda asociado a la orden, usuario y fecha."
+   ],
+   "secuencia": [
+    "El actor selecciona la orden y solicita el cambio de estado.",
+    "El sistema valida el estado destino y las restricciones aplicables.",
+    "El sistema actualiza el estado y registra el cambio en la bitácora."
+   ],
+   "situaciones_anormales": [
+    "Orden inexistente: «No se cambió el estado: la orden no existe.»",
+    "Estado no permitido: «No se cambió el estado: seleccione un estado válido.»",
+    "Intento de cargar costos en orden terminada, cerrada o cedida: «No se registró el costo: la orden no admite nuevos costos en su estado actual.»",
+    "Falla al guardar: revierte el cambio y muestra «No se cambió el estado; no se guardaron cambios.»"
+   ],
+   "parametros": [
+    "Estados permitidos: abierta, en desarrollo, terminada, cerrada y cedida.",
+    "Solo el Administrador puede autorizar la reapertura; se requiere justificación y bitácora."
+   ],
+   "salidas": [
+    "Estado actual de la orden y confirmación o mensaje de rechazo.",
+    "Registro de transición en bitácora."
+   ],
+   "almacenamiento_bd": [
+    "ordenes_trabajo: estado (texto, no nulo, CHECK en abierta/en_desarrollo/terminada/cerrada/cedida), updated_at (timestamp).",
+    "bitacora: id (clave primaria), entidad (texto), entidad_id (identificador), accion (texto), estado_anterior (texto), estado_nuevo (texto), usuario_id (identificador, FK a usuarios), fecha_hora (timestamp).",
+    "Actualización de estado y bitácora en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Tarifas por hora de programador",
+   "descripcion": "El sistema deberá registrar tarifas por hora de cada programador con sus fechas de vigencia para calcular el costo de las horas aprobadas.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos",
+    "Administrador"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos)",
+   "entradas": [
+    "programador_id (identificador)",
+    "tarifa_hora (decimal(14,2), USD por hora)",
+    "vigente_desde (date, AAAA-MM-DD)",
+    "vigente_hasta (date, AAAA-MM-DD o nulo)"
+   ],
+   "validacion_entradas": [
+    "El programador debe existir.",
+    "La tarifa debe ser mayor que cero.",
+    "La fecha de inicio es obligatoria y la fecha final, si se informa, no puede precederla.",
+    "No pueden existir tarifas vigentes superpuestas para el mismo programador."
+   ],
+   "validacion_salidas": [
+    "Para una fecha de trabajo, existe como máximo una tarifa vigente por programador.",
+    "La tarifa usada en cada cálculo queda conservada como valor aplicado, aunque se registre posteriormente otra tarifa."
+   ],
+   "secuencia": [
+    "El actor ingresa programador, tarifa y vigencia.",
+    "El sistema valida fechas, importe y ausencia de solapamientos.",
+    "El sistema guarda la tarifa y confirma su período de vigencia."
+   ],
+   "situaciones_anormales": [
+    "Programador inexistente: «No se registró la tarifa: el programador no existe.»",
+    "Tarifa no positiva: «No se registró la tarifa: debe ser mayor que cero.»",
+    "Vigencias superpuestas: «No se registró la tarifa: existe otra tarifa vigente para ese período.»",
+    "Falla al guardar: revierte la operación y muestra «No se registró la tarifa; no se guardaron cambios.»"
+   ],
+   "parametros": [
+    "Moneda por defecto USD, precisión de 2 decimales, configurable por el Administrador.",
+    "La tarifa aplicable se determina por la fecha de trabajo y el intervalo de vigencia."
+   ],
+   "salidas": [
+    "Tarifa por hora registrada con programador y vigencia.",
+    "Mensaje de confirmación o validación."
+   ],
+   "almacenamiento_bd": [
+    "tarifas_programador: id (clave primaria), programador_id (identificador, FK a programadores), tarifa_hora decimal(14,2), vigente_desde (date), vigente_hasta (date, nullable), CHECK (tarifa_hora > 0 AND (vigente_hasta IS NULL OR vigente_hasta >= vigente_desde)).",
+    "Índice por programador_id, vigente_desde y vigente_hasta; validar solapamientos dentro de una transacción."
+   ]
+  },
+  {
+   "nombre": "Captura de horas de mano de obra",
+   "descripcion": "El sistema deberá permitir al Contador de costos capturar horas de trabajo por programador, orden y fecha a partir de la hoja de tiempo del programador.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos); Manual_aplicación_catálogo_SunGames.docx, cuenta 4101 «Mano de obra directa de desarrollo»",
+   "entradas": [
+    "orden_id (identificador de orden)",
+    "programador_id (identificador de programador)",
+    "fecha_trabajo (date, AAAA-MM-DD)",
+    "horas (decimal(10,2))",
+    "referencia_hoja_tiempo (texto)",
+    "periodo_contable (texto, AAAA-MM)"
+   ],
+   "validacion_entradas": [
+    "La orden y el programador deben existir.",
+    "La orden debe estar abierta o en desarrollo.",
+    "Las horas deben ser mayores que cero y la fecha debe pertenecer al período indicado.",
+    "La referencia de hoja de tiempo es obligatoria.",
+    "No se aceptan registros duplicados de la misma hoja de tiempo, programador, orden y fecha."
+   ],
+   "validacion_salidas": [
+    "Cada registro de horas queda asociado a una sola orden, programador, fecha y hoja de tiempo.",
+    "Las horas capturadas no generan costo ni partida hasta que sean aprobadas."
+   ],
+   "secuencia": [
+    "El Contador de costos captura los datos de la hoja de tiempo.",
+    "El sistema valida orden, programador, fecha, horas y referencia.",
+    "El sistema guarda el registro en estado pendiente de aprobación y confirma la captura."
+   ],
+   "situaciones_anormales": [
+    "Orden no elegible: «No se capturaron las horas: la orden no existe o no admite costos en su estado actual.»",
+    "Horas no positivas: «No se capturaron las horas: indique un valor mayor que cero.»",
+    "Referencia duplicada: «No se capturaron las horas: la hoja de tiempo ya está registrada para esos datos.»",
+    "Falla al guardar: revierte la operación y muestra «No se capturaron las horas; no se guardaron cambios.»"
+   ],
+   "parametros": [
+    "Precisión de horas: 2 decimales, configurable.",
+    "El programador entrega la hoja de tiempo, pero no es usuario del sistema."
+   ],
+   "salidas": [
+    "Registro de horas pendiente de aprobación con orden, programador, fecha y referencia."
+   ],
+   "almacenamiento_bd": [
+    "horas_orden: id (clave primaria), orden_id (identificador, FK a ordenes_trabajo), programador_id (identificador, FK a programadores), fecha_trabajo (date), periodo_contable (texto), horas decimal(10,2), referencia_hoja_tiempo (texto), estado (texto: pendiente/aprobada/rechazada), usuario_captura_id (identificador, FK a usuarios), created_at (timestamp).",
+    "Índice por orden_id, programador_id y periodo_contable; restricción única por orden_id, programador_id, fecha_trabajo y referencia_hoja_tiempo."
+   ]
+  },
+  {
+   "nombre": "Aprobación y costeo de horas",
+   "descripcion": "El sistema deberá permitir al Contador de costos aprobar las horas capturadas y calcular su costo con la tarifa vigente del programador en la fecha de trabajo.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos); Manual_aplicación_catálogo_SunGames.docx, cuenta 4101 «Mano de obra directa de desarrollo»",
+   "entradas": [
+    "horas_orden_id (identificador de registro de horas)",
+    "decision (enum: aprobar, rechazar)",
+    "fecha_aprobacion (date, AAAA-MM-DD)",
+    "justificacion (texto, obligatoria al rechazar)"
+   ],
+   "validacion_entradas": [
+    "El registro debe existir y estar pendiente de aprobación.",
+    "Debe existir una tarifa vigente para el programador en la fecha de trabajo.",
+    "Solo el Contador de costos puede aprobar o rechazar las horas.",
+    "La justificación es obligatoria para el rechazo."
+   ],
+   "validacion_salidas": [
+    "Costo de mano de obra directa = horas aprobadas × tarifa por hora vigente en la fecha de trabajo.",
+    "El costo aprobado se identifica con la cuenta 4101 y se conserva la tarifa aplicada.",
+    "Una misma línea de horas no puede aprobarse ni costearse más de una vez."
+   ],
+   "secuencia": [
+    "El Contador de costos revisa las horas y su hoja de tiempo.",
+    "El sistema verifica la tarifa vigente y calcula el costo si se aprueba.",
+    "El actor confirma aprobar o rechazar; el sistema guarda la decisión y el costo aprobado correspondiente."
+   ],
+   "situaciones_anormales": [
+    "Sin tarifa vigente: «No se aprobaron las horas: no existe tarifa vigente para el programador en la fecha de trabajo.»",
+    "Registro ya procesado: «No se procesaron las horas: el registro ya fue aprobado o rechazado.»",
+    "Falta justificación de rechazo: «No se rechazaron las horas: indique la justificación.»",
+    "Falla al guardar: revierte la decisión y el costo asociado y muestra «No se procesaron las horas; no se guardaron cambios.»"
+   ],
+   "parametros": [
+    "Costo calculado con horas aprobadas × tarifa por hora vigente.",
+    "Moneda por defecto USD, 2 decimales y tolerancia de cuadre 0.00, configurables por el Administrador."
+   ],
+   "salidas": [
+    "Horas aprobadas o rechazadas.",
+    "Costo calculado por línea aprobada, tarifa aplicada y referencia a cuenta 4101."
+   ],
+   "almacenamiento_bd": [
+    "horas_orden: estado (texto), aprobado_por_id (identificador, FK a usuarios), fecha_aprobacion (date, nullable), justificacion_rechazo (texto, nullable).",
+    "costos_orden: id (clave primaria), orden_id (identificador, FK a ordenes_trabajo), tipo_costo (texto: mano_obra_directa), periodo_contable (texto), programador_id (identificador, FK a programadores), horas_orden_id (identificador, único, FK a horas_orden), horas decimal(10,2), tarifa_hora decimal(14,2), importe decimal(14,2), cuenta_codigo (texto, valor 4101), usuario_id (identificador, FK a usuarios), created_at (timestamp).",
+    "Aprobación, cálculo y alta del costo en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Conciliación de horas con planilla",
+   "descripcion": "El sistema deberá permitir conciliar las horas pagadas de la planilla de desarrollo con horas asignadas a órdenes, costos indirectos o gastos del período sin omisiones ni duplicaciones.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos",
+    "Contador general"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos); Manual_aplicación_catálogo_SunGames.docx, cuenta 4101 y cuentas de egresos de desarrollo",
+   "entradas": [
+    "periodo_contable (texto, AAAA-MM)",
     "referencia_planilla (texto)",
-    "documento_soporte (texto, referencia al archivo o expediente)"
+    "detalle_planilla (lista de programador_id y horas_pagadas decimal(10,2))",
+    "asignaciones (lista de horas de orden, costo indirecto o gasto del período)"
    ],
    "validacion_entradas": [
-    "La orden debe existir y estar abierta.",
-    "El período debe estar disponible para registro contable.",
-    "El importe debe ser mayor que cero y usar la precisión de la moneda contable.",
-    "La referencia de planilla y el documento soporte son obligatorios.",
-    "El costo debe corresponder a trabajo directo de desarrollo del videojuego de la orden."
+    "El período y la referencia de planilla son obligatorios.",
+    "Los programadores deben existir y las horas pagadas deben ser mayores o iguales a cero.",
+    "Cada hora pagada debe tener exactamente una clasificación: orden de trabajo, costo indirecto o gasto del período.",
+    "Una misma hora no puede aparecer en más de una clasificación."
    ],
    "validacion_salidas": [
-    "El importe asignado se identifica como mano de obra directa y se acumula una sola vez en la orden.",
-    "El total de mano de obra directa de la orden coincide con la suma de sus asignaciones válidas."
+    "Para cada programador y período, horas pagadas = horas asignadas a órdenes + horas clasificadas como indirecto + horas clasificadas como gasto del período.",
+    "El resultado identifica horas sin asignación y posibles duplicaciones; no modifica por sí solo la planilla ni aprueba horas de orden."
    ],
    "secuencia": [
-    "El actor selecciona la orden y captura el período, importe y referencias de soporte.",
-    "El sistema valida el estado de la orden, el período, el importe y la documentación.",
-    "El sistema registra la asignación como costo directo asociado a 4101 y actualiza el acumulado de la orden."
+    "El Contador general o de costos carga la referencia y el detalle de planilla.",
+    "El sistema recupera las horas aprobadas y las otras clasificaciones del período.",
+    "El sistema compara las horas y presenta diferencias, omisiones o duplicaciones."
    ],
    "situaciones_anormales": [
-    "Orden cerrada o inexistente: «No se asignó el costo: la orden no existe o no está abierta.»",
-    "Período no disponible: «No se asignó el costo: el período no está habilitado para registro.»",
-    "Importe no positivo: «No se asignó el costo: el importe debe ser mayor que cero.»",
-    "Falta la referencia de planilla: «No se asignó el costo: indique la planilla soporte.»",
-    "Falla al guardar: revierte la asignación y muestra «No se guardaron cambios en la orden.»"
+    "Horas no conciliadas: «La conciliación presenta horas pagadas sin clasificación o diferencias; revise el detalle antes de confirmar.»",
+    "Hora duplicada: «La conciliación no es válida: una o más horas están asignadas más de una vez.»",
+    "Falla de consulta: «No se pudo completar la conciliación de horas; intente nuevamente.»"
    ],
    "parametros": [
-    "Precisión monetaria: la definida para la moneda contable.",
-    "No se define en las fuentes una tarifa por hora ni una fórmula de conversión de horas a costo; se registra el importe respaldado por planilla."
+    "Período de conciliación: AAAA-MM.",
+    "La conciliación debe cubrir todas las horas pagadas del período."
    ],
    "salidas": [
-    "Detalle de mano de obra directa asociado a la orden y acumulado actualizado."
+    "Resultado de conciliación por programador, horas pagadas, horas clasificadas y diferencias.",
+    "Detalle de horas pendientes de asignación o duplicadas."
    ],
    "almacenamiento_bd": [
-    "costos_orden: id (clave primaria), orden_id (identificador, no nulo, FK a ordenes_trabajo), tipo_costo (texto, no nulo), periodo (date, no nulo), importe (decimal(14,2), no nulo, CHECK importe > 0), cuenta_codigo (texto, no nulo, referencia a cuentas del catálogo), referencia_origen (texto, no nulo), documento_soporte (texto, no nulo), created_at (timestamp).",
-    "Para mano de obra directa, tipo_costo = mano_obra_directa y cuenta_codigo = 4101.",
-    "Índices por orden_id, periodo y tipo_costo; inserción atómica con actualización del acumulado."
+    "conciliaciones_planilla: id (clave primaria), periodo_contable (texto), referencia_planilla (texto), estado (texto), usuario_id (identificador, FK a usuarios), created_at (timestamp).",
+    "conciliaciones_planilla_detalle: id (clave primaria), conciliacion_id (identificador, FK a conciliaciones_planilla), programador_id (identificador, FK a programadores), horas_pagadas decimal(10,2), horas_orden decimal(10,2), horas_indirectas decimal(10,2), horas_gasto decimal(10,2), diferencia decimal(10,2).",
+    "La confirmación y sus detalles se guardan en una transacción atómica."
    ]
   },
   {
-   "nombre": "Asignación de costos de servicios directos",
-   "descripcion": "El sistema deberá asociar a una orden abierta los costos documentados de servicios profesionales contratados específicamente para el videojuego.",
+   "nombre": "Registro de costos indirectos reales",
+   "descripcion": "El sistema deberá registrar los costos indirectos reales de desarrollo respaldados por documentos y asociados al período contable.",
    "prioridad": "Alta",
    "actores": [
     "Contador de costos",
-    "Contador"
+    "Contador general"
    ],
-   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuentas 4102 y 2101; Política 8 «Servicios Profesionales contratados a terceros»; Modelo_de_Negocio_SunGames.docx, socios clave y estructura de costos",
+   "fuente": "Decisión de diseño del equipo (costos); Manual_aplicación_catálogo_SunGames.docx, cuenta 4103 «Costos indirectos de desarrollo»",
    "entradas": [
-    "orden_id (identificador, FK)",
-    "periodo (date, mes contable AAAA-MM)",
-    "importe_del_costo (decimal, moneda contable configurada)",
-    "proveedor_id (identificador, referencia al proveedor)",
+    "periodo_contable (texto, AAAA-MM)",
+    "fecha_costo (date, AAAA-MM-DD)",
+    "descripcion (texto)",
+    "importe_real (decimal(14,2), USD)",
     "referencia_documento (texto)",
-    "documento_soporte (texto, referencia al contrato o documento tributario)"
+    "cuenta_origen (código de cuenta contable)"
    ],
    "validacion_entradas": [
-    "La orden debe existir y estar abierta.",
-    "El proveedor debe estar registrado y el documento soporte debe identificar el servicio y el videojuego.",
-    "El servicio debe corresponder directamente al desarrollo de ese título; los servicios administrativos no son elegibles para esta asignación.",
-    "El importe debe ser mayor que cero y el período debe estar habilitado.",
-    "Las retenciones, el IVA y el saldo por pagar se toman del registro de compras correspondiente; no se duplican mediante esta asignación."
+    "El período debe estar habilitado y la descripción, fecha, importe y documento son obligatorios.",
+    "El importe debe ser mayor que cero.",
+    "La cuenta de origen debe existir y el documento no debe estar previamente registrado para el mismo costo.",
+    "El costo debe corresponder a costos comunes de desarrollo, no a servicios profesionales de terceros que son gasto del período."
    ],
    "validacion_salidas": [
-    "El importe asociado a la orden coincide con el costo directo documentado del servicio, sin volver a sumar retenciones o impuestos registrados en el módulo de compras.",
-    "El costo se identifica para su acumulación por título en la cuenta 4102 o, según la política contable aprobada, en el tratamiento aplicable."
+    "El costo real queda asociado al período y disponible para comparación con los costos indirectos aplicados.",
+    "El sistema conserva el importe real y la referencia documental sin duplicar el registro de compra."
    ],
    "secuencia": [
-    "El actor selecciona la orden y el servicio documentado del proveedor.",
-    "El sistema valida proveedor, soporte, período, importe y correspondencia con el título.",
-    "El sistema asocia el costo a la orden y conserva la referencia al registro de compras, si existe."
+    "El actor captura el costo indirecto y su soporte.",
+    "El sistema valida período, importe, cuenta y referencia.",
+    "El sistema registra el costo real para el período y confirma el alta."
    ],
    "situaciones_anormales": [
-    "Orden no abierta: «No se asignó el costo: la orden no existe o no está abierta.»",
-    "Proveedor o soporte inexistente: «No se asignó el costo: verifique el proveedor y el documento del servicio.»",
-    "Servicio administrativo: «No se asignó el costo: los honorarios administrativos no corresponden a costos directos de desarrollo.»",
-    "Costo ya asociado al mismo documento: «No se asignó el costo: el documento ya está asociado a esta orden.»",
-    "Falla al guardar: revierte la asociación y muestra «No se guardaron cambios en la orden.»"
+    "Período no habilitado: «No se registró el costo indirecto: el período no está habilitado.»",
+    "Documento duplicado: «No se registró el costo indirecto: el documento ya está registrado.»",
+    "Servicio profesional de tercero: «No se registró como costo indirecto: los servicios profesionales de terceros se reconocen como gasto del período.»",
+    "Falla al guardar: revierte el registro y muestra «No se registró el costo indirecto; no se guardaron cambios.»"
    ],
    "parametros": [
-    "Precisión monetaria: la definida para la moneda contable.",
-    "La decisión de capitalizar o llevar a gasto depende de la política contable aplicable y aprobada; no se fija un valor predeterminado."
+    "Moneda por defecto USD y 2 decimales, configurables por el Administrador.",
+    "Cuenta de costos indirectos de desarrollo: 4103, conforme al catálogo."
    ],
    "salidas": [
-    "Costo de servicio directo vinculado a la orden, con proveedor y referencia documental."
+    "Costo indirecto real del período con importe, cuenta y referencia documental."
    ],
    "almacenamiento_bd": [
-    "costos_orden: id (clave primaria), orden_id (identificador, no nulo, FK a ordenes_trabajo), tipo_costo (texto, no nulo), periodo (date, no nulo), importe (decimal(14,2), no nulo, CHECK importe > 0), cuenta_codigo (texto, referencia a cuentas del catálogo), proveedor_id (identificador, FK a proveedores), referencia_origen (texto, no nulo), documento_soporte (texto, no nulo), created_at (timestamp).",
-    "Para servicios directos registrados como costo, tipo_costo = servicio_directo y cuenta_codigo = 4102; la referencia de origen debe ser única por orden para prevenir duplicados.",
-    "Índices por orden_id, proveedor_id y periodo; asociación transaccional."
+    "costos_indirectos_reales: id (clave primaria), periodo_contable (texto), fecha_costo (date), descripcion (texto), importe_real decimal(14,2), referencia_documento (texto), cuenta_origen (texto), usuario_id (identificador, FK a usuarios), estado (texto).",
+    "Restricción de unicidad para la referencia de documento y costo; índices por período y cuenta. Alta transaccional."
    ]
   },
   {
-   "nombre": "Asignación de materiales a órdenes",
-   "descripcion": "El sistema deberá permitir asociar a una orden abierta el costo documentado de materiales únicamente cuando exista una política aprobada que defina su clasificación y origen contable.",
-   "prioridad": "Media",
+   "nombre": "Aplicación de costos indirectos a órdenes",
+   "descripcion": "El sistema deberá calcular y aplicar a cada orden elegible los costos indirectos presupuestados con base en las horas de mano de obra directa aprobadas.",
+   "prioridad": "Alta",
    "actores": [
-    "Contador de costos",
-    "Contador"
+    "Contador de costos"
    ],
-   "fuente": "Manual_aplicación_catálogo_SunGames.docx, Política 5 «Inexistencia de método de inventarios de mercancías» y cuentas 4101 a 4103; [PENDIENTE DE VERIFICAR: tratamiento de materiales de desarrollo]",
+   "fuente": "Decisión de diseño del equipo (costos)",
    "entradas": [
-    "orden_id (identificador, FK)",
-    "material_id (identificador, referencia a inventario físico, si aplica)",
-    "fecha (date, AAAA-MM-DD)",
-    "cantidad (decimal, unidad de medida pendiente de definir)",
-    "costo_asignado (decimal, moneda contable configurada)",
-    "documento_soporte (texto, referencia)",
-    "politica_clasificacion (identificador de política aprobada)"
+    "orden_id (identificador de orden)",
+    "periodo_contable (texto, AAAA-MM)",
+    "horas_directas_aprobadas (decimal(10,2), derivado de horas aprobadas)",
+    "costo_indirecto_presupuestado (decimal(14,2))",
+    "horas_presupuestadas_totales (decimal(10,2))"
    ],
    "validacion_entradas": [
-    "La orden debe existir y estar abierta.",
-    "El registro solo se habilita si hay una política aprobada que determine que el material es un costo del desarrollo y establezca su tratamiento contable.",
-    "Si el material procede de inventario físico, debe existir y tener cantidad disponible conforme al registro de inventario.",
-    "La cantidad y el costo deben ser mayores que cero; el documento soporte es obligatorio.",
-    "Las licencias digitales no se registran como existencias de mercancías."
+    "La orden debe existir y estar abierta o en desarrollo.",
+    "Las horas presupuestadas totales deben ser mayores que cero y los importes presupuestados deben ser no negativos.",
+    "Solo se consideran horas directas aprobadas del período y asignadas a la orden.",
+    "No debe existir una aplicación duplicada para la misma orden y período."
    ],
    "validacion_salidas": [
-    "El costo asociado no supera el costo documentado de la salida del material.",
-    "La asignación queda identificada separadamente de la mano de obra y los servicios directos.",
-    "El sistema no crea ni presume una cuenta contable para materiales de desarrollo sin una clasificación aprobada."
+    "Tasa predeterminada = costos indirectos presupuestados ÷ horas presupuestadas totales.",
+    "Costo indirecto aplicado a la orden = horas de mano de obra directa aprobadas de la orden × tasa predeterminada.",
+    "El costo aplicado se registra en 4103 y se vincula con orden y período."
    ],
    "secuencia": [
-    "El actor selecciona la orden y el material documentado.",
-    "El sistema comprueba que exista una política de clasificación aprobada y, si corresponde, valida la salida del inventario físico.",
-    "El sistema registra la asociación y su documento soporte o bloquea la operación si falta la definición contable."
+    "El Contador de costos selecciona orden y período.",
+    "El sistema obtiene horas presupuestadas, costo indirecto presupuestado y horas directas aprobadas.",
+    "El sistema calcula la tasa predeterminada y el importe aplicable, muestra el detalle y solicita confirmación.",
+    "Al confirmar, registra el costo indirecto aplicado a la orden."
    ],
    "situaciones_anormales": [
-    "Sin política aprobada: «No se asignó el material: falta aprobar su clasificación y tratamiento contable.»",
-    "Material no disponible en inventario físico: «No se asignó el material: la cantidad solicitada no está disponible.»",
-    "Orden no abierta: «No se asignó el material: la orden no existe o no está abierta.»",
-    "Intento de registrar una licencia digital como mercancía: «No se asignó el material: las licencias digitales no se controlan como inventario de mercancías.»",
-    "Falla al guardar: revierte la asociación y muestra «No se guardaron cambios en la orden.»"
+    "Horas presupuestadas totales igual a cero: «No se aplicaron costos indirectos: las horas presupuestadas deben ser mayores que cero.»",
+    "Orden no elegible: «No se aplicaron costos indirectos: la orden no admite costos en su estado actual.»",
+    "Aplicación duplicada: «No se aplicaron costos indirectos: ya existe una aplicación para la orden y período.»",
+    "Falla al guardar: revierte la aplicación y muestra «No se aplicaron costos indirectos; no se guardaron cambios.»"
    ],
    "parametros": [
-    "Unidad de medida, método de valoración y cuenta contable para materiales de desarrollo: [PENDIENTE DE VERIFICAR].",
-    "No se establece valor por defecto para la clasificación de materiales."
+    "Base de aplicación: horas de mano de obra directa aprobadas.",
+    "Tasa predeterminada: costos indirectos presupuestados ÷ horas presupuestadas totales.",
+    "Cuenta de aplicación: 4103; moneda por defecto USD, 2 decimales, configurable."
    ],
    "salidas": [
-    "Asociación de costo de material a la orden, únicamente si se encuentra habilitada por una política aprobada; de lo contrario, mensaje de bloqueo."
+    "Tasa predeterminada, horas aplicadas e importe de costos indirectos aplicado a la orden."
    ],
    "almacenamiento_bd": [
-    "materiales_orden: id (clave primaria), orden_id (identificador, no nulo, FK a ordenes_trabajo), material_id (identificador, nullable, FK a inventario_items), fecha (date, no nulo), cantidad (decimal(14,4), no nulo, CHECK cantidad > 0), costo_asignado (decimal(14,2), no nulo, CHECK costo_asignado > 0), politica_clasificacion_id (identificador, no nulo, FK a politicas_contables), documento_soporte (texto, no nulo), created_at (timestamp).",
-    "La inserción queda condicionada a la existencia y vigencia de la política aprobada; transacción atómica con la salida de inventario cuando corresponda.",
-    "La cuenta contable de materiales queda pendiente de definición y no se infiere del catálogo existente."
+    "aplicaciones_indirectos: id (clave primaria), orden_id (identificador, FK a ordenes_trabajo), periodo_contable (texto), costo_indirecto_presupuestado decimal(14,2), horas_presupuestadas_totales decimal(10,2), tasa decimal(14,6), horas_directas_aprobadas decimal(10,2), importe_aplicado decimal(14,2), cuenta_codigo (texto, valor 4103), usuario_id (identificador, FK a usuarios), estado (texto).",
+    "Restricción única por orden_id y periodo_contable. Cálculo e inserción en una transacción atómica."
    ]
   },
   {
-   "nombre": "Aplicación de costos indirectos",
-   "descripcion": "El sistema deberá distribuir los costos indirectos de desarrollo documentados entre las órdenes elegibles mediante una base y una tasa aprobadas por SunGames.",
+   "nombre": "Liquidación de sobre o subaplicación indirecta",
+   "descripcion": "El sistema deberá comparar al cierre de cada período los costos indirectos reales con los costos aplicados y presentar el importe de sobreaplicación o subaplicación para su liquidación contable.",
    "prioridad": "Alta",
    "actores": [
     "Contador de costos",
-    "Contador"
+    "Contador general"
    ],
-   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuenta 4103 «Costos indirectos de desarrollo» y Política 9 sobre equipo usado directamente en producción; Modelo_de_Negocio_SunGames.docx, costos por título",
+   "fuente": "Decisión de diseño del equipo (costos)",
    "entradas": [
-    "periodo (date, mes contable AAAA-MM)",
-    "costo_indirecto_id (identificador, referencia al costo documentado)",
-    "ordenes_elegibles (lista de identificadores de órdenes abiertas)",
-    "base_asignacion (tipo y valor decimal, conforme a política aprobada)",
-    "tasa_asignacion (decimal, conforme a política aprobada)",
-    "politica_asignacion_id (identificador de política aprobada)"
+    "periodo_contable (texto, AAAA-MM)",
+    "costos_indirectos_reales (decimal(14,2), derivado del período)",
+    "costos_indirectos_aplicados (decimal(14,2), derivado del período)",
+    "cuenta_liquidacion (código contable configurado)"
    ],
    "validacion_entradas": [
-    "El período debe estar habilitado y las órdenes seleccionadas deben existir y estar abiertas.",
-    "El costo indirecto debe tener documento soporte y corresponder a desarrollo; los gastos administrativos no se asignan como costos indirectos de desarrollo sin respaldo aprobado.",
-    "La base, la tasa y la regla de distribución deben estar configuradas y aprobadas antes de ejecutar la aplicación.",
-    "El mismo costo indirecto no puede aplicarse dos veces a una orden para el mismo período."
+    "El período debe estar en cierre y los costos reales y aplicados deben estar registrados.",
+    "La cuenta de liquidación debe existir y estar activa antes de preparar la partida.",
+    "El período no debe tener ya una liquidación confirmada."
    ],
    "validacion_salidas": [
-    "Para cada orden, costo aplicado = base de asignación de la orden × tasa aprobada, conforme a la unidad y regla de redondeo configuradas.",
-    "La suma de los importes distribuidos coincide con el importe distribuible del costo indirecto, considerando únicamente el redondeo definido por la política.",
-    "Los importes se identifican con la cuenta 4103 y con el período y orden correspondientes."
+    "Variación indirecta = costos indirectos reales − costos indirectos aplicados.",
+    "Si la variación es positiva, se identifica como subaplicación; si es negativa, como sobreaplicación; si es cero, no hay variación.",
+    "La partida de liquidación debe cuadrar y mantener el detalle del cálculo."
    ],
    "secuencia": [
-    "El actor selecciona el período, el costo indirecto, las órdenes elegibles y la política aprobada.",
-    "El sistema valida soportes, órdenes y configuración de base y tasa.",
-    "El sistema calcula la distribución conforme a la política y presenta el detalle para confirmación.",
-    "Al confirmar, el sistema registra las asignaciones a las órdenes."
+    "El actor solicita el cálculo de liquidación para el período.",
+    "El sistema suma costos reales y aplicados y calcula la variación.",
+    "El sistema muestra la clasificación y prepara la partida para revisión en el libro diario.",
+    "El Contador general confirma el envío de la partida al flujo contable existente."
    ],
    "situaciones_anormales": [
-    "Falta política, base o tasa aprobada: «No se aplicaron costos indirectos: configure y apruebe la base y la tasa de asignación.»",
-    "Importe distribuido distinto del importe distribuible: «No se aplicaron costos indirectos: la distribución no concilia con el costo seleccionado.»",
-    "Aplicación duplicada: «No se aplicaron costos indirectos: el costo ya fue distribuido a una o más órdenes.»",
-    "Falla al guardar: revierte todas las asignaciones de la ejecución y muestra «No se aplicaron costos indirectos; no se guardaron cambios.»"
+    "Cuenta de liquidación sin definir: «No se preparó la liquidación: falta configurar la cuenta contable aprobada.»",
+    "Variación cero: muestra «No existe sobreaplicación ni subaplicación para el período.»",
+    "Período ya liquidado: «No se preparó la liquidación: el período ya tiene una liquidación confirmada.»",
+    "Partida descuadrada: «No se preparó la liquidación: el debe y el haber no coinciden.»"
    ],
    "parametros": [
-    "Base de asignación, tasa, alcance de costos distribuibles y regla de redondeo: [PENDIENTE DE VERIFICAR].",
-    "No se establece una base ni una tasa predeterminada en los manuales."
+    "La base de aplicación es horas directas aprobadas; la cuenta de liquidación y su contrapartida quedan sujetas a configuración aprobada.",
+    "Tolerancia de cuadre por defecto 0.00, configurable por el Administrador."
    ],
    "salidas": [
-    "Detalle de costos indirectos distribuidos por orden y período, con base, tasa e importe calculado."
+    "Costos indirectos reales y aplicados, variación calculada y clasificación como sobreaplicación o subaplicación.",
+    "Partida preparada para el flujo de diario, si la cuenta contable está definida."
    ],
    "almacenamiento_bd": [
-    "aplicaciones_indirectos: id (clave primaria), costo_indirecto_id (identificador, no nulo), periodo (date, no nulo), politica_asignacion_id (identificador, no nulo, FK a politicas_contables), estado (texto, no nulo).",
-    "aplicaciones_indirectos_detalle: id (clave primaria), aplicacion_id (identificador, no nulo, FK a aplicaciones_indirectos), orden_id (identificador, no nulo, FK a ordenes_trabajo), base_importe (decimal(14,2), no nulo), tasa (decimal(9,6), no nulo), importe_aplicado (decimal(14,2), no nulo), cuenta_codigo (texto, no nulo, valor 4103).",
-    "Restricción única por costo_indirecto_id, periodo y orden_id; índices por periodo y orden_id; ejecución completa en una transacción atómica."
+    "liquidaciones_indirectos: id (clave primaria), periodo_contable (texto, único), costos_reales decimal(14,2), costos_aplicados decimal(14,2), variacion decimal(14,2), cuenta_liquidacion (texto), partida_id (identificador, FK al libro diario, nullable), estado (texto), usuario_id (identificador, FK a usuarios), created_at (timestamp).",
+    "Cálculo, estado y vínculo con partida en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Acumulación periódica en videojuegos en desarrollo",
+   "descripcion": "El sistema deberá generar al cierre de cada período una partida automática que traslade a 1204 los costos aprobados de mano de obra directa y costos indirectos aplicados cuando el parámetro de capitalización esté habilitado.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos",
+    "Contador general"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos); Manual_aplicación_catálogo_SunGames.docx, procedimiento de cierre y cuentas de costos de desarrollo",
+   "entradas": [
+    "periodo_contable (texto, AAAA-MM)",
+    "ordenes_trabajo (lista de identificadores de órdenes elegibles)",
+    "capitalizar_desarrollo (boolean configurable)",
+    "confirmacion_cierre_periodo (boolean)"
+   ],
+   "validacion_entradas": [
+    "El período debe estar en cierre y la confirmación de cierre es obligatoria.",
+    "Solo se incluyen costos aprobados de 4101 y costos indirectos aplicados de 4103; no se incluyen servicios profesionales de terceros.",
+    "Cada orden debe tener costos no trasladados y no puede estar cedida.",
+    "El sistema no traslada costos si capitalizar_desarrollo es no."
+   ],
+   "validacion_salidas": [
+    "Por orden, el total trasladado a 1204 es la suma de costos elegibles de 4101 y 4103 aún no trasladados.",
+    "La partida automática registra Debe 1204 y Haber 4101 y 4103 por los importes correspondientes y cumple partida doble.",
+    "La partida queda vinculada con cada orden y período, sin duplicar costos ya trasladados."
+   ],
+   "secuencia": [
+    "El sistema obtiene el parámetro de capitalización y los costos elegibles pendientes del período.",
+    "Si capitalizar_desarrollo es no, no genera el traslado y conserva el detalle para consulta.",
+    "Si capitalizar_desarrollo es sí, el sistema genera una partida automática por orden con sus líneas y vínculos.",
+    "El sistema remite la partida al flujo existente del libro diario y registra la integración."
+   ],
+   "situaciones_anormales": [
+    "Capitalización deshabilitada: no genera partida y muestra «No se generó el traslado: la capitalización del desarrollo está deshabilitada.»",
+    "Cuenta 1204 o cuenta de costo inactiva o inexistente: «No se generó el traslado: una cuenta requerida no existe o no está activa.»",
+    "Importes descuadrados: revierte la partida completa y muestra «No se generó el traslado: el debe y el haber no coinciden.»",
+    "Partida duplicada: «No se generó el traslado: los costos de la orden y período ya fueron trasladados.»"
+   ],
+   "parametros": [
+    "capitalizar_desarrollo: sí/no, configurable por el Administrador; el valor inicial requiere definición contable.",
+    "Cuentas del traslado según la decisión de diseño: Debe 1204, Haber 4101 y 4103.",
+    "Tolerancia de cuadre por defecto 0.00; ejercicio calendario y períodos mensuales conforme a la configuración general."
+   ],
+   "salidas": [
+    "Partida automática por orden y período cuando la capitalización esté habilitada.",
+    "Resumen de costos trasladados o mensaje de no generación."
+   ],
+   "almacenamiento_bd": [
+    "traslados_costos: id (clave primaria), orden_id (identificador, FK a ordenes_trabajo), periodo_contable (texto), importe_4101 decimal(14,2), importe_4103 decimal(14,2), capitalizar_desarrollo (boolean), partida_id (identificador, FK al libro diario), estado (texto), created_at (timestamp).",
+    "Restricción única por orden_id y periodo_contable; referencia a costos fuente para impedir traslados duplicados.",
+    "Creación de partida, vínculo y marca de costos trasladados en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Traslado de videojuegos terminados",
+   "descripcion": "El sistema deberá preparar un traslado solicitado expresamente para mover el costo acumulado de una orden terminada desde 1204 hacia 1205, sin ejecutarlo automáticamente al cambiar el estado de la orden.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos",
+    "Contador general"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos); Manual_aplicación_catálogo_SunGames.docx, traslado de videojuegos en desarrollo a videojuegos terminados",
+   "entradas": [
+    "orden_id (identificador de orden)",
+    "fecha_terminacion (date, AAAA-MM-DD)",
+    "confirmacion_traslado (boolean)"
+   ],
+   "validacion_entradas": [
+    "La orden debe existir y estar en estado terminada.",
+    "Debe existir costo capitalizado en 1204 asociado a la orden y no trasladado previamente.",
+    "La confirmación expresa es obligatoria.",
+    "Las cuentas 1204 y 1205 deben existir y estar activas en el catálogo."
+   ],
+   "validacion_salidas": [
+    "El importe propuesto corresponde al saldo de costo acumulado de 1204 asociado a la orden.",
+    "El sistema prepara Debe 1205 / Haber 1204 por el mismo importe y no contabiliza el traslado por el mero cambio de estado.",
+    "La partida preparada queda vinculada a la orden y a la fecha de terminación."
+   ],
+   "secuencia": [
+    "El actor solicita expresamente el traslado de la orden terminada.",
+    "El sistema calcula el saldo de 1204 atribuible a la orden y presenta el asiento propuesto.",
+    "Al confirmar, el sistema prepara la partida para el flujo del libro diario; no la genera automáticamente por el cambio de estado.",
+    "El sistema registra el vínculo entre la orden y la partida."
+   ],
+   "situaciones_anormales": [
+    "Orden no terminada: «No se preparó el traslado: la orden no está terminada.»",
+    "Saldo de 1204 inexistente: «No se preparó el traslado: la orden no tiene costo pendiente en 1204.»",
+    "Traslado ya realizado: «No se preparó el traslado: el costo de la orden ya fue transferido a 1205.»",
+    "Falta confirmación: «No se preparó el traslado: confirme la operación para continuar.»"
+   ],
+   "parametros": [
+    "Traslado no automático; requiere solicitud y confirmación expresa.",
+    "Asiento propuesto: Debe 1205 / Haber 1204.",
+    "Tolerancia de cuadre por defecto 0.00, configurable por el Administrador."
+   ],
+   "salidas": [
+    "Partida preparada con importe y cuentas 1204 y 1205, vinculada a la orden.",
+    "Mensaje de validación si el traslado no procede."
+   ],
+   "almacenamiento_bd": [
+    "traslados_videojuegos_terminados: id (clave primaria), orden_id (identificador, FK a ordenes_trabajo), fecha_terminacion (date), importe decimal(14,2), partida_id (identificador, FK al libro diario, nullable), estado (texto: preparado/contabilizado), usuario_id (identificador, FK a usuarios), created_at (timestamp).",
+    "Restricción única por orden_id; actualizar estado y vincular partida en transacción atómica."
    ]
   },
   {
    "nombre": "Cierre de orden de trabajo",
-   "descripcion": "El sistema deberá cerrar una orden de trabajo cuando el contador confirme que terminó la acumulación de costos del videojuego y que sus asignaciones están respaldadas.",
+   "descripcion": "El sistema deberá cerrar una orden de trabajo terminada cuando el Contador de costos confirme que su costo está conciliado y su detalle respaldado.",
    "prioridad": "Alta",
    "actores": [
-    "Contador de costos",
-    "Contador"
+    "Contador de costos"
    ],
-   "fuente": "Manual_aplicación_catálogo_SunGames.docx, procedimiento mensual de traslado de costos 4101 a 4103 a 1204 y cuenta 1205; Modelo_de_Negocio_SunGames.docx, producción y lanzamiento por título",
+   "fuente": "Decisión de diseño del equipo (costos); Manual_aplicación_catálogo_SunGames.docx, cuentas de costos de desarrollo y hoja de costos de la orden",
    "entradas": [
-    "orden_id (identificador, FK)",
+    "orden_id (identificador de orden)",
     "fecha_cierre (date, AAAA-MM-DD)",
-    "confirmacion_cierre (boolean)",
-    "referencia_lanzamiento (texto, opcional, referencia al registro de lanzamiento)"
+    "confirmacion_cierre (boolean)"
    ],
    "validacion_entradas": [
-    "La orden debe existir y estar abierta.",
+    "La orden debe existir y estar terminada.",
     "La fecha de cierre debe pertenecer a un período habilitado.",
-    "No deben existir asignaciones sin soporte ni aplicaciones de costos indirectos incompletas.",
-    "La confirmación del contador es obligatoria.",
-    "El lanzamiento del juego se valida con su registro correspondiente si se solicita el traslado de videojuegos en desarrollo a videojuegos terminados."
+    "La confirmación es obligatoria.",
+    "Los costos asociados deben contar con referencias de soporte y no debe haber registros pendientes de aprobación."
    ],
    "validacion_salidas": [
-    "Una orden cerrada no admite nuevas asignaciones de costos.",
-    "El cierre conserva el detalle y total acumulado por categoría.",
-    "El cierre de la orden no cambia por sí solo el tratamiento contable de los costos; los traslados a 1204 o 1205 dependen de la política contable aprobada."
+    "El estado de la orden cambia a cerrada y se conservan sus costos, presupuestos y documentos.",
+    "Una orden cerrada no admite nuevas cargas de costo.",
+    "El cierre no genera por sí mismo un traslado entre 1204 y 1205."
    ],
    "secuencia": [
-    "El actor solicita el cierre e ingresa fecha y confirmación.",
-    "El sistema valida orden, período, soportes y estado de las asignaciones.",
-    "El sistema presenta el total acumulado para revisión.",
-    "Al confirmar, el sistema cambia el estado de la orden a cerrada y registra fecha y usuario."
+    "El Contador de costos solicita el cierre de la orden.",
+    "El sistema valida estado, período, aprobaciones y soportes.",
+    "El sistema presenta el costo acumulado para revisión.",
+    "Con la confirmación, cambia el estado a cerrada y registra usuario y fecha en bitácora."
    ],
    "situaciones_anormales": [
-    "Orden inexistente o ya cerrada: «No se cerró la orden: no existe o ya está cerrada.»",
-    "Asignaciones incompletas: «No se cerró la orden: revise los costos sin soporte o las aplicaciones indirectas incompletas.»",
-    "Período no habilitado: «No se cerró la orden: el período no está habilitado.»",
+    "Orden no terminada: «No se cerró la orden: solo se pueden cerrar órdenes terminadas.»",
+    "Hay horas pendientes de aprobación o costos sin soporte: «No se cerró la orden: revise las horas pendientes y los costos sin soporte.»",
     "Falta confirmación: «No se cerró la orden: confirme el cierre para continuar.»",
-    "Falla al guardar: revierte el cambio de estado y muestra «No se cerró la orden; no se guardaron cambios.»"
+    "Falla al guardar: revierte el cambio y muestra «No se cerró la orden; no se guardaron cambios.»"
    ],
    "parametros": [
-    "El sistema no establece un plazo automático de cierre ni cierra órdenes por fecha.",
-    "El traslado contable de costos requiere la política contable aplicable aprobada."
+    "El cierre requiere confirmación del Contador de costos y período habilitado.",
+    "El cierre no ejecuta automáticamente el traslado de 1204 a 1205."
    ],
    "salidas": [
-    "Orden cerrada con fecha, usuario responsable y resumen de costos acumulados."
+    "Orden cerrada con fecha, usuario y resumen del costo acumulado.",
+    "Registro del cambio en bitácora."
    ],
    "almacenamiento_bd": [
-    "ordenes_trabajo: actualizar estado (texto) a cerrada y registrar fecha_cierre (date), usuario_cierre_id (texto, FK a usuarios) y referencia_lanzamiento (texto, nullable).",
-    "Restricción: solo transición de abierta a cerrada; conservar los registros de costos asociados sin borrado.",
-    "Cambio de estado y registro de auditoría en una transacción atómica."
+    "ordenes_trabajo: estado (texto), fecha_cierre (date, nullable), usuario_cierre_id (identificador, FK a usuarios).",
+    "bitacora: registro de entidad, entidad_id, acción, usuario_id y fecha_hora.",
+    "Cambio de estado y bitácora en una transacción atómica; no se borran costos asociados."
    ]
   },
   {
-   "nombre": "Cálculo del costo total y unitario por videojuego",
-   "descripcion": "El sistema deberá calcular el costo total acumulado por videojuego y presentar el costo unitario por título, sin tratar cada licencia digital vendida como una unidad de inventario.",
+   "nombre": "Reapertura controlada de orden",
+   "descripcion": "El sistema deberá permitir únicamente al Administrador reabrir una orden cerrada mediante una justificación obligatoria y registrar la operación en bitácora.",
+   "prioridad": "Alta",
+   "actores": [
+    "Administrador"
+   ],
+   "fuente": "Decisión de diseño del equipo (parámetros por defecto); Decisión de diseño del equipo (costos)",
+   "entradas": [
+    "orden_id (identificador de orden)",
+    "justificacion (texto)",
+    "usuario_id (identificador de usuario)",
+    "fecha_reapertura (date, AAAA-MM-DD)"
+   ],
+   "validacion_entradas": [
+    "La orden debe existir y estar cerrada.",
+    "El actor debe tener el rol Administrador.",
+    "La justificación es obligatoria y no puede contener solo espacios.",
+    "La orden cedida no se reabre mediante esta operación."
+   ],
+   "validacion_salidas": [
+    "La orden pasa a estado abierta y conserva su historial previo.",
+    "La bitácora registra orden, Administrador, fecha y justificación."
+   ],
+   "secuencia": [
+    "El Administrador solicita reabrir la orden e ingresa justificación.",
+    "El sistema valida rol, estado y contenido de la justificación.",
+    "El sistema cambia el estado a abierta y registra el evento en bitácora."
+   ],
+   "situaciones_anormales": [
+    "Usuario sin rol Administrador: «Acceso denegado: solo el Administrador puede reabrir órdenes.»",
+    "Orden inexistente o no cerrada: «No se reabrió la orden: la orden no existe o no está cerrada.»",
+    "Falta justificación: «No se reabrió la orden: indique la justificación.»",
+    "Falla al guardar la bitácora o el cambio: revierte la operación y muestra «No se reabrió la orden; no se guardaron cambios.»"
+   ],
+   "parametros": [
+    "Reapertura permitida solo al Administrador.",
+    "Justificación obligatoria y registro en bitácora, configurables conforme a las decisiones por defecto del equipo."
+   ],
+   "salidas": [
+    "Orden reabierta en estado abierta o mensaje de rechazo.",
+    "Registro de auditoría con justificación."
+   ],
+   "almacenamiento_bd": [
+    "ordenes_trabajo: estado (texto), updated_at (timestamp).",
+    "bitacora: id (clave primaria), entidad (texto), entidad_id (identificador), accion (texto), justificacion (texto, no nulo), usuario_id (identificador, FK a usuarios), fecha_hora (timestamp).",
+    "Cambio y bitácora en una transacción atómica."
+   ]
+  },
+  {
+   "nombre": "Consulta de costo acumulado frente al presupuesto",
+   "descripcion": "El sistema deberá presentar por orden y programador los costos y horas reales frente a los datos presupuestados y calcular sus variaciones.",
    "prioridad": "Alta",
    "actores": [
     "Contador de costos",
-    "Contador"
+    "Contador general"
    ],
-   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuentas 4101 a 4103 y cuentas 1204 y 1205; Política 5; Modelo_de_Negocio_SunGames.docx, cada videojuego como unidad de negocio y costo marginal digital casi nulo",
+   "fuente": "Decisión de diseño del equipo (costos); Modelo_de_Negocio_SunGames.docx, presupuesto y evaluación por videojuego",
    "entradas": [
-    "orden_id (identificador, FK)",
-    "fecha_corte (date, AAAA-MM-DD)",
-    "incluir_costos (lista de categorías: mano de obra directa, servicios directos, materiales habilitados e indirectos aplicados)"
+    "orden_id (identificador de orden)",
+    "fecha_corte (date, AAAA-MM-DD)"
    ],
    "validacion_entradas": [
-    "La orden debe existir y el usuario debe tener permiso de consulta de costos.",
-    "La fecha de corte no puede ser anterior a la apertura de la orden.",
-    "Solo se incluyen costos válidos y no duplicados asociados a la orden hasta la fecha de corte.",
-    "Los materiales solo se incluyen si su clasificación está aprobada."
+    "La orden debe existir y la fecha de corte no puede preceder su apertura.",
+    "Solo se incluyen horas aprobadas, costos registrados y aplicaciones indirectas confirmadas hasta la fecha de corte."
    ],
    "validacion_salidas": [
-    "Costo total del título = suma de mano de obra directa + servicios directos + materiales habilitados + costos indirectos aplicados, según las categorías efectivamente registradas.",
-    "Costo unitario por título = costo total acumulado de la orden ÷ 1 videojuego.",
-    "El informe identifica fecha de corte, categorías, total y la definición de unidad usada; no calcula costo por licencia vendida ni costo unitario de mercancías digitales."
+    "Variación de horas por programador = horas reales aprobadas − horas presupuestadas.",
+    "Costo presupuestado de mano de obra = horas presupuestadas × tarifa presupuestada registrada.",
+    "Variación de tarifa por programador = (tarifa real ponderada − tarifa presupuestada) × horas reales aprobadas.",
+    "Variación de costo total = costo real acumulado − costo presupuestado acumulado.",
+    "Variación de costos indirectos = costos indirectos reales − costos indirectos aplicados; la consulta distingue costos reales, aplicados y presupuestados.",
+    "El reporte muestra orden, programador, período, fecha de corte y componentes incluidos; no calcula costo por licencia digital vendida."
    ],
    "secuencia": [
-    "El actor selecciona la orden y fecha de corte.",
-    "El sistema recupera las asignaciones válidas de costos por categoría.",
-    "El sistema suma los importes, calcula el costo unitario por título y presenta el desglose."
+    "El actor selecciona orden y fecha de corte.",
+    "El sistema recupera presupuesto, horas aprobadas, tarifas aplicadas, costos indirectos reales y aplicados.",
+    "El sistema calcula variaciones con las fórmulas definidas y presenta el desglose."
    ],
    "situaciones_anormales": [
-    "Orden inexistente: «No se calcularon los costos: la orden no existe.»",
-    "No hay costos registrados: muestra los totales en cero e informa «No hay costos registrados para la orden a la fecha seleccionada.»",
-    "Material sin clasificación aprobada: excluye ese importe y muestra «Hay materiales pendientes de clasificación; el total no los incluye.»",
-    "Falla de consulta: muestra «No se pudo calcular el costo; intente nuevamente.»"
+    "Orden inexistente: «No se consultaron los costos: la orden no existe.»",
+    "Sin costos reales: muestra importes reales en cero e informa «No hay costos registrados para la orden a la fecha seleccionada.»",
+    "Falla de consulta: «No se pudo generar la comparación de costos; intente nuevamente.»"
    ],
    "parametros": [
-    "Fecha de corte: la seleccionada por el usuario.",
-    "Unidad de costo unitario: un videojuego (un título/orden).",
-    "Precisión y redondeo monetarios: los definidos para la moneda contable."
+    "Fecha de corte seleccionada por el usuario.",
+    "Moneda por defecto USD, 2 decimales y redondeo configurable por el Administrador.",
+    "No se calcula costo por licencia digital vendida."
    ],
    "salidas": [
-    "Consulta desglosada por categoría con costo total acumulado y costo unitario por título."
+    "Consulta desglosada de horas y costos presupuestados y reales por orden y programador.",
+    "Variaciones de horas, tarifa, costo total e indirectos."
    ],
    "almacenamiento_bd": [
-    "No requiere tabla de resultados persistidos: cálculo consultivo sobre costos_orden y aplicaciones_indirectos_detalle.",
-    "Si se conserva historial de consultas: consultas_costos_orden con id (clave primaria), orden_id (FK a ordenes_trabajo), fecha_corte (date), total (decimal(14,2)), unidad_calculo (texto), usuario_id (FK a usuarios), created_at (timestamp).",
-    "La consulta lee únicamente registros confirmados y utiliza una instantánea consistente de los datos."
+    "No requiere persistencia de resultados; consulta consistente sobre ordenes_trabajo, presupuestos_orden, presupuesto_horas_programador, horas_orden, costos_orden, costos_indirectos_reales y aplicaciones_indirectos.",
+    "Si se conserva historial: consultas_costos_orden con id (clave primaria), orden_id (FK a ordenes_trabajo), fecha_corte (date), usuario_id (FK a usuarios) y created_at (timestamp)."
+   ]
+  },
+  {
+   "nombre": "Cesión completa y baja del costo del título",
+   "descripcion": "El sistema deberá preparar para el libro diario los asientos de una cesión completa de videojuego y cambiar la orden a cedida cuando la operación quede contabilizada.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos",
+    "Contador general"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos); Modelo_de_Negocio_SunGames.docx, traspaso de productos a terceros; Manual_aplicación_catálogo_SunGames.docx, Política 10",
+   "entradas": [
+    "orden_id (identificador de orden)",
+    "fecha_cesion (date, AAAA-MM-DD)",
+    "importe_cesion (decimal(14,2), USD)",
+    "cuenta_recepcion (código 1103 Bancos o cuenta por cobrar configurada)",
+    "cuenta_ingreso_cesion (código configurado)",
+    "cuenta_costo_cesion (código configurado)",
+    "confirmacion (boolean)"
+   ],
+   "validacion_entradas": [
+    "La orden debe existir y tener costo acumulado en 1205.",
+    "Importe, fecha, cuentas y confirmación son obligatorios.",
+    "Las cuentas deben existir y estar activas; las cuentas de ingreso y costo de cesión deben estar aprobadas y configuradas.",
+    "El costo a dar de baja es el costo acumulado de la orden en 1205 y no puede excederlo ni repetirse.",
+    "La cesión debe quedar vinculada al acuerdo de transferencia del título."
+   ],
+   "validacion_salidas": [
+    "Asiento por ingreso: Debe Bancos o Cuentas por cobrar / Haber Ingresos por cesión de videojuegos por el importe de cesión.",
+    "Asiento por baja del costo: Debe costo por cesión / Haber 1205 por el costo acumulado de la orden.",
+    "Los asientos deben cuadrar; al contabilizarse, la orden pasa a cedida.",
+    "El sistema no calcula ni registra costo de licencias individuales vendidas."
+   ],
+   "secuencia": [
+    "El Contador de costos selecciona orden y registra los datos de cesión y acuerdo soporte.",
+    "El sistema calcula el costo acumulado atribuible en 1205 y presenta los dos asientos propuestos.",
+    "El Contador general revisa y confirma el envío al flujo existente del libro diario.",
+    "Al confirmarse la contabilización de los asientos, el sistema cambia la orden a cedida y registra la acción en bitácora."
+   ],
+   "situaciones_anormales": [
+    "Orden sin costo en 1205: «No se preparó la cesión: la orden no tiene costo acumulado en 1205.»",
+    "Cuenta contable no configurada: «No se preparó la cesión: falta configurar una cuenta contable aprobada.»",
+    "Costo ya dado de baja: «No se preparó la cesión: el costo de esta orden ya fue dado de baja.»",
+    "Partida descuadrada: «No se preparó la cesión: el debe y el haber no coinciden.»",
+    "Falla al guardar: revierte partidas, vínculo y cambio de estado y muestra «No se registró la cesión; no se guardaron cambios.»"
+   ],
+   "parametros": [
+    "Cuentas de recepción admitidas: Bancos o Cuentas por cobrar, según operación.",
+    "Cuenta de costo por cesión y cuenta de ingreso por cesión: configuración aprobada requerida; no se presume una cuenta del catálogo.",
+    "Tolerancia de cuadre por defecto 0.00, configurable por el Administrador."
+   ],
+   "salidas": [
+    "Asientos propuestos y vinculados con la orden y el acuerdo de cesión.",
+    "Estado cedida al confirmarse la contabilización.",
+    "Mensaje de bloqueo si faltan cuentas aprobadas."
+   ],
+   "almacenamiento_bd": [
+    "cesiones_videojuegos: id (clave primaria), orden_id (identificador, FK a ordenes_trabajo), fecha_cesion (date), importe_cesion decimal(14,2), costo_dado_baja decimal(14,2), cuenta_recepcion (texto), cuenta_ingreso_cesion (texto), cuenta_costo_cesion (texto), partida_ingreso_id (identificador, FK al libro diario), partida_costo_id (identificador, FK al libro diario), referencia_acuerdo (texto), estado (texto), usuario_id (identificador, FK a usuarios).",
+    "Restricción única por orden_id para evitar baja duplicada del costo acumulado.",
+    "Partidas, cesión, estado y bitácora en una transacción atómica."
    ]
   },
   {
    "nombre": "Integración de costos con contabilidad general",
-   "descripcion": "El sistema deberá preparar la partida contable de los costos de una orden conforme al tratamiento contable aprobado y vincularla con sus documentos y detalle de costos.",
+   "descripcion": "El sistema deberá vincular cada costo y traslado de orden con una partida del libro diario sin duplicar su registro ni su mayorización.",
    "prioridad": "Alta",
    "actores": [
     "Contador de costos",
-    "Contador"
+    "Contador general"
    ],
-   "fuente": "Manual_aplicación_catálogo_SunGames.docx, cuentas 4101 a 4104, 1204, 1205, política 7 y procedimiento de cierre mensual; Modelo_de_Negocio_SunGames.docx, control de costos por título",
+   "fuente": "Decisión de diseño del equipo (costos); Manual_aplicación_catálogo_SunGames.docx, libro diario y libro mayor",
    "entradas": [
-    "orden_id (identificador, FK)",
-    "periodo_contable (date, AAAA-MM)",
-    "politica_contable_id (identificador de política aprobada)",
-    "cuentas_destino (códigos del catálogo aplicables)",
-    "confirmacion_integracion (boolean)"
+    "orden_id (identificador de orden)",
+    "periodo_contable (texto, AAAA-MM)",
+    "tipo_integracion (enum: costo_4101, costo_4103, traslado_1204, traslado_1205, cesion, liquidacion_indirectos)",
+    "partida_id (identificador de partida del libro diario)",
+    "detalle_costos (lista de costos fuente)"
    ],
    "validacion_entradas": [
-    "La orden debe existir y tener costos confirmados y respaldados.",
-    "El período contable debe estar habilitado.",
-    "La política contable debe estar aprobada y definir si los costos internos de desarrollo se capitalizan o se reconocen como gasto.",
-    "Las cuentas deben existir y estar activas en el catálogo; los códigos 4101 a 4103 y 1204 son los indicados por el manual para el tratamiento de capitalización descrito allí.",
-    "La partida generada debe cumplir la validación de partida doble del libro diario."
+    "La orden y la partida deben existir; la partida debe cumplir las validaciones del libro diario.",
+    "Las cuentas usadas deben existir y estar activas en el catálogo.",
+    "Cada costo fuente solo puede integrarse una vez para la misma operación.",
+    "La partida debe conservar la relación con orden, período, usuario y fecha."
    ],
    "validacion_salidas": [
-    "El debe y el haber de la partida preparada deben ser iguales.",
-    "Los importes por cuenta concilian con el detalle de costos de la orden y no pueden integrarse dos veces para el mismo período y orden.",
-    "Cuando la política aprobada indique capitalización, el traslado mensual reflejará los costos elegibles desde 4101 a 4103 hacia 1204; al lanzamiento, el saldo aplicable de 1204 se trasladará a 1205 según el registro de lanzamiento.",
-    "Si la política aprobada exige reconocer el desarrollo interno como gasto, el sistema no generará el traslado a 1204 ni 1205."
+    "El total por cuenta de la partida coincide con los importes aprobados de los costos fuente correspondientes.",
+    "Debe y haber deben ser iguales conforme a la validación general de partida doble.",
+    "La integración no vuelve a mayorizar una partida que el flujo existente ya procesa."
    ],
    "secuencia": [
-    "El actor selecciona orden, período y política contable aprobada.",
-    "El sistema verifica el detalle de costos, las cuentas y el estado del período.",
-    "El sistema prepara la partida con referencias a la orden y los soportes, conforme al tratamiento aprobado.",
-    "El sistema envía la partida al flujo existente del libro diario, sin duplicar su mayorización, y conserva la relación entre partida y orden."
+    "El sistema prepara o recibe la partida del flujo del libro diario.",
+    "El Contador general revisa y confirma el vínculo con orden, período y costos fuente.",
+    "El sistema registra la relación y actualiza el estado de integración, sin repetir la mayorización."
    ],
    "situaciones_anormales": [
-    "Tratamiento contable no definido o sin aprobar: «No se integraron los costos: falta definir y aprobar el tratamiento contable aplicable al desarrollo interno.»",
-    "Cuenta inactiva o inexistente: «No se integraron los costos: una cuenta contable no existe o no está activa.»",
-    "Período cerrado: «No se integraron los costos: el período contable no está habilitado.»",
-    "Partida descuadrada: «No se integraron los costos: el debe y el haber no coinciden.»",
-    "Integración duplicada: «No se integraron los costos: la orden ya fue integrada para el período seleccionado.»",
-    "Falla al guardar: revierte partida y vínculo con la orden, y muestra «No se integraron los costos; no se guardaron cambios.»"
+    "Partida inexistente o no validada: «No se integraron los costos: la partida no existe o no está validada.»",
+    "Cuenta inexistente o inactiva: «No se integraron los costos: una cuenta contable no existe o no está activa.»",
+    "Integración duplicada: «No se integraron los costos: los registros fuente ya están vinculados a una partida.»",
+    "Diferencia entre partida y costos fuente: «No se integraron los costos: los importes de la partida no concilian con el detalle de costos.»",
+    "Falla al guardar: revierte el vínculo y muestra «No se integraron los costos; no se guardaron cambios.»"
    ],
    "parametros": [
-    "Tratamiento contable del desarrollo interno: [PENDIENTE DE VERIFICAR] por diferencia entre las reglas de traslado del manual y la Política 7 sobre NIIF para las PYMES.",
-    "Cuentas, decimales y tolerancia de cuadre: las del catálogo y la moneda contable; tolerancia de cuadre 0.00 conforme a partida doble."
+    "Cuentas 4101, 4103, 1204 y 1205 según las decisiones de diseño, sujetas a existencia y actividad en el catálogo.",
+    "Tolerancia de cuadre por defecto 0.00, configurable por el Administrador.",
+    "El flujo de libro diario y mayorización existente conserva su responsabilidad de registrar y mayorizar partidas."
    ],
    "salidas": [
-    "Partida preparada para el flujo del libro diario, vinculada a la orden, con detalle de cuentas, importes y documentos soporte; o mensaje de bloqueo si falta política aprobada."
+    "Vínculo entre orden, costos fuente, período y partida del diario.",
+    "Resultado de conciliación de importes por cuenta."
    ],
    "almacenamiento_bd": [
-    "integraciones_costos_contabilidad: id (clave primaria), orden_id (identificador, no nulo, FK a ordenes_trabajo), periodo_contable (date, no nulo), politica_contable_id (identificador, no nulo, FK a politicas_contables), partida_id (identificador, FK al libro diario), estado (texto, no nulo), created_at (timestamp).",
-    "Restricción única por orden_id y periodo_contable para impedir duplicados; índice por partida_id.",
-    "La creación de la partida y del vínculo se realiza en una transacción atómica; ante error se revierten ambos registros."
+    "integraciones_costos_contabilidad: id (clave primaria), orden_id (identificador, FK a ordenes_trabajo), periodo_contable (texto), tipo_integracion (texto), partida_id (identificador, FK a partidas), estado (texto), usuario_id (identificador, FK a usuarios), created_at (timestamp).",
+    "integraciones_costos_detalle: id (clave primaria), integracion_id (identificador, FK a integraciones_costos_contabilidad), costo_fuente_id (identificador), importe decimal(14,2), cuenta_codigo (texto).",
+    "Restricción única sobre costo_fuente_id y tipo_integracion; vínculo transaccional sin duplicar la mayorización."
+   ]
+  },
+  {
+   "nombre": "Bitácora de movimientos de costo",
+   "descripcion": "El sistema deberá registrar en bitácora cada movimiento de costo asociado a una orden con su programador cuando corresponda, período, usuario y fecha.",
+   "prioridad": "Alta",
+   "actores": [
+    "Contador de costos",
+    "Administrador"
+   ],
+   "fuente": "Decisión de diseño del equipo (costos)",
+   "entradas": [
+    "orden_id (identificador de orden)",
+    "movimiento_id (identificador del movimiento de costo)",
+    "programador_id (identificador, opcional)",
+    "periodo_contable (texto, AAAA-MM)",
+    "usuario_id (identificador de usuario)",
+    "accion (texto)",
+    "fecha_hora (timestamp)"
+   ],
+   "validacion_entradas": [
+    "La orden, movimiento, período y usuario deben existir.",
+    "El programador es obligatorio para movimientos de mano de obra y opcional para otros tipos de costo.",
+    "La bitácora se genera para altas, aprobaciones, rechazos, aplicaciones, traslados, cesiones y ajustes de costos."
+   ],
+   "validacion_salidas": [
+    "Cada movimiento conserva orden, período, usuario y fecha; los movimientos de mano de obra conservan también programador.",
+    "El registro de bitácora no puede modificarse ni eliminarse desde las operaciones ordinarias del sistema."
+   ],
+   "secuencia": [
+    "El sistema ejecuta una operación de costo.",
+    "En la misma transacción registra la acción y los datos de trazabilidad.",
+    "El sistema confirma la operación solo si el movimiento y su bitácora se guardan correctamente."
+   ],
+   "situaciones_anormales": [
+    "No se pudo guardar la bitácora: revierte el movimiento de costo y muestra «No se registró el movimiento: no se pudo guardar la trazabilidad.»",
+    "Falta un dato obligatorio de trazabilidad: «No se registró el movimiento: faltan datos de orden, período, usuario o fecha.»"
+   ],
+   "parametros": [
+    "Registro de trazabilidad obligatorio para todo movimiento de costo.",
+    "Fecha y hora registradas por el sistema."
+   ],
+   "salidas": [
+    "Registro consultable de acciones de costo por orden, programador, período, usuario y fecha."
+   ],
+   "almacenamiento_bd": [
+    "bitacora_costos: id (clave primaria), orden_id (identificador, FK a ordenes_trabajo), movimiento_id (identificador), programador_id (identificador, FK a programadores, nullable), periodo_contable (texto), usuario_id (identificador, FK a usuarios), accion (texto), fecha_hora (timestamp).",
+    "Índices por orden_id, programador_id, periodo_contable y fecha_hora; inserción de movimiento y bitácora en una transacción atómica."
    ]
   }
  ],
  "vacios": [
-  "Los manuales describen los costos de mano de obra directa (4101), servicios directos (4102) y costos indirectos de desarrollo (4103), pero no definen materiales de desarrollo, una cuenta para esos materiales, una unidad de medida ni su método de valoración. Se requiere aprobación antes de habilitar su asignación a órdenes.",
-  "El manual indica trasladar costos 4101 a 4103 a videojuegos en desarrollo (1204) y luego a videojuegos terminados (1205), pero su Política 7 señala que, bajo NIIF para las PYMES, el desarrollo interno se reconoce como gasto. Debe verificarse y aprobarse el marco contable aplicable y el tratamiento que utilizará el sistema antes de integrar costos.",
-  "No se define una base, tasa ni regla de distribución para aplicar costos indirectos entre órdenes; estos parámetros deben ser aprobados antes de ejecutar la distribución.",
-  "Las fuentes no definen el cálculo de costo por licencia vendida ni el número de unidades producidas. El costo unitario especificado se limita al costo por título/orden, no al costo por copia digital."
+  "Tratamiento contable del desarrollo de videojuegos aún sin decidir: el parámetro capitalizar_desarrollo sí/no permite configurarlo, pero se requiere definir el valor que aplicará SunGames.",
+  "Discrepancia: la decisión de diseño excluye los servicios profesionales de terceros de las órdenes y los lleva a gasto del período, mientras el manual incluye servicios directos en 4102; se requiere confirmar el tratamiento y la cuenta del catálogo aplicable.",
+  "Discrepancia de catálogo: las decisiones de diseño asignan 1204 a videojuegos en desarrollo y 1205 a videojuegos terminados como activo corriente, mientras el manual describe 1204 como licencias de software y 1205 como amortización acumulada de licencias de software; se requiere aprobar la correspondencia y clasificación de las cuentas.",
+  "Cuenta contable para el costo por cesión de videojuegos: [PENDIENTE DE VERIFICAR]. El manual propone 5105 para otros ingresos en la cesión, mientras la decisión de diseño requiere una cuenta de ingresos por cesión; debe aprobarse la correspondencia contable.",
+  "Cuenta o cuentas para liquidar la sobreaplicación o subaplicación de costos indirectos: [PENDIENTE DE VERIFICAR].",
+  "Porcentajes de cargas laborales y prestaciones: [PENDIENTE DE VERIFICAR].",
+  "No se automatiza el costo que sale de 1205 por cada licencia vendida; el tratamiento queda pendiente de definición.",
+  "No se genera amortización de videojuegos mientras se clasifiquen como activo corriente; su tratamiento futuro requiere definición."
  ]
 }
