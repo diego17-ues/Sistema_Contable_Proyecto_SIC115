@@ -44,9 +44,12 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'sic_sunGames',
     'usuarios',
+    'bitacora',
 ]
 
 AUTH_USER_MODEL = 'usuarios.Usuario'
+
+LOGIN_URL = 'login'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

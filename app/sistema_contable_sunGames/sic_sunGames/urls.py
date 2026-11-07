@@ -4,7 +4,7 @@ from .views import auth, pages
 
 urlpatterns = [
     path("", pages.index, name="index"),
-    path("login/", pages.render_screen, {"screen": "login"}, name="login"),
+    path("login/", auth.login_view, name="login"),
     path("panel/", pages.panel, name="panel"),
     path("logout/", auth.logout_view, name="logout"),
     path("panel/dashboard/", pages.render_screen, {"screen": "dashboard"}, name="dashboard"),

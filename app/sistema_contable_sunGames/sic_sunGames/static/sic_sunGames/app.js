@@ -11,8 +11,7 @@
   const logoUrl = JSON.parse($('#logoUrl').textContent);
   const initialScreen = $('#appShell').dataset.screen || 'dashboard';
   const initialParams = new URLSearchParams(window.location.search);
-  let savedUser = null;
-  try { savedUser = JSON.parse(sessionStorage.getItem('sunGamesCurrentUser') || 'null'); } catch (_) {}
+  const savedUser = JSON.parse($('#currentUser').textContent);
 
   const navGroups = [
     { label: 'Inicio', items: [{ id: 'dashboard', title: 'Dashboard', icon: '⌂' }] },
@@ -776,27 +775,7 @@
     }
   }
 
-  $('#loginForm').addEventListener('submit', event => {
-    event.preventDefault();
-    const username = $('#loginUser').value.trim();
-    const password = $('#loginPassword').value;
-    const user = users.find(item => item.username.toLowerCase() === username.toLowerCase() && item.status === 'Activo');
-    if (!user || !password) { $('#loginError').textContent = 'Usuario o contraseña incorrectos.'; return; }
-    $('#loginError').textContent = '';
-    state.currentUser = { username: user.username, name: user.name, role: user.profile };
-    sessionStorage.setItem('sunGamesCurrentUser', JSON.stringify(state.currentUser));
-    state.sessionPassword = password;
-    $('#activeUser').textContent = user.profile === 'Contador General' ? `Bienvenida, ${user.name}` : `Te damos la bienvenida, ${user.name}`;
-    $('.user-meta small').textContent = '';
-    $('.avatar').textContent = user.name.split(/\s+/).slice(0, 2).map(word => word[0]).join('').toUpperCase();
-    $('#loginView').classList.add('is-hidden');
-    $('#appShell').classList.remove('is-hidden');
-    state.audit.unshift({ date: `${today()} ${new Date().toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: false })}`, user: user.name, action: 'Inicio de sesión', detail: 'Acceso al sistema' });
-    setScreen('dashboard');
-  });
-
   $('#logoutButton').addEventListener('click', () => {
-    sessionStorage.removeItem('sunGamesCurrentUser');
     state.currentUser = null;
     state.sessionPassword = '';
   });
@@ -841,17 +820,10 @@
     if (!state.currentUser) return;
     const user = state.currentUser;
     $('#activeUser').textContent = user.role === 'Contador General' ? `Bienvenida, ${user.name}` : `Te damos la bienvenida, ${user.name}`;
-    $('.user-meta small').textContent = '';
     $('.avatar').textContent = user.name.split(/\s+/).slice(0, 2).map(word => word[0]).join('').toUpperCase();
   }
 
   function showScreenFromUrl() {
-    const loginPath = new URL(screenUrls.login, window.location.origin).pathname;
-    if (window.location.pathname === loginPath) {
-      $('#loginView').classList.remove('is-hidden');
-      $('#appShell').classList.add('is-hidden');
-      return;
-    }
     if (!state.currentUser) {
       window.location.replace(screenUrls.login);
       return;
@@ -867,8 +839,6 @@
     state.report = params.get('report') || state.report;
     state.operation = params.get('operation') || state.operation;
     state.ledgerMode = params.get('mode') || state.ledgerMode;
-    $('#loginView').classList.add('is-hidden');
-    $('#appShell').classList.remove('is-hidden');
     $('#appShell').dataset.screen = state.current;
     showCurrentUser();
     page();
