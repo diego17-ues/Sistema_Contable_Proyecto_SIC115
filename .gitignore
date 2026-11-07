@@ -1,31 +1,39 @@
-/vendor/
-node_modules/
-npm-debug.log
-yarn-error.log
+# Entorno virtual
+.venv/
+venv/
+env/
 
-# Laravel 4 specific
-bootstrap/compiled.php
-app/storage/
-
-# Laravel 5 & Lumen specific
-public/storage
-public/hot
-
-# Laravel 5 & Lumen specific with changed public path
-public_html/storage
-.env.local 
-public_html/hot
-
-storage/*.key
+# Variables secretas
 .env
-Homestead.yaml
-Homestead.json
-/.vagrant
-.phpunit.result.cache
+.env.*
+!.env.example
 
-/public/build
-/storage/pail
-.env.backup
-.env.production
-.phpactor.json
-auth.json
+# Base de datos local SQLite 
+*.sqlite3
+
+# Archivos generados por Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Archivos estáticos recolectados y media subida
+staticfiles/
+media/
+
+# Configuración de editores
+.vscode/
+.idea/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Pruebas y cobertura
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Logs
+*.log
