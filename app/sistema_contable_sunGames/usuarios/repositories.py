@@ -17,18 +17,17 @@ class UsuarioRepository:
     def listar(self):
         return Usuario.objects.order_by("username")
 
-    def crear(self, *, username, nombre_completo, rol):
-        usuario = Usuario(
+    def nuevo(self, *, username, nombre_completo, rol):
+        return Usuario(
             username=username, nombre_completo=nombre_completo, rol=rol
         )
-        # TODO(CU-02.1): sin contraseña utilizable hasta definir cómo se
-        # establece la contraseña de usuarios nuevos.
-        usuario.set_unusable_password()
+
+    def guardar(self, usuario):
         try:
             with transaction.atomic():
                 usuario.save()
         except IntegrityError as exc:
-            if self.existe_username(username):
+            if self.existe_username(usuario.username):
                 raise UsuarioDuplicadoError() from exc
             raise
         return usuario

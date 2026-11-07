@@ -20,13 +20,16 @@ class UsuarioService:
         self._verificar_administrador(actor)
         self._validar_rol(rol)
         self._validar_username_disponible(username)
-        # TODO(CU-02.1): definir cómo se establece la contraseña de usuarios
-        # nuevos (pendiente de definir en AGENT.md).
-        # TODO(CU-03): registrar el alta en la bitácora mediante
-        # AuditoriaService, dentro de transaction.atomic().
-        return self._repositorio.crear(
+        usuario = self._repositorio.nuevo(
             username=username, nombre_completo=nombre_completo, rol=rol
         )
+        # TODO(CU-02.1): definir cómo se establece la contraseña de usuarios
+        # nuevos (pendiente de definir en AGENTS.md). Mientras tanto la
+        # cuenta se crea sin contraseña utilizable.
+        usuario.set_unusable_password()
+        # TODO(CU-03): registrar el alta en la bitácora mediante
+        # BitacoraService, dentro de transaction.atomic().
+        return self._repositorio.guardar(usuario)
 
     def desactivar(self, actor, username):
         """CU-02.2: cambia el estado a inactivo; el registro se conserva."""
@@ -35,7 +38,7 @@ class UsuarioService:
         if not usuario.activo:
             raise UsuarioInactivoError("El usuario ya está inactivo.")
         # TODO(CU-03): registrar la desactivación en la bitácora mediante
-        # AuditoriaService, dentro de transaction.atomic().
+        # BitacoraService, dentro de transaction.atomic().
         return self._repositorio.actualizar_estado(usuario, activo=False)
 
     def listar(self, actor):

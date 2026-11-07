@@ -15,18 +15,19 @@ class UsuarioRepositoryTest(TestCase):
         self.repositorio = UsuarioRepository()
 
     def crear(self, username="jperez", rol=Rol.CONTADOR_GENERAL):
-        return self.repositorio.crear(
-            username=username, nombre_completo="Juan Pérez", rol=rol
+        return self.repositorio.guardar(
+            self.repositorio.nuevo(
+                username=username, nombre_completo="Juan Pérez", rol=rol
+            )
         )
 
-    def test_crear_registra_usuario_activo_sin_contrasena_utilizable(self):
+    def test_guardar_registra_usuario_activo(self):
         usuario = self.crear()
 
         guardado = Usuario.objects.get(pk=usuario.pk)
         self.assertTrue(guardado.activo)
         self.assertTrue(guardado.is_active)
         self.assertEqual(guardado.rol, Rol.CONTADOR_GENERAL)
-        self.assertFalse(guardado.has_usable_password())
 
     def test_username_unico_en_base_de_datos(self):
         self.crear()
@@ -78,9 +79,12 @@ class UsuarioServiceIntegracionTest(TestCase):
     """CU-02.1 y CU-02.2 con el repositorio real."""
 
     def setUp(self):
-        self.admin = UsuarioRepository().crear(
-            username="admin", nombre_completo="Administrador",
-            rol=Rol.ADMINISTRADOR,
+        repositorio = UsuarioRepository()
+        self.admin = repositorio.guardar(
+            repositorio.nuevo(
+                username="admin", nombre_completo="Administrador",
+                rol=Rol.ADMINISTRADOR,
+            )
         )
         self.servicio = crear_usuario_service()
 
@@ -94,7 +98,9 @@ class UsuarioServiceIntegracionTest(TestCase):
         self.servicio.desactivar(self.admin, "jperez")
 
         self.assertEqual(Usuario.objects.count(), total)
-        self.assertFalse(Usuario.objects.get(username="jperez").activo)
+        guardado = Usuario.objects.get(username="jperez")
+        self.assertFalse(guardado.activo)
+        self.assertFalse(guardado.has_usable_password())
 
     def test_alta_duplicada_no_crea_otra_cuenta(self):
         self.servicio.agregar(
