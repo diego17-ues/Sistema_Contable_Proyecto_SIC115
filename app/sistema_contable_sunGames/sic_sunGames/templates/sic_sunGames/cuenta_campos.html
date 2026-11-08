@@ -1,0 +1,22 @@
+<div class="modal-fields" data-cuenta-form>
+  {% if vista_previa %}
+  <div class="field"><label for="codigoPropuesto">Código asignado</label><input id="codigoPropuesto" data-url="{% url 'cuenta_siguiente_codigo' %}" placeholder="Elige tipo y subtipo" readonly /></div>
+  {% endif %}
+  {% for campo in form.campos_cuenta %}
+  <div class="field{% if campo.name == 'denominacion' and not vista_previa %} full{% endif %}">
+    <label for="{{ campo.id_for_label }}">{{ campo.label }}{% if campo.field.required %} *{% endif %}</label>
+    {{ campo }}
+    {% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+  </div>
+  {% endfor %}
+</div>
+<p class="form-section">Documentación de respaldo</p>
+<div class="modal-fields">
+  {% for campo in form.campos_documentacion %}
+  <div class="field">
+    <label for="{{ campo.id_for_label }}">{{ campo.label }}{% if campo.field.required %} *{% endif %}</label>
+    {{ campo }}
+    {% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+  </div>
+  {% endfor %}
+</div>

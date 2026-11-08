@@ -28,13 +28,18 @@ class ArchivoExportado:
     nombre: str
 
 
+def accion_con_referencia(evento):
+    accion = evento.get_accion_display()
+    return f"{accion} · {evento.referencia}" if evento.referencia else accion
+
+
 def filas(eventos):
     for evento in eventos:
         yield (
             timezone.localtime(evento.fecha_hora).strftime(FORMATO_FECHA_HORA),
             evento.actor.username if evento.actor_id else "",
             evento.afectado.username if evento.afectado_id else "",
-            evento.get_accion_display(),
+            accion_con_referencia(evento),
             evento.get_resultado_display(),
         )
 

@@ -7,6 +7,8 @@ class Accion(models.TextChoices):
     DESACTIVACION_USUARIO = "DESACTIVACION_USUARIO", "Desactivación de usuario"
     REACTIVACION_USUARIO = "REACTIVACION_USUARIO", "Reactivación de usuario"
     CAMBIO_CONTRASENA = "CAMBIO_CONTRASENA", "Cambio de contraseña"
+    ALTA_CUENTA = "ALTA_CUENTA", "Alta de cuenta"
+    MODIFICACION_CUENTA = "MODIFICACION_CUENTA", "Modificación de cuenta"
 
 
 class Resultado(models.TextChoices):

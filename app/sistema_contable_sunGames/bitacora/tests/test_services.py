@@ -22,7 +22,7 @@ class BitacoraServiceTests(SimpleTestCase):
 
         repositorio.crear.assert_called_once_with(
             accion=Accion.INICIO_SESION, resultado=Resultado.EXITOSO,
-            actor=actor, afectado=afectado,
+            actor=actor, afectado=afectado, referencia="",
         )
         self.assertIs(registro, repositorio.crear.return_value)
 
@@ -36,5 +36,5 @@ class BitacoraServiceTests(SimpleTestCase):
         repositorio.crear.assert_called_once_with(
             accion=Accion.INICIO_SESION,
             resultado=Resultado.CREDENCIALES_INCORRECTAS,
-            actor=None, afectado=None,
+            actor=None, afectado=None, referencia="",
         )

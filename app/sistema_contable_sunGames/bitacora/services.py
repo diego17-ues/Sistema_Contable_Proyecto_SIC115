@@ -10,9 +10,11 @@ class BitacoraService:
     def __init__(self, repositorio):
         self._repositorio = repositorio
 
-    def registrar(self, accion, resultado, *, actor=None, afectado=None):
+    def registrar(self, accion, resultado, *, actor=None, afectado=None,
+                  referencia=""):
         return self._repositorio.crear(
-            accion=accion, resultado=resultado, actor=actor, afectado=afectado
+            accion=accion, resultado=resultado, actor=actor,
+            afectado=afectado, referencia=referencia,
         )
 
 
