@@ -21,11 +21,13 @@ class UsuarioRepositoryEnMemoria:
     def listar(self):
         return [self._usuarios[k] for k in sorted(self._usuarios)]
 
-    def crear(self, *, username, nombre_completo, rol):
-        usuario = Usuario(
+    def nuevo(self, *, username, nombre_completo, rol):
+        return Usuario(
             username=username, nombre_completo=nombre_completo, rol=rol
         )
-        self._usuarios[username] = usuario
+
+    def guardar(self, usuario):
+        self._usuarios[usuario.username] = usuario
         return usuario
 
     def actualizar_estado(self, usuario, *, activo):

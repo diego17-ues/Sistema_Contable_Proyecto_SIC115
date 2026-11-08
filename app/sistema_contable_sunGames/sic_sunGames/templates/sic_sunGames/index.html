@@ -5,92 +5,7 @@
 {% block body_attributes %} data-initial-screen="{{ initial_screen }}"{% endblock %}
 
 {% block content %}
-    <section id="loginView" class="login-layout{% if initial_screen != 'login' %} is-hidden{% endif %}" aria-label="Inicio de sesión">
-      <div class="login-brand-panel">
-        <div class="brand-logo-card">
-          <img src="{% static 'sic_sunGames/SunGames_Logo.png' %}" alt="SunGames Interactive Worlds" />
-        </div>
-        <div class="login-brand-copy">
-          <span class="eyebrow eyebrow-gold login-system-title">Sistema Contable</span>
-          <svg class="accounting-illustration" viewBox="0 0 480 310" role="img" aria-labelledby="accountingIllustrationTitle accountingIllustrationDescription">
-            <title id="accountingIllustrationTitle">Ilustración contable animada</title>
-            <desc id="accountingIllustrationDescription">Billetes, calculadora y gráfica financiera.</desc>
-            <g aria-hidden="true">
-              <rect class="chart-bar" x="103" y="184" width="20" height="47" rx="5" fill="#ffffff" fill-opacity=".27" />
-              <rect class="chart-bar chart-bar-2" x="143" y="160" width="20" height="71" rx="5" fill="#ffffff" fill-opacity=".34" />
-              <rect class="chart-bar chart-bar-3" x="183" y="143" width="20" height="88" rx="5" fill="#d8a628" fill-opacity=".7" />
-              <rect class="chart-bar chart-bar-4" x="223" y="119" width="20" height="112" rx="5" fill="#ffffff" fill-opacity=".4" />
-              <rect class="chart-bar chart-bar-5" x="263" y="99" width="20" height="132" rx="5" fill="#d8a628" fill-opacity=".8" />
-              <path class="chart-line" d="M91 175c28-5 38-38 66-32s38 18 64-13 41-14 61-41 43-2 78-37" fill="none" stroke="#d8a628" stroke-width="4" stroke-linecap="round" />
-              <circle class="chart-point" cx="360" cy="52" r="5" fill="#f8edcf" stroke="#d8a628" stroke-width="3" />
-            </g>
-            <g transform="translate(78 75)" aria-hidden="true">
-              <g class="coin-float">
-                <circle r="22" fill="#d8a628" />
-                <circle r="16" fill="none" stroke="#0b2035" stroke-opacity=".45" stroke-width="1.5" />
-                <path d="M2-11v22M7-7c-1-4-12-4-12 1 0 6 12 2 12 8 0 5-11 6-13 1" fill="none" stroke="#0b2035" stroke-linecap="round" stroke-width="2" />
-              </g>
-            </g>
-            <g transform="translate(57 145)" aria-hidden="true">
-              <g class="money-float">
-                <rect x="8" y="7" width="176" height="92" rx="10" fill="#0b2035" fill-opacity=".65" stroke="#ffffff" stroke-opacity=".3" stroke-width="1.5" />
-                <rect y="0" width="176" height="92" rx="10" fill="#1b3d5d" stroke="#ffffff" stroke-opacity=".72" stroke-width="2" />
-                <rect x="8" y="8" width="160" height="76" rx="7" fill="none" stroke="#d8a628" stroke-opacity=".78" stroke-width="1.5" />
-                <circle cx="88" cy="46" r="25" fill="#d8a628" />
-                <circle cx="88" cy="46" r="19" fill="none" stroke="#0b2035" stroke-opacity=".5" stroke-width="1.5" />
-                <path d="M91 31v30m7-23c-2-5-17-5-17 2 0 8 17 3 17 11 0 7-16 8-19 1" fill="none" stroke="#0b2035" stroke-linecap="round" stroke-width="2.5" />
-                <path d="M18 20h30M18 27h20M128 65h30M138 72h20" stroke="#ffffff" stroke-opacity=".72" stroke-linecap="round" stroke-width="2" />
-              </g>
-            </g>
-            <g transform="translate(315 105)" aria-hidden="true">
-              <g class="calculator-float">
-                <rect x="6" y="8" width="112" height="166" rx="15" fill="#0b2035" fill-opacity=".76" stroke="#ffffff" stroke-opacity=".82" stroke-width="2" />
-                <rect x="18" y="20" width="88" height="34" rx="6" fill="#f8edcf" />
-                <path d="M28 43h48" stroke="#102b45" stroke-linecap="round" stroke-width="3" />
-                <circle cx="91" cy="37" r="3" fill="#d8a628" />
-                <g fill="#ffffff" fill-opacity=".2">
-                  <rect x="18" y="65" width="18" height="18" rx="5" />
-                  <rect x="45" y="65" width="18" height="18" rx="5" />
-                  <rect x="72" y="65" width="18" height="18" rx="5" />
-                  <rect x="18" y="92" width="18" height="18" rx="5" />
-                  <rect x="45" y="92" width="18" height="18" rx="5" />
-                  <rect x="72" y="92" width="18" height="18" rx="5" />
-                  <rect x="18" y="119" width="18" height="18" rx="5" />
-                  <rect x="45" y="119" width="18" height="18" rx="5" />
-                </g>
-                <rect class="calculator-key" x="72" y="119" width="18" height="18" rx="5" fill="#d8a628" />
-                <rect x="18" y="146" width="45" height="18" rx="5" fill="#ffffff" fill-opacity=".2" />
-                <rect x="72" y="146" width="18" height="18" rx="5" fill="#ffffff" fill-opacity=".2" />
-                <circle cx="27" cy="74" r="2" fill="#f8edcf" />
-                <circle cx="54" cy="74" r="2" fill="#f8edcf" />
-                <circle cx="81" cy="74" r="2" fill="#f8edcf" />
-                <circle cx="27" cy="101" r="2" fill="#f8edcf" />
-                <circle cx="54" cy="101" r="2" fill="#f8edcf" />
-                <circle cx="81" cy="101" r="2" fill="#f8edcf" />
-                <circle cx="27" cy="128" r="2" fill="#f8edcf" />
-                <circle cx="54" cy="128" r="2" fill="#f8edcf" />
-              </g>
-            </g>
-          </svg>
-        </div>
-      </div>
-      <div class="login-form-panel">
-        <form id="loginForm" class="login-card" method="post" action="{% url 'login' %}">
-          {% csrf_token %}
-          <span class="eyebrow">ACCESO AL SISTEMA</span>
-          <h2>Iniciar sesión</h2>
-          <p class="muted">Ingresa con tu usuario del sistema.</p>
-          <label for="loginUser">Usuario</label>
-          <input id="loginUser" name="user" autocomplete="username" required placeholder="Nombre de usuario" />
-          <label for="loginPassword">Contraseña</label>
-          <input id="loginPassword" name="password" type="password" autocomplete="current-password" required placeholder="Contraseña" />
-          <p id="loginError" class="form-error" role="alert"></p>
-          <button class="button button-primary button-wide" type="submit">Iniciar sesión <span aria-hidden="true">→</span></button>
-        </form>
-      </div>
-    </section>
-
-    <div id="appShell" class="app-shell{% if initial_screen == 'login' %} is-hidden{% endif %}" data-screen="{{ initial_screen }}">
+    <div id="appShell" class="app-shell" data-screen="{{ initial_screen }}">
       <aside id="sidebar" class="sidebar">
         <div class="sidebar-brand">
           <img src="{% static 'sic_sunGames/SunGames_Logo.png' %}" alt="SunGames" />
@@ -116,8 +31,8 @@
           <div class="topbar-actions">
             <span class="topbar-period"><span class="status-dot"></span>Período abierto</span>
             <button id="userMenu" class="user-menu" type="button" aria-label="Usuario activo">
-              <span class="avatar">CG</span>
-              <span class="user-meta"><strong id="activeUser">Contador General</strong><small>Contador General</small></span>
+              <span class="avatar"></span>
+              <span class="user-meta"><strong id="activeUser">{{ usuario_actual.name }}</strong><small>{{ usuario_actual.role }}</small></span>
               <span class="chevron">⌄</span>
             </button>
           </div>
@@ -133,5 +48,6 @@
 {% block scripts %}
   {{ screen_urls|json_script:"screenUrls" }}
   {{ logo_url|json_script:"logoUrl" }}
-  <script src="{% static 'sic_sunGames/app.js' %}?v=20261106-2"></script>
+  {{ usuario_actual|json_script:"currentUser" }}
+  <script src="{% static 'sic_sunGames/app.js' %}?v=20261107-1"></script>
 {% endblock %}

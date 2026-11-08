@@ -40,6 +40,16 @@ class AgregarUsuarioTest(BaseServicioTest):
         self.assertTrue(usuario.activo)
         self.assertTrue(self.repositorio.existe_username("jperez"))
 
+    def test_cuenta_nueva_sin_contrasena_utilizable(self):
+        usuario = self.servicio.agregar(
+            self.admin,
+            username="jperez",
+            nombre_completo="Juan Pérez",
+            rol=Rol.CONTADOR_GENERAL,
+        )
+
+        self.assertIs(usuario.has_usable_password(), False)
+
     def test_rechaza_username_duplicado(self):
         self.servicio.agregar(
             self.admin, username="jperez", nombre_completo="Juan",
@@ -91,11 +101,15 @@ class AgregarUsuarioTest(BaseServicioTest):
                 rol=Rol.CONTADOR_GENERAL,
             )
         repositorio.existe_username.assert_called_once_with("jperez")
-        repositorio.crear.assert_not_called()
+        repositorio.guardar.assert_not_called()
 
-    def test_delega_la_creacion_al_repositorio(self):
+    def test_invalida_la_contrasena_antes_de_guardar(self):
         repositorio = Mock(spec=UsuarioRepository)
         repositorio.existe_username.return_value = False
+        usuario = repositorio.nuevo.return_value
+        usuario.set_unusable_password.side_effect = (
+            lambda: repositorio.guardar.assert_not_called()
+        )
         servicio = UsuarioService(repositorio)
 
         resultado = servicio.agregar(
@@ -103,11 +117,13 @@ class AgregarUsuarioTest(BaseServicioTest):
             rol=Rol.CONTADOR_GENERAL,
         )
 
-        repositorio.crear.assert_called_once_with(
+        repositorio.nuevo.assert_called_once_with(
             username="jperez", nombre_completo="Juan",
             rol=Rol.CONTADOR_GENERAL,
         )
-        self.assertIs(resultado, repositorio.crear.return_value)
+        usuario.set_unusable_password.assert_called_once_with()
+        repositorio.guardar.assert_called_once_with(usuario)
+        self.assertIs(resultado, repositorio.guardar.return_value)
 
 
 class DesactivarUsuarioTest(BaseServicioTest):

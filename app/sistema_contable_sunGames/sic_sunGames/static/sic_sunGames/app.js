@@ -11,8 +11,7 @@
   const logoUrl = JSON.parse($('#logoUrl').textContent);
   const initialScreen = $('#appShell').dataset.screen || 'dashboard';
   const initialParams = new URLSearchParams(window.location.search);
-  let savedUser = null;
-  try { savedUser = JSON.parse(sessionStorage.getItem('sunGamesCurrentUser') || 'null'); } catch (_) {}
+  const savedUser = JSON.parse($('#currentUser').textContent);
 
   const navGroups = [
     { label: 'Inicio', items: [{ id: 'dashboard', title: 'Dashboard', icon: '⌂' }] },
@@ -69,22 +68,12 @@
     { id: 'V-1044', date: '2026-10-27', title: 'Título B', channel: 'Steam', amount: 480, status: 'Pendiente' },
   ];
 
-  const users = [
-    { name: 'Beatriz', username: 'contador', profile: 'Contador General', status: 'Activo', last: '2026-10-31 09:12' },
-    { name: 'Auxiliar Contable', username: 'auxiliar', profile: 'Auxiliar Contable', status: 'Activo', last: '2026-10-30 14:26' },
-    { name: 'Administrador', username: 'admin', profile: 'Administrador', status: 'Activo', last: '2026-10-29 08:40' },
-  ];
-
   const state = {
     current: initialScreen, report: initialParams.get('report') || 'results', operation: initialParams.get('operation') || 'verify', period: 'month',
-    currentUser: savedUser, sessionPassword: '', ledgerMode: initialParams.get('mode') || 'ledger', trialBalanceTo: today(),
+    currentUser: savedUser, ledgerMode: initialParams.get('mode') || 'ledger', trialBalanceTo: today(),
     ledgerFilter: { account: '5101', from: '', to: '' }, salesQuery: '', accountQuery: '', accountGroup: '',
     periodStatus: 'ABIERTO', closedRange: null, worksheet: null, provisionalFrom: '2026-10-01', provisionalTo: '2026-10-31',
-    auditQuery: '', steamStatus: 'En espera', audit: [
-      { date: '2026-10-31 09:12', user: 'Contador General', action: 'Inicio de sesión', detail: 'Acceso al sistema' },
-      { date: '2026-10-31 09:18', user: 'Contador General', action: 'Consulta de reporte', detail: 'Estado de Resultados' },
-      { date: '2026-10-30 14:26', user: 'Auxiliar Contable', action: 'Consulta de ventas', detail: 'Listado de ventas' },
-    ],
+    steamStatus: 'En espera',
     nextLedgerId: 9,
     salesTotal: 78240,
   };
@@ -316,7 +305,6 @@
     if (!periodRows.length) { page(); showToast('No hay movimientos en el rango seleccionado.', 'warning'); return; }
     state.worksheet = buildWorksheet(from, to);
     state.report = 'worksheet';
-    addAudit('Hoja de Trabajo generada', `${from} a ${to}`);
     page();
   }
 
@@ -359,32 +347,13 @@
   }
 
   function requestProvisionalClose() {
-    if (!hasCurrentWorksheet()) { showToast('Genera primero la Hoja de Trabajo del período seleccionado.', 'error'); return; }
-    if (!worksheetChecks(state.worksheet).every(item => item.ok)) { showToast('La Hoja de Trabajo debe cuadrar antes del cierre provisional.', 'error'); return; }
-    if (state.currentUser?.role !== 'Contador General') { showToast('El cierre provisional requiere el acceso del contador.', 'error'); return; }
-    if (state.periodStatus !== 'ABIERTO') { showToast('El período ya está cerrado provisionalmente.', 'warning'); return; }
-    openModal('Confirmar cierre provisional', `Período ${state.worksheet.from} a ${state.worksheet.to}`, `<div class="field full"><label for="closePassword">Contraseña del contador</label><input id="closePassword" name="password" type="password" required autocomplete="current-password"/></div>`, 'Confirmar cierre', data => {
-      if (data.password !== state.sessionPassword) { showToast('La contraseña del contador no es correcta.', 'error'); return false; }
-      state.periodStatus = 'CERRADO_PROVISIONAL';
-      state.closedRange = { from: state.worksheet.from, to: state.worksheet.to };
-      addAudit('Cierre provisional confirmado', `${state.closedRange.from} a ${state.closedRange.to}`);
-      state.report = 'worksheet'; page(); showToast('Período cerrado provisionalmente.', 'success');
-    });
+    // TODO(CU-07.2): las acciones que cambian el estado del período están pendientes de definir.
+    showToast('El cierre provisional está pendiente de definición (CU-07).', 'warning');
   }
 
   function requestPeriodReopen() {
-    if (state.periodStatus !== 'CERRADO_PROVISIONAL' || !state.closedRange) { showToast('No hay un período cerrado provisionalmente.', 'warning'); return; }
-    if (state.currentUser?.role !== 'Contador General') { showToast('La reapertura requiere el acceso del contador.', 'error'); return; }
-    openModal('Reabrir período', `${state.closedRange.from} a ${state.closedRange.to}`, `<div class="field full"><label for="reopenPassword">Contraseña del contador</label><input id="reopenPassword" name="password" type="password" required autocomplete="current-password"/></div>`, 'Reabrir período', data => {
-      if (data.password !== state.sessionPassword) { showToast('La contraseña del contador no es correcta.', 'error'); return false; }
-      state.periodStatus = 'ABIERTO';
-      state.provisionalFrom = state.closedRange.from;
-      state.provisionalTo = state.closedRange.to;
-      state.closedRange = null;
-      state.report = 'worksheet';
-      addAudit('Período reabierto', `${state.provisionalFrom} a ${state.provisionalTo}`);
-      page(); showToast('Período reabierto.', 'success');
-    });
+    // TODO(CU-07): la reapertura de un período está pendiente de definir.
+    showToast('La reapertura del período está pendiente de definición (CU-07).', 'warning');
   }
 
   function statementHeading(title, period) {
@@ -593,12 +562,13 @@
   }
 
   function usersPage() {
-    return `${heading('Usuarios', 'Consulta los usuarios, su perfil y el estado de acceso.', `<button class="button button-primary" type="button" data-action="new-user">＋ Nuevo usuario</button>`)}<section class="card"><div class="card-header"><div><h2>Usuarios del sistema</h2><p>Perfiles y accesos</p></div><span class="tag">${users.length} usuarios</span></div><div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Usuario</th><th>Perfil</th><th>Estado</th><th>Último acceso</th><th></th></tr></thead><tbody>${users.map((user, index) => `<tr><td><strong>${safe(user.name)}</strong></td><td>${safe(user.username)}</td><td>${safe(user.profile)}</td><td><span class="tag ${user.status === 'Activo' ? 'tag-open' : 'tag-muted'}">${safe(user.status)}</span></td><td>${safe(user.last)}</td><td class="num"><button class="text-button" type="button" data-action="edit-user" data-index="${index}">Consultar</button><button class="text-button" type="button" data-action="toggle-user" data-index="${index}">${user.status === 'Activo' ? 'Desactivar' : 'Activar'}</button></td></tr>`).join('')}</tbody></table></div></section>`;
+    // TODO(CU-02): la consulta, alta y desactivación de usuarios se harán contra el servidor.
+    return `${heading('Usuarios', 'Consulta los usuarios, su perfil y el estado de acceso.', '')}<section class="card"><div class="card-body"><p>La administración de usuarios estará disponible próximamente.</p></div></section>`;
   }
 
   function auditPage() {
-    const filtered = state.audit.filter(log => !state.auditQuery || `${log.user} ${log.action} ${log.detail}`.toLowerCase().includes(state.auditQuery.toLowerCase()));
-    return `${heading('Auditoría', 'Consulta las acciones registradas en el sistema.', `<button class="button button-secondary" type="button" data-action="export" data-format="PDF">↓ PDF</button><button class="button button-secondary" type="button" data-action="export" data-format="Excel">↓ Excel</button>`)}<div class="filter-bar"><div class="field grow"><label for="auditQuery">Buscar en auditoría</label><input id="auditQuery" value="${safe(state.auditQuery)}" placeholder="Usuario, acción o detalle"/></div><div class="field"><label for="auditFrom">Desde</label><input id="auditFrom" type="date" value="2026-10-01"/></div><div class="field"><label for="auditTo">Hasta</label><input id="auditTo" type="date" value="2026-10-31"/></div><button class="button button-secondary" type="button" data-action="filter-audit">Consultar</button></div><section class="card"><div class="card-header"><div><h2>Registro de actividad</h2><p>Usuario, fecha y descripción de la acción</p></div><span class="tag">${filtered.length} eventos</span></div><div class="table-wrap"><table><thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Acción</th><th>Detalle</th></tr></thead><tbody>${filtered.map(log => `<tr><td>${safe(log.date)}</td><td><strong>${safe(log.user)}</strong></td><td>${safe(log.action)}</td><td>${safe(log.detail)}</td></tr>`).join('')}</tbody></table></div></section>`;
+    // TODO(CU-03.1, CU-03.2): la consulta y descarga de logs se harán contra el servidor.
+    return `${heading('Auditoría', 'Consulta las acciones registradas en el sistema.', '')}<section class="card"><div class="card-body"><p>La consulta de la bitácora estará disponible próximamente.</p></div></section>`;
   }
 
   function showToast(message, type = 'success') {
@@ -615,38 +585,23 @@
     setTimeout(() => toast.remove(), 3000);
   }
 
-  function addAudit(action, detail) {
-    state.audit.unshift({ date: `${today()} ${new Date().toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: false })}`, user: state.currentUser?.name || $('#activeUser').textContent, action, detail });
-  }
-
   function openModal(title, description, fields, submitLabel, onSubmit) {
     $('#modalRoot').innerHTML = `<div class="modal-backdrop" data-action="backdrop-close"><section class="modal" role="dialog" aria-modal="true" aria-label="${safe(title)}"><div class="modal-header"><div><h2>${safe(title)}</h2><p>${safe(description)}</p></div><button class="modal-close" type="button" data-action="close-modal" aria-label="Cerrar">×</button></div><form id="genericModalForm" class="modal-form"><div class="modal-fields">${fields}</div><div class="modal-actions"><button class="button button-secondary" type="button" data-action="close-modal">Cancelar</button><button class="button button-primary" type="submit">${safe(submitLabel)}</button></div></form></section></div>`;
     $('#genericModalForm').onsubmit = event => { event.preventDefault(); const data = Object.fromEntries(new FormData(event.currentTarget).entries()); if (onSubmit(data) !== false) $('#modalRoot').innerHTML = ''; };
     $('.modal-backdrop').addEventListener('click', event => { if (event.target === $('.modal-backdrop')) $('#modalRoot').innerHTML = ''; });
   }
 
-  function accountFields(account = {}) {
-    const groups = ['Activo', 'Pasivo', 'Patrimonio', 'Desarrollo', 'Egreso', 'Ingreso'];
-    return `<div class="field"><label for="accountCode">Código</label><input id="accountCode" name="code" required value="${safe(account.code || '')}" ${account.code ? 'readonly' : ''}/></div><div class="field"><label for="accountName">Denominación</label><input id="accountName" name="name" required value="${safe(account.name || '')}"/></div><div class="field"><label for="accountGroupModal">Tipo de cuenta</label><select id="accountGroupModal" name="group" required>${groups.map(group => `<option ${account.group === group ? 'selected' : ''}>${group}</option>`).join('')}</select></div><div class="field"><label for="accountNature">Naturaleza</label><select id="accountNature" name="nature"><option ${account.nature === 'Deudora' ? 'selected' : ''}>Deudora</option><option ${account.nature === 'Acreedora' ? 'selected' : ''}>Acreedora</option></select></div><div class="field full"><label for="accountDescription">Descripción</label><textarea id="accountDescription" name="description">${safe(account.description || '')}</textarea></div>`;
-  }
-
-  function withAdminAuthorization(actionLabel, authorizedAction) {
-    if (state.currentUser?.role !== 'Administrador') { showToast('Solo el administrador puede autorizar este cambio.', 'error'); return; }
-    openModal('Autorización de administrador', actionLabel, `<div class="field full"><label for="adminPassword">Contraseña del administrador</label><input id="adminPassword" name="password" type="password" required autocomplete="current-password"/></div>`, 'Continuar', data => {
-      if (data.password !== state.sessionPassword) { showToast('La contraseña del administrador no es correcta.', 'error'); return false; }
-      authorizedAction();
-      return false;
-    });
+  function withAdminAuthorization() {
+    // TODO(CU-06): la autorización de administrador para cambios del catálogo no está definida en la especificación.
+    showToast('La autorización de administrador está pendiente de definición.', 'warning');
   }
 
   function onAction(action, target) {
-    if (['new-user', 'edit-user', 'toggle-user', 'filter-audit'].includes(action) && state.currentUser?.role !== 'Administrador') { showToast('Esta acción está disponible para el administrador.', 'error'); return; }
     if (action === 'simulate-sale') {
       const id = `V-${1049 + Math.max(0, sales.length - 5)}`;
       const amount = 320 + Math.round(Math.random() * 480);
       sales.unshift({ id, date: today(), title: 'Título nuevo', channel: 'Tienda digital', amount, status: 'Pendiente' });
       state.salesTotal += amount;
-      addAudit('Venta agregada', `${id} · ${money(amount)}`);
       page(); showToast('Venta agregada.', 'success');
     }
     if (action === 'add-ledger-row') { $('#movementRows').insertAdjacentHTML('beforeend', movementRowMarkup($$('.ledger-input-row', $('#movementRows')).length + 1)); }
@@ -662,18 +617,7 @@
       page();
     }
     if (action === 'clear-ledger-filter') { state.ledgerFilter = { account: state.ledgerFilter.account || '5101', from: '', to: '' }; page(); }
-    if (action === 'new-account') withAdminAuthorization('Crear una cuenta', () => openModal('Nueva cuenta', '', accountFields(), 'Guardar cuenta', data => {
-      if (accounts.some(account => account.code === data.code)) { showToast('El código ya está registrado.', 'error'); return false; }
-      accounts.push({ ...data, status: 'Activa' }); addAudit('Cuenta creada', `${data.code} · ${data.name}`); page(); showToast('Cuenta agregada al catálogo.', 'success');
-    }));
-    if (action === 'edit-account') {
-      const account = accounts.find(item => item.code === target.dataset.code);
-      if (account) withAdminAuthorization('Modificar una cuenta', () => openModal('Editar cuenta', '', accountFields(account), 'Guardar cambios', data => { Object.assign(account, data); addAudit('Cuenta actualizada', `${account.code} · ${account.name}`); page(); showToast('Cuenta actualizada.', 'success'); }));
-    }
-    if (action === 'toggle-account') {
-      const account = accounts.find(item => item.code === target.dataset.code);
-      if (account) withAdminAuthorization('Cambiar el estado de una cuenta', () => { account.status = account.status === 'Activa' ? 'Inactiva' : 'Activa'; addAudit('Estado de cuenta actualizado', `${account.code} · ${account.status}`); page(); showToast(`Cuenta ${account.status.toLowerCase()}.`, 'success'); });
-    }
+    if (['new-account', 'edit-account', 'toggle-account'].includes(action)) withAdminAuthorization();
     if (action === 'show-trial-balance') { state.ledgerMode = 'trial-balance'; page(); }
     if (action === 'back-ledger') { state.ledgerMode = 'ledger'; page(); }
     if (action === 'refresh-trial-balance') { state.trialBalanceTo = $('#trialBalanceTo').value || today(); page(); }
@@ -688,17 +632,7 @@
     if (action === 'filter-sales') { state.salesQuery = $('#salesQuery').value; page(); }
     if (action === 'post-sale') postSale(target.dataset.sale);
     if (action === 'reconcile') showToast('Consulta de conciliación realizada.', 'success');
-    if (action === 'steam-check') { state.steamStatus = $('#steamStatusSelect').value; addAudit('Estado de Steam API visualizado', state.steamStatus); page(); showToast('Estado de conexión actualizado.', 'success'); }
-    if (action === 'new-user') openModal('Nuevo usuario', 'Captura los datos de acceso y el perfil correspondiente.', `<div class="field"><label>Nombre</label><input name="name" required placeholder="Nombre completo"/></div><div class="field"><label>Usuario</label><input name="username" required placeholder="Identificador de acceso"/></div><div class="field"><label>Perfil</label><select name="profile"><option>Administrador</option><option>Contador General</option><option>Auxiliar Contable</option></select></div><div class="field"><label>Contraseña provisional</label><input name="password" type="password" required placeholder="Contraseña"/></div>`, 'Agregar usuario', data => { users.push({ ...data, status: 'Activo', last: 'Sin acceso' }); addAudit('Usuario creado', `${data.username} · ${data.profile}`); page(); showToast('Usuario agregado.', 'success'); });
-    if (action === 'edit-user') {
-      const user = users[Number(target.dataset.index)];
-      if (user) openModal('Consultar usuario', 'Datos del usuario seleccionado.', `<div class="field"><label>Nombre</label><input name="name" value="${safe(user.name)}" required/></div><div class="field"><label>Usuario</label><input name="username" value="${safe(user.username)}" readonly/></div><div class="field full"><label>Perfil</label><select name="profile"><option ${user.profile === 'Administrador' ? 'selected' : ''}>Administrador</option><option ${user.profile === 'Contador General' ? 'selected' : ''}>Contador General</option><option ${user.profile === 'Auxiliar Contable' ? 'selected' : ''}>Auxiliar Contable</option></select></div>`, 'Guardar cambios', data => { Object.assign(user, data); page(); showToast('Información de usuario actualizada.', 'success'); });
-    }
-    if (action === 'toggle-user') {
-      const user = users[Number(target.dataset.index)];
-      if (user) { user.status = user.status === 'Activo' ? 'Inactivo' : 'Activo'; addAudit('Estado de usuario actualizado', `${user.username} · ${user.status}`); page(); showToast(`Usuario ${user.status.toLowerCase()}.`, 'success'); }
-    }
-    if (action === 'filter-audit') { state.auditQuery = $('#auditQuery').value; page(); }
+    if (action === 'steam-check') { state.steamStatus = $('#steamStatusSelect').value; page(); showToast('Estado de conexión actualizado.', 'success'); }
     if (action === 'close-modal') $('#modalRoot').innerHTML = '';
   }
 
@@ -726,7 +660,6 @@
     });
     state.worksheet = null;
     state.ledgerFilter.account = code;
-    saved.forEach(row => addAudit('Transacción registrada en Libro Mayor', `${row.correlativo} · ${row.code} · ${row.account} · ${row.concept} · ${row.side === 'Cargo' ? 'Debe' : 'Haber'} ${money(row.amount)}${row.reference ? ` · Ref. ${row.reference}` : ''}`));
     page(); showToast(`${saved.length} transacción(es) registradas en Libro Mayor.`, 'success');
   }
 
@@ -750,7 +683,6 @@
     sale.correlativo = nextCorrelative('Comprobante de Ingreso', sale.date);
     ledgerRows.push({ id: state.nextLedgerId++, date: sale.date, code: '5101', account: 'Ingresos por licencias de videojuegos', concept: `Venta ${sale.id} · ${sale.title}`, reference: sale.id, type: 'Comprobante de Ingreso', correlativo: sale.correlativo, side: 'Abono', amount: sale.amount });
     state.worksheet = null;
-    addAudit('Venta registrada en Libro Mayor', `${sale.correlativo} · 5101 · ${sale.id} · Haber ${money(sale.amount)}`);
     page(); showToast('Venta registrada directamente en Libro Mayor.', 'success');
   }
 
@@ -768,7 +700,6 @@
       ledgerRows.push(adjustment);
       state.worksheet = buildWorksheet(sheet.from, sheet.to);
       state.report = 'worksheet';
-      addAudit('Ajuste registrado en Libro Mayor', `${adjustment.correlativo} · ${account.code} · ${adjustment.concept} · ${adjustment.side === 'Cargo' ? 'Debe' : 'Haber'} ${money(adjustment.amount)}`);
       const balanced = worksheetChecks(state.worksheet).every(item => item.ok);
       page();
       showToast(balanced ? `Ajuste ${adjustment.correlativo} guardado.` : `Ajuste ${adjustment.correlativo} guardado; la hoja aún no cuadra.`, balanced ? 'success' : 'warning');
@@ -776,29 +707,8 @@
     }
   }
 
-  $('#loginForm').addEventListener('submit', event => {
-    event.preventDefault();
-    const username = $('#loginUser').value.trim();
-    const password = $('#loginPassword').value;
-    const user = users.find(item => item.username.toLowerCase() === username.toLowerCase() && item.status === 'Activo');
-    if (!user || !password) { $('#loginError').textContent = 'Usuario o contraseña incorrectos.'; return; }
-    $('#loginError').textContent = '';
-    state.currentUser = { username: user.username, name: user.name, role: user.profile };
-    sessionStorage.setItem('sunGamesCurrentUser', JSON.stringify(state.currentUser));
-    state.sessionPassword = password;
-    $('#activeUser').textContent = user.profile === 'Contador General' ? `Bienvenida, ${user.name}` : `Te damos la bienvenida, ${user.name}`;
-    $('.user-meta small').textContent = '';
-    $('.avatar').textContent = user.name.split(/\s+/).slice(0, 2).map(word => word[0]).join('').toUpperCase();
-    $('#loginView').classList.add('is-hidden');
-    $('#appShell').classList.remove('is-hidden');
-    state.audit.unshift({ date: `${today()} ${new Date().toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: false })}`, user: user.name, action: 'Inicio de sesión', detail: 'Acceso al sistema' });
-    setScreen('dashboard');
-  });
-
   $('#logoutButton').addEventListener('click', () => {
-    sessionStorage.removeItem('sunGamesCurrentUser');
     state.currentUser = null;
-    state.sessionPassword = '';
   });
 
   $('#appShell').addEventListener('click', event => {
@@ -841,17 +751,10 @@
     if (!state.currentUser) return;
     const user = state.currentUser;
     $('#activeUser').textContent = user.role === 'Contador General' ? `Bienvenida, ${user.name}` : `Te damos la bienvenida, ${user.name}`;
-    $('.user-meta small').textContent = '';
     $('.avatar').textContent = user.name.split(/\s+/).slice(0, 2).map(word => word[0]).join('').toUpperCase();
   }
 
   function showScreenFromUrl() {
-    const loginPath = new URL(screenUrls.login, window.location.origin).pathname;
-    if (window.location.pathname === loginPath) {
-      $('#loginView').classList.remove('is-hidden');
-      $('#appShell').classList.add('is-hidden');
-      return;
-    }
     if (!state.currentUser) {
       window.location.replace(screenUrls.login);
       return;
@@ -867,8 +770,6 @@
     state.report = params.get('report') || state.report;
     state.operation = params.get('operation') || state.operation;
     state.ledgerMode = params.get('mode') || state.ledgerMode;
-    $('#loginView').classList.add('is-hidden');
-    $('#appShell').classList.remove('is-hidden');
     $('#appShell').dataset.screen = state.current;
     showCurrentUser();
     page();
