@@ -1,6 +1,10 @@
+import secrets
+
 from usuarios.exceptions import UsuarioNoEncontradoError
 from usuarios.models import Usuario
 from usuarios.roles import Rol
+
+CLAVE_NUEVA = secrets.token_urlsafe(16)
 
 
 class UsuarioRepositoryEnMemoria:

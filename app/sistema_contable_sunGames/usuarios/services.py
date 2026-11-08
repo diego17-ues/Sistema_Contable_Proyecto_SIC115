@@ -26,18 +26,18 @@ class UsuarioService:
         self._bitacora = bitacora
         self._transaccion = transaccion
 
-    def agregar(self, actor, *, username, nombre_completo, rol):
-        """CU-02.1: registra un usuario activo con el rol indicado."""
+    def agregar(self, actor, *, username, nombre_completo, rol, contrasena):
+        """CU-02.1: registra un usuario activo con el rol indicado.
+
+        La contraseña inicial la asigna el Administrador y se guarda con hash.
+        """
         self._verificar_administrador(actor)
         self._validar_rol(rol)
         self._validar_username_disponible(username)
         usuario = self._repositorio.nuevo(
             username=username, nombre_completo=nombre_completo, rol=rol
         )
-        # TODO(CU-02.1): definir cómo se establece la contraseña de usuarios
-        # nuevos (pendiente de definir en AGENTS.md). Mientras tanto la
-        # cuenta se crea sin contraseña utilizable.
-        usuario.set_unusable_password()
+        usuario.set_password(contrasena)
         with self._transaccion():
             usuario = self._repositorio.guardar(usuario)
             self._registrar(Accion.ALTA_USUARIO, actor, usuario)

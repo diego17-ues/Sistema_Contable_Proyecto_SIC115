@@ -3,6 +3,8 @@ from django.test import SimpleTestCase
 from usuarios.forms import UsuarioAltaForm
 from usuarios.roles import Rol
 
+from .fakes import CLAVE_NUEVA
+
 
 class UsuarioAltaFormTest(SimpleTestCase):
     """CU-02.1 Formulario de alta."""
@@ -12,6 +14,8 @@ class UsuarioAltaFormTest(SimpleTestCase):
             "username": "jperez",
             "nombre_completo": "Juan Pérez",
             "rol": Rol.CONTADOR_GENERAL,
+            "contrasena": CLAVE_NUEVA,
+            "confirmacion": CLAVE_NUEVA,
         }
         datos.update(cambios)
         return datos
@@ -26,7 +30,8 @@ class UsuarioAltaFormTest(SimpleTestCase):
         form = UsuarioAltaForm(data={})
 
         self.assertFalse(form.is_valid())
-        for campo in ("username", "nombre_completo", "rol"):
+        for campo in ("username", "nombre_completo", "rol", "contrasena",
+                      "confirmacion"):
             self.assertEqual(
                 form.errors[campo], ["Este campo es obligatorio."]
             )
@@ -48,6 +53,37 @@ class UsuarioAltaFormTest(SimpleTestCase):
 
         self.assertFalse(form.is_valid())
         self.assertEqual(form.errors["rol"], ["Seleccione un rol permitido."])
+
+    def test_confirmacion_distinta(self):
+        form = UsuarioAltaForm(data=self.datos(confirmacion="otra-cosa-99"))
+
+        self.assertFalse(form.is_valid())
+        self.assertEqual(
+            form.errors["confirmacion"], ["Las contraseñas no coinciden."]
+        )
+
+    def test_contrasena_debil_rechazada_en_espanol(self):
+        form = UsuarioAltaForm(
+            data=self.datos(contrasena="12345", confirmacion="12345")
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertTrue(
+            any("contraseña" in error for error in form.errors["contrasena"])
+        )
+
+    def test_no_entrega_la_confirmacion_al_servicio(self):
+        form = UsuarioAltaForm(data=self.datos())
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertNotIn("confirmacion", form.cleaned_data)
+        self.assertEqual(form.cleaned_data["contrasena"], CLAVE_NUEVA)
+
+    def test_no_vuelve_a_mostrar_la_contrasena(self):
+        form = UsuarioAltaForm(data=self.datos(username=""))
+
+        self.assertFalse(form.is_valid())
+        self.assertNotIn(CLAVE_NUEVA, str(form))
 
     def test_conserva_los_valores_validos_ante_un_error(self):
         form = UsuarioAltaForm(data=self.datos(username=""))

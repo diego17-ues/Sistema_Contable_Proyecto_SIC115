@@ -7,6 +7,8 @@ from usuarios.models import Usuario
 from usuarios.repositories import UsuarioRepository
 from usuarios.roles import Rol
 
+from .fakes import CLAVE_NUEVA
+
 
 class UsuarioRepositoryTest(TestCase):
     """Integración contra PostgreSQL."""
@@ -91,7 +93,7 @@ class UsuarioServiceIntegracionTest(TestCase):
     def test_alta_y_desactivacion_no_borran_el_registro(self):
         self.servicio.agregar(
             self.admin, username="jperez", nombre_completo="Juan Pérez",
-            rol=Rol.CONTADOR_GENERAL,
+            contrasena=CLAVE_NUEVA, rol=Rol.CONTADOR_GENERAL,
         )
         total = Usuario.objects.count()
 
@@ -100,17 +102,17 @@ class UsuarioServiceIntegracionTest(TestCase):
         self.assertEqual(Usuario.objects.count(), total)
         guardado = Usuario.objects.get(username="jperez")
         self.assertFalse(guardado.activo)
-        self.assertFalse(guardado.has_usable_password())
+        self.assertTrue(guardado.check_password(CLAVE_NUEVA))
 
     def test_alta_duplicada_no_crea_otra_cuenta(self):
         self.servicio.agregar(
             self.admin, username="jperez", nombre_completo="Juan Pérez",
-            rol=Rol.CONTADOR_GENERAL,
+            contrasena=CLAVE_NUEVA, rol=Rol.CONTADOR_GENERAL,
         )
 
         with self.assertRaises(UsuarioDuplicadoError):
             self.servicio.agregar(
                 self.admin, username="jperez", nombre_completo="Otro",
-                rol=Rol.ADMINISTRADOR,
+                contrasena=CLAVE_NUEVA, rol=Rol.ADMINISTRADOR,
             )
         self.assertEqual(Usuario.objects.filter(username="jperez").count(), 1)

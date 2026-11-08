@@ -245,20 +245,26 @@ class AdministracionIntegracionTests(TestCase):
         self.assertEqual(respuesta.status_code, 403)
         self.assertTrue(Usuario.objects.get(username="admin").activo)
 
-    def test_alta_crea_cuenta_sin_contrasena_y_registra(self):
+    def test_alta_crea_cuenta_con_contrasena_y_registra(self):
         self.client.force_login(self.admin)
 
         respuesta = self.client.post(reverse("usuario_nuevo"), {
             "username": "nuevo", "nombre_completo": "Nuevo Usuario",
-            "rol": Rol.CONTADOR_GENERAL,
+            "rol": Rol.CONTADOR_GENERAL, "contrasena": CLAVE,
+            "confirmacion": CLAVE,
         })
 
         self.assertRedirects(respuesta, reverse("users"))
         nuevo = Usuario.objects.get(username="nuevo")
-        self.assertFalse(nuevo.has_usable_password())
+        self.assertTrue(nuevo.check_password(CLAVE))
         registro = RegistroBitacora.objects.latest("id")
         self.assertEqual(registro.accion, Accion.ALTA_USUARIO)
         self.assertEqual(registro.afectado, nuevo)
+        self.client.logout()
+        login = self.client.post(
+            reverse("login"), {"username": "nuevo", "password": CLAVE}
+        )
+        self.assertRedirects(login, reverse("dashboard"))
 
     def test_alta_duplicada_se_senala_junto_al_campo(self):
         self.client.force_login(self.admin)

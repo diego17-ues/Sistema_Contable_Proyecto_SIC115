@@ -15,6 +15,7 @@ from usuarios.roles import Rol
 from usuarios.services import UsuarioService
 
 from .fakes import (
+    CLAVE_NUEVA,
     BitacoraEnMemoria,
     UsuarioRepositoryEnMemoria,
     crear_usuario,
@@ -36,7 +37,7 @@ class AgregarUsuarioTest(BaseServicioTest):
             self.admin,
             username="jperez",
             nombre_completo="Juan Pérez",
-            rol=Rol.CONTADOR_GENERAL,
+            contrasena=CLAVE_NUEVA, rol=Rol.CONTADOR_GENERAL,
         )
 
         self.assertEqual(usuario.username, "jperez")
@@ -45,26 +46,27 @@ class AgregarUsuarioTest(BaseServicioTest):
         self.assertTrue(usuario.activo)
         self.assertTrue(self.repositorio.existe_username("jperez"))
 
-    def test_cuenta_nueva_sin_contrasena_utilizable(self):
+    def test_cuenta_nueva_con_la_contrasena_asignada(self):
         usuario = self.servicio.agregar(
             self.admin,
             username="jperez",
             nombre_completo="Juan Pérez",
-            rol=Rol.CONTADOR_GENERAL,
+            contrasena=CLAVE_NUEVA, rol=Rol.CONTADOR_GENERAL,
         )
 
-        self.assertIs(usuario.has_usable_password(), False)
+        self.assertTrue(usuario.check_password(CLAVE_NUEVA))
+        self.assertNotEqual(usuario.password, CLAVE_NUEVA)
 
     def test_rechaza_username_duplicado(self):
         self.servicio.agregar(
             self.admin, username="jperez", nombre_completo="Juan",
-            rol=Rol.CONTADOR_GENERAL,
+            contrasena=CLAVE_NUEVA, rol=Rol.CONTADOR_GENERAL,
         )
 
         with self.assertRaises(UsuarioDuplicadoError):
             self.servicio.agregar(
                 self.admin, username="jperez", nombre_completo="Otro",
-                rol=Rol.ADMINISTRADOR,
+                contrasena=CLAVE_NUEVA, rol=Rol.ADMINISTRADOR,
             )
 
     def test_rechaza_rol_no_valido(self):
@@ -72,7 +74,7 @@ class AgregarUsuarioTest(BaseServicioTest):
             with self.subTest(rol=rol), self.assertRaises(RolInvalidoError):
                 self.servicio.agregar(
                     self.admin, username="jperez", nombre_completo="Juan",
-                    rol=rol,
+                    contrasena=CLAVE_NUEVA, rol=rol,
                 )
         self.assertFalse(self.repositorio.existe_username("jperez"))
 
@@ -82,7 +84,7 @@ class AgregarUsuarioTest(BaseServicioTest):
         with self.assertRaises(RolNoAutorizadoError):
             self.servicio.agregar(
                 contador, username="jperez", nombre_completo="Juan",
-                rol=Rol.CONTADOR_GENERAL,
+                contrasena=CLAVE_NUEVA, rol=Rol.CONTADOR_GENERAL,
             )
         self.assertFalse(self.repositorio.existe_username("jperez"))
 
@@ -92,7 +94,7 @@ class AgregarUsuarioTest(BaseServicioTest):
         with self.assertRaises(UsuarioInactivoError):
             self.servicio.agregar(
                 admin_inactivo, username="jperez", nombre_completo="Juan",
-                rol=Rol.CONTADOR_GENERAL,
+                contrasena=CLAVE_NUEVA, rol=Rol.CONTADOR_GENERAL,
             )
 
     def test_no_llama_a_crear_si_el_username_existe(self):
@@ -103,30 +105,30 @@ class AgregarUsuarioTest(BaseServicioTest):
         with self.assertRaises(UsuarioDuplicadoError):
             servicio.agregar(
                 self.admin, username="jperez", nombre_completo="Juan",
-                rol=Rol.CONTADOR_GENERAL,
+                contrasena=CLAVE_NUEVA, rol=Rol.CONTADOR_GENERAL,
             )
         repositorio.existe_username.assert_called_once_with("jperez")
         repositorio.guardar.assert_not_called()
 
-    def test_invalida_la_contrasena_antes_de_guardar(self):
+    def test_asigna_la_contrasena_antes_de_guardar(self):
         repositorio = Mock(spec=UsuarioRepository)
         repositorio.existe_username.return_value = False
         usuario = repositorio.nuevo.return_value
-        usuario.set_unusable_password.side_effect = (
-            lambda: repositorio.guardar.assert_not_called()
+        usuario.set_password.side_effect = (
+            lambda _: repositorio.guardar.assert_not_called()
         )
         servicio = UsuarioService(repositorio, BitacoraEnMemoria())
 
         resultado = servicio.agregar(
             self.admin, username="jperez", nombre_completo="Juan",
-            rol=Rol.CONTADOR_GENERAL,
+            contrasena=CLAVE_NUEVA, rol=Rol.CONTADOR_GENERAL,
         )
 
         repositorio.nuevo.assert_called_once_with(
             username="jperez", nombre_completo="Juan",
             rol=Rol.CONTADOR_GENERAL,
         )
-        usuario.set_unusable_password.assert_called_once_with()
+        usuario.set_password.assert_called_once_with(CLAVE_NUEVA)
         repositorio.guardar.assert_called_once_with(usuario)
         self.assertIs(resultado, repositorio.guardar.return_value)
 
@@ -195,7 +197,7 @@ class ListarUsuariosTest(BaseServicioTest):
     def test_lista_usuarios_registrados(self):
         self.servicio.agregar(
             self.admin, username="jperez", nombre_completo="Juan",
-            rol=Rol.CONTADOR_GENERAL,
+            contrasena=CLAVE_NUEVA, rol=Rol.CONTADOR_GENERAL,
         )
 
         usernames = [u.username for u in self.servicio.listar(self.admin)]
@@ -225,13 +227,13 @@ class BitacoraDeUsuariosTest(SimpleTestCase):
         self.repositorio = UsuarioRepositoryEnMemoria([self.admin])
         self.servicio = UsuarioService(self.repositorio, self.bitacora)
 
-    def test_alta_sin_contrasena_utilizable_y_registrada(self):
+    def test_alta_con_contrasena_asignada_y_registrada(self):
         usuario = self.servicio.agregar(
             self.admin, username="nuevo", nombre_completo="Nuevo",
-            rol=Rol.CONTADOR_GENERAL,
+            contrasena=CLAVE_NUEVA, rol=Rol.CONTADOR_GENERAL,
         )
 
-        self.assertIs(usuario.has_usable_password(), False)
+        self.assertTrue(usuario.check_password(CLAVE_NUEVA))
         self.assertTrue(usuario.activo)
         self.assertEqual(self.bitacora.registros, [{
             "accion": Accion.ALTA_USUARIO, "resultado": Resultado.EXITOSO,
@@ -242,7 +244,7 @@ class BitacoraDeUsuariosTest(SimpleTestCase):
         with self.assertRaises(UsuarioDuplicadoError):
             self.servicio.agregar(
                 self.admin, username="admin", nombre_completo="Otro",
-                rol=Rol.ADMINISTRADOR,
+                contrasena=CLAVE_NUEVA, rol=Rol.ADMINISTRADOR,
             )
         self.assertEqual(self.bitacora.registros, [])
 

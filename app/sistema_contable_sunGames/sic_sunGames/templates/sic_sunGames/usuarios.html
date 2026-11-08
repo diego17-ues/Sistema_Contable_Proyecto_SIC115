@@ -31,7 +31,7 @@
 {% block modal %}
 {% if form %}
 <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Nuevo usuario">
-  <div class="modal-header"><div><h2>Nuevo usuario</h2><p>Captura el nombre de usuario, el nombre completo y el rol.</p></div><a class="modal-close" href="{% url 'users' %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-header"><div><h2>Nuevo usuario</h2><p>Captura el nombre de usuario, el nombre completo, la contraseña inicial y el rol.</p></div><a class="modal-close" href="{% url 'users' %}" aria-label="Cerrar">×</a></div>
   <form class="modal-form" method="post" action="{% url 'usuario_nuevo' %}" novalidate>
     {% csrf_token %}
     <div class="modal-fields">
