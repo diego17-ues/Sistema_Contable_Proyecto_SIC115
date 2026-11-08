@@ -738,8 +738,7 @@ Documento de trabajo para prototipado | Sistema Contable SunGames
 
 #### **Descripción** 
 
-Permite registrar cada movimiento contable directamente en el Libro Mayor y consultar movimientos y saldos. No requiere un registro agrupador ni que movimientos separados se compensen entre sí. 
-
+Permite registrar movimientos contables sobre cuentas de detalle. Cada movimiento tiene cuenta, fecha, concepto e importe firmado. Varios movimientos pueden agruparse en una transacción para consulta. El sistema valida cada movimiento, pero no exige que las transacciones cuadren al registrarse: esa verificación corresponde al Balance de comprobación.
 #### **Pantallas del caso** 
 
 #### **Registro y consulta del Libro Mayor** 
