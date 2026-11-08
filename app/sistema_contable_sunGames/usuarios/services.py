@@ -1,3 +1,5 @@
+from contextlib import nullcontext
+
 from bitacora.eventos import Accion, Resultado
 
 from .exceptions import (
@@ -7,6 +9,7 @@ from .exceptions import (
     RolInvalidoError,
     RolNoAutorizadoError,
     ServicioAutenticacionError,
+    UsuarioActivoError,
     UsuarioDuplicadoError,
     UsuarioInactivoError,
     UsuarioNoEncontradoError,
@@ -19,24 +22,27 @@ class UsuarioService:
 
     ROLES_ASIGNABLES = frozenset(Rol.values)
 
-    def __init__(self, repositorio):
+    def __init__(self, repositorio, bitacora, transaccion=nullcontext):
         self._repositorio = repositorio
+        self._bitacora = bitacora
+        self._transaccion = transaccion
 
-    def agregar(self, actor, *, username, nombre_completo, rol):
-        """CU-02.1: registra un usuario activo con el rol indicado."""
+    def agregar(self, actor, *, username, nombre_completo, rol, contrasena):
+        """CU-02.1: registra un usuario activo con el rol indicado.
+
+        La contraseña inicial la asigna el Administrador y se guarda con hash.
+        """
         self._verificar_administrador(actor)
         self._validar_rol(rol)
         self._validar_username_disponible(username)
         usuario = self._repositorio.nuevo(
             username=username, nombre_completo=nombre_completo, rol=rol
         )
-        # TODO(CU-02.1): definir cómo se establece la contraseña de usuarios
-        # nuevos (pendiente de definir en AGENTS.md). Mientras tanto la
-        # cuenta se crea sin contraseña utilizable.
-        usuario.set_unusable_password()
-        # TODO(CU-03): registrar el alta en la bitácora mediante
-        # BitacoraService, dentro de transaction.atomic().
-        return self._repositorio.guardar(usuario)
+        usuario.set_password(contrasena)
+        with self._transaccion():
+            usuario = self._repositorio.guardar(usuario)
+            self._registrar(Accion.ALTA_USUARIO, actor, usuario)
+        return usuario
 
     def desactivar(self, actor, username):
         """CU-02.2: cambia el estado a inactivo; el registro se conserva."""
@@ -44,14 +50,50 @@ class UsuarioService:
         usuario = self._repositorio.obtener_por_username(username)
         if not usuario.activo:
             raise UsuarioInactivoError("El usuario ya está inactivo.")
-        # TODO(CU-03): registrar la desactivación en la bitácora mediante
-        # BitacoraService, dentro de transaction.atomic().
-        return self._repositorio.actualizar_estado(usuario, activo=False)
+        with self._transaccion():
+            usuario = self._repositorio.actualizar_estado(
+                usuario, activo=False
+            )
+            self._registrar(Accion.DESACTIVACION_USUARIO, actor, usuario)
+        return usuario
+
+    def reactivar(self, actor, username):
+        """Vuelve a habilitar una cuenta inactiva; su historial se conserva."""
+        self._verificar_administrador(actor)
+        usuario = self._repositorio.obtener_por_username(username)
+        if usuario.activo:
+            raise UsuarioActivoError()
+        with self._transaccion():
+            usuario = self._repositorio.actualizar_estado(
+                usuario, activo=True
+            )
+            self._registrar(Accion.REACTIVACION_USUARIO, actor, usuario)
+        return usuario
+
+    def cambiar_contrasena(self, actor, username, contrasena):
+        """Asigna una nueva contraseña; los demás datos no cambian."""
+        self._verificar_administrador(actor)
+        usuario = self._repositorio.obtener_por_username(username)
+        usuario.set_password(contrasena)
+        with self._transaccion():
+            usuario = self._repositorio.guardar_contrasena(usuario)
+            self._registrar(Accion.CAMBIO_CONTRASENA, actor, usuario)
+        return usuario
 
     def listar(self, actor):
         """CU-02.3: devuelve los usuarios registrados sin modificarlos."""
         self._verificar_administrador(actor)
         return self._repositorio.listar()
+
+    def obtener(self, actor, username):
+        """CU-02.3: devuelve la ficha de un usuario sin modificarla."""
+        self._verificar_administrador(actor)
+        return self._repositorio.obtener_por_username(username)
+
+    def _registrar(self, accion, actor, afectado):
+        self._bitacora.registrar(
+            accion, Resultado.EXITOSO, actor=actor, afectado=afectado
+        )
 
     @staticmethod
     def _verificar_administrador(actor):
@@ -136,14 +178,16 @@ class AutenticacionService:
 class AccesoService:
     """Área inicial y módulos autorizados por rol (CU-01)."""
 
-    AREA_INICIAL = {Rol.CONTADOR_GENERAL: "dashboard"}
+    AREA_INICIAL = {
+        Rol.CONTADOR_GENERAL: "dashboard",
+        Rol.ADMINISTRADOR: "users",
+    }
+    MODULOS_CONTADOR_GENERAL = frozenset(
+        {"dashboard", "ledger", "accounts", "reports", "operations"}
+    )
     MODULOS = {
-        Rol.CONTADOR_GENERAL: frozenset(
-            {"dashboard", "ledger", "accounts", "reports", "operations"}
-        ),
-        # TODO(CU-01): el Administrador no tiene área inicial ni módulos
-        # hasta que existan sus templates (CU-02, CU-03).
-        Rol.ADMINISTRADOR: frozenset(),
+        Rol.CONTADOR_GENERAL: MODULOS_CONTADOR_GENERAL,
+        Rol.ADMINISTRADOR: MODULOS_CONTADOR_GENERAL | {"users", "audit"},
     }
 
     def area_inicial(self, usuario):

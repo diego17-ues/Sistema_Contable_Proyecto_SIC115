@@ -29,12 +29,11 @@ def panel(request):
     return redirect("login")
 
 
-@login_required
-def render_screen(request, screen):
-    if screen not in SCREEN_URL_NAMES:
-        raise Http404
+def contexto_panel(request, screen):
+    """Verifica el acceso al módulo y arma el contexto común del panel."""
+    acceso = crear_acceso_service()
     try:
-        crear_acceso_service().verificar_acceso(request.user, screen)
+        acceso.verificar_acceso(request.user, screen)
     except UsuarioError as error:
         raise PermissionDenied(str(error)) from error
 
@@ -46,16 +45,22 @@ def render_screen(request, screen):
             for name, route_name in SCREEN_URL_NAMES.items()
         },
     }
-    return render(
-        request,
-        "sic_sunGames/index.html",
-        {
-            "initial_screen": screen,
-            "screen_urls": screen_urls,
-            "logo_url": static("sic_sunGames/SunGames_Logo.png"),
-            "usuario_actual": {
-                "name": request.user.nombre_completo,
-                "role": request.user.get_rol_display(),
-            },
+    return {
+        "initial_screen": screen,
+        "screen_urls": screen_urls,
+        "logo_url": static("sic_sunGames/SunGames_Logo.png"),
+        "modulos": sorted(acceso.modulos(request.user)),
+        "usuario_actual": {
+            "name": request.user.nombre_completo,
+            "role": request.user.get_rol_display(),
         },
+    }
+
+
+@login_required
+def render_screen(request, screen):
+    if screen not in SCREEN_URL_NAMES:
+        raise Http404
+    return render(
+        request, "sic_sunGames/index.html", contexto_panel(request, screen)
     )

@@ -36,3 +36,7 @@ class UsuarioRepository:
         usuario.activo = activo
         usuario.save(update_fields=["activo"])
         return usuario
+
+    def guardar_contrasena(self, usuario):
+        usuario.save(update_fields=["password"])
+        return usuario

@@ -37,11 +37,11 @@
             </button>
           </div>
         </header>
-        <div id="appContent" class="page-content"></div>
+        <div id="appContent" class="page-content"{% block server_rendered %}{% endblock %}>{% block page_content %}{% endblock %}</div>
       </main>
     </div>
 
-    <div id="modalRoot"></div>
+    <div id="modalRoot">{% block modal %}{% endblock %}</div>
     <div id="toastRoot" class="toast-root" aria-live="polite"></div>
 {% endblock %}
 
@@ -49,5 +49,7 @@
   {{ screen_urls|json_script:"screenUrls" }}
   {{ logo_url|json_script:"logoUrl" }}
   {{ usuario_actual|json_script:"currentUser" }}
-  <script src="{% static 'sic_sunGames/app.js' %}?v=20261107-1"></script>
+  {{ modulos|json_script:"modulos" }}
+  <script id="serverMessages" type="application/json">[{% for message in messages %}{"text": "{{ message|escapejs }}", "level": "{{ message.tags|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]</script>
+  <script src="{% static 'sic_sunGames/app.js' %}?v=20261108-2"></script>
 {% endblock %}

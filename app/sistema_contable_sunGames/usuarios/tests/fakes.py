@@ -1,6 +1,10 @@
+import secrets
+
 from usuarios.exceptions import UsuarioNoEncontradoError
 from usuarios.models import Usuario
 from usuarios.roles import Rol
+
+CLAVE_NUEVA = secrets.token_urlsafe(16)
 
 
 class UsuarioRepositoryEnMemoria:
@@ -34,6 +38,9 @@ class UsuarioRepositoryEnMemoria:
         usuario.activo = activo
         return usuario
 
+    def guardar_contrasena(self, usuario):
+        return usuario
+
 
 def crear_usuario(username="admin", rol=Rol.ADMINISTRADOR, activo=True):
     return Usuario(
@@ -42,3 +49,20 @@ def crear_usuario(username="admin", rol=Rol.ADMINISTRADOR, activo=True):
         rol=rol,
         activo=activo,
     )
+
+
+class BitacoraEnMemoria:
+    """Implementación en memoria de BitacoraService.registrar()."""
+
+    def __init__(self):
+        self.registros = []
+
+    def registrar(self, accion, resultado, *, actor=None, afectado=None):
+        self.registros.append(
+            {
+                "accion": accion,
+                "resultado": resultado,
+                "actor": actor,
+                "afectado": afectado,
+            }
+        )
