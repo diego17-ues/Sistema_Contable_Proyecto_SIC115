@@ -75,6 +75,7 @@ Implementar únicamente los casos indicados aquí. Todo lo demás queda fuera.
 - Las tasas e impuestos se usan solo si están verificados y configurados como parámetros. No fijarlos en el código.
 - Mobiliario y equipo se capitaliza a partir de USD 500.
 - El Balance de Comprobación no se bloquea por desigualdad entre columnas debe y haber.
+- Código de cuenta de 4 dígitos: posición 1 rubro, posición 2 naturaleza, posiciones 3 y 4 número de cuenta dentro del grupo (01 a 99). El código lo asigna el servicio, nunca el usuario. Un código dado de baja no se reutiliza.
 
 ## Eliminaciones
 
@@ -131,3 +132,13 @@ Los pasos completos de instalación están en `README.md`.
 - No agregar funciones de costos, estimaciones ni roles diferidos.
 - No trabajar directamente en `main`.
 - No poner lógica de negocio en vistas, templates, formularios ni señales de Django.
+
+**Administrador:**
+- CU-01 Iniciar sesión (compartido por todos los roles)
+- CU-02 Administrar Usuarios, con CU-02.1, CU-02.2 y CU-02.3
+- CU-03 Control de Auditoría, con CU-03.1, CU-03.2, CU-03.2.1 y CU-03.2.2
+- CU-06 Catálogo de Cuentas: consulta, registro, modificación y baja. Excepción a la especificación, que asigna registro y modificación al Contador General.
+
+**Contador General:**
+- CU-04, CU-05, CU-07, CU-08 (con sus subcasos)
+- CU-06 Catálogo de Cuentas: solo consulta.
