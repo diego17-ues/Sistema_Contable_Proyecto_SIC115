@@ -42,3 +42,20 @@ def crear_usuario(username="admin", rol=Rol.ADMINISTRADOR, activo=True):
         rol=rol,
         activo=activo,
     )
+
+
+class BitacoraEnMemoria:
+    """Implementación en memoria de BitacoraService.registrar()."""
+
+    def __init__(self):
+        self.registros = []
+
+    def registrar(self, accion, resultado, *, actor=None, afectado=None):
+        self.registros.append(
+            {
+                "accion": accion,
+                "resultado": resultado,
+                "actor": actor,
+                "afectado": afectado,
+            }
+        )

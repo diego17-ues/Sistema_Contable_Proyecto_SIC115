@@ -3,6 +3,8 @@ from django.db import models
 
 class Accion(models.TextChoices):
     INICIO_SESION = "INICIO_SESION", "Inicio de sesión"
+    ALTA_USUARIO = "ALTA_USUARIO", "Alta de usuario"
+    DESACTIVACION_USUARIO = "DESACTIVACION_USUARIO", "Desactivación de usuario"
 
 
 class Resultado(models.TextChoices):

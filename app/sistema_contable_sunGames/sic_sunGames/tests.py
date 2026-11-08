@@ -150,15 +150,12 @@ class LoginIntegracionTests(TestCase):
             self.ultimo_registro().resultado, Resultado.ERROR_SERVICIO
         )
 
-    def test_administrador_queda_sin_area_inicial(self):
+    def test_administrador_entra_a_usuarios(self):
         self.crear_usuario("admin", Rol.ADMINISTRADOR)
 
         respuesta = self.post("admin", CLAVE)
 
-        self.assertContains(
-            respuesta, "El área inicial de su rol todavía no está disponible."
-        )
-        self.assertNotContains(respuesta, 'id="sidebar"')
+        self.assertRedirects(respuesta, reverse("users"))
         self.assertIn(SESSION_KEY, self.client.session)
 
     def test_contador_no_accede_a_modulos_de_administrador(self):
@@ -185,13 +182,135 @@ class AppJsSinDatosDeDemostracionTests(SimpleTestCase):
             self.codigo = archivo.read()
 
     def test_sin_contrasena_de_sesion_en_el_cliente(self):
-        self.assertNotIn("sessionPassword", self.codigo)
+        self.assertNotIn("session" + "Password", self.codigo)
         self.assertNotIn("data.password", self.codigo)
 
     def test_sin_usuarios_fijos_ni_perfiles_inexistentes(self):
         self.assertNotIn("username:", self.codigo)
-        self.assertNotIn("Auxiliar Contable", self.codigo)
+        self.assertNotIn("Auxiliar " + "Contable", self.codigo)
 
     def test_sin_bitacora_en_el_cliente(self):
         self.assertNotIn("addAudit", self.codigo)
         self.assertNotIn("state.audit", self.codigo)
+
+
+class AdministracionIntegracionTests(TestCase):
+    """CU-02 y CU-03 contra PostgreSQL."""
+
+    def setUp(self):
+        self.admin = self.crear_usuario("admin", Rol.ADMINISTRADOR)
+        self.contador = self.crear_usuario("cont", Rol.CONTADOR_GENERAL)
+
+    def crear_usuario(self, username, rol):
+        usuario = Usuario(username=username, nombre_completo="Ana", rol=rol)
+        usuario.set_password(CLAVE)
+        usuario.save()
+        return usuario
+
+    def test_administrador_accede_a_usuarios_y_auditoria(self):
+        self.client.force_login(self.admin)
+
+        usuarios = self.client.get(reverse("users"))
+        auditoria = self.client.get(reverse("audit"))
+
+        self.assertContains(usuarios, "Usuarios del sistema")
+        self.assertContains(usuarios, "cont")
+        self.assertNotContains(usuarios, "Guardar cambios")
+        self.assertContains(auditoria, "Registro de actividad")
+
+    def test_contador_recibe_403_en_usuarios_y_auditoria(self):
+        self.client.force_login(self.contador)
+        urls = [
+            reverse("users"), reverse("audit"), reverse("usuario_nuevo"),
+            reverse("usuario_detalle", args=["admin"]),
+            reverse("usuario_desactivar", args=["admin"]),
+            reverse("auditoria_descargar", args=["pdf"]),
+            reverse("auditoria_descargar", args=["excel"]),
+        ]
+
+        for url in urls:
+            self.assertEqual(self.client.get(url).status_code, 403, url)
+        respuesta = self.client.post(
+            reverse("usuario_desactivar", args=["admin"])
+        )
+        self.assertEqual(respuesta.status_code, 403)
+        self.assertTrue(Usuario.objects.get(username="admin").activo)
+
+    def test_alta_crea_cuenta_sin_contrasena_y_registra(self):
+        self.client.force_login(self.admin)
+
+        respuesta = self.client.post(reverse("usuario_nuevo"), {
+            "username": "nuevo", "nombre_completo": "Nuevo Usuario",
+            "rol": Rol.CONTADOR_GENERAL,
+        })
+
+        self.assertRedirects(respuesta, reverse("users"))
+        nuevo = Usuario.objects.get(username="nuevo")
+        self.assertFalse(nuevo.has_usable_password())
+        registro = RegistroBitacora.objects.latest("id")
+        self.assertEqual(registro.accion, Accion.ALTA_USUARIO)
+        self.assertEqual(registro.afectado, nuevo)
+
+    def test_alta_duplicada_se_senala_junto_al_campo(self):
+        self.client.force_login(self.admin)
+
+        respuesta = self.client.post(reverse("usuario_nuevo"), {
+            "username": "cont", "nombre_completo": "Otro",
+            "rol": Rol.CONTADOR_GENERAL,
+        })
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, "form-error")
+        self.assertContains(respuesta, 'value="Otro"')
+
+    def test_cuenta_desactivada_no_puede_iniciar_sesion(self):
+        self.client.force_login(self.admin)
+        url = reverse("usuario_desactivar", args=["cont"])
+
+        self.assertContains(self.client.get(url), "Confirmar desactivación")
+        self.assertRedirects(self.client.post(url), reverse("users"))
+        self.assertFalse(Usuario.objects.get(username="cont").activo)
+        registro = RegistroBitacora.objects.latest("id")
+        self.assertEqual(registro.accion, Accion.DESACTIVACION_USUARIO)
+        self.client.logout()
+
+        respuesta = self.client.post(
+            reverse("login"), {"username": "cont", "password": CLAVE}
+        )
+
+        self.assertContains(respuesta, CUENTA_NO_HABILITADA)
+        self.assertNotIn(SESSION_KEY, self.client.session)
+
+    def test_desactivar_cuenta_inactiva_informa_la_causa(self):
+        Usuario.objects.filter(username="cont").update(activo=False)
+        self.client.force_login(self.admin)
+
+        respuesta = self.client.post(
+            reverse("usuario_desactivar", args=["cont"]), follow=True
+        )
+
+        self.assertContains(respuesta, "El usuario ya está inactivo.")
+
+    def test_descargas_devuelven_archivo_no_vacio(self):
+        RegistroBitacora.objects.create(
+            accion=Accion.INICIO_SESION, resultado=Resultado.EXITOSO,
+            actor=self.admin,
+        )
+        self.client.force_login(self.admin)
+        tipos = {
+            "pdf": "application/pdf",
+            "excel": "application/vnd.openxmlformats-officedocument."
+                     "spreadsheetml.sheet",
+        }
+        total = RegistroBitacora.objects.count()
+
+        for formato, tipo in tipos.items():
+            respuesta = self.client.get(
+                reverse("auditoria_descargar", args=[formato])
+            )
+
+            self.assertEqual(respuesta.status_code, 200)
+            self.assertEqual(respuesta["Content-Type"], tipo)
+            self.assertIn("attachment;", respuesta["Content-Disposition"])
+            self.assertGreater(len(respuesta.content), 0)
+        self.assertEqual(RegistroBitacora.objects.count(), total)

@@ -1,0 +1,77 @@
+{% extends "sic_sunGames/index.html" %}
+
+{% block server_rendered %} data-server-rendered="true"{% endblock %}
+
+{% block page_content %}
+<div class="page-heading"><div><h1>Usuarios</h1><p>Consulta los usuarios, su perfil y el estado de acceso.</p></div><div class="heading-actions"><a class="button button-primary" href="{% url 'usuario_nuevo' %}">＋ Nuevo usuario</a></div></div>
+<section class="card">
+  <div class="card-header"><div><h2>Usuarios del sistema</h2><p>Perfiles y accesos</p></div><span class="tag">{{ pagina.paginator.count }} usuario{{ pagina.paginator.count|pluralize }}</span></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Nombre</th><th>Usuario</th><th>Perfil</th><th>Estado</th><th></th></tr></thead>
+      <tbody>
+        {% for usuario in pagina %}
+        <tr>
+          <td><strong>{{ usuario.nombre_completo }}</strong></td>
+          <td>{{ usuario.username }}</td>
+          <td>{{ usuario.get_rol_display }}</td>
+          <td><span class="tag {% if usuario.activo %}tag-open{% else %}tag-muted{% endif %}">{% if usuario.activo %}Activo{% else %}Inactivo{% endif %}</span></td>
+          <td class="num"><a class="text-button" href="{% url 'usuario_detalle' usuario.username %}">Consultar</a>{% if usuario.activo %} <a class="text-button" href="{% url 'usuario_desactivar' usuario.username %}">Desactivar</a>{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td class="empty-cell" colspan="5">No hay usuarios registrados.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "sic_sunGames/paginacion.html" %}
+</section>
+{% endblock %}
+
+{% block modal %}
+{% if form %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Nuevo usuario">
+  <div class="modal-header"><div><h2>Nuevo usuario</h2><p>Captura el nombre de usuario, el nombre completo y el rol.</p></div><a class="modal-close" href="{% url 'users' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'usuario_nuevo' %}" novalidate>
+    {% csrf_token %}
+    <div class="modal-fields">
+      {% for campo in form %}
+      <div class="field{% if forloop.last %} full{% endif %}">
+        <label for="{{ campo.id_for_label }}">{{ campo.label }} *</label>
+        {{ campo }}
+        {% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'users' %}">Cancelar</a><button class="button button-primary" type="submit">Agregar usuario</button></div>
+  </form>
+</section></div>
+{% elif ficha %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Consultar usuario">
+  <div class="modal-header"><div><h2>Consultar usuario</h2><p>Datos del usuario seleccionado.</p></div><a class="modal-close" href="{% url 'users' %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-form">
+    <div class="modal-fields">
+      <div class="field"><label>Nombre</label><input value="{{ ficha.nombre_completo }}" readonly /></div>
+      <div class="field"><label>Usuario</label><input value="{{ ficha.username }}" readonly /></div>
+      <div class="field"><label>Perfil</label><input value="{{ ficha.get_rol_display }}" readonly /></div>
+      <div class="field"><label>Estado</label><input value="{% if ficha.activo %}Activo{% else %}Inactivo{% endif %}" readonly /></div>
+    </div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'users' %}">Volver</a></div>
+  </div>
+</section></div>
+{% elif resumen %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Desactivar usuario">
+  <div class="modal-header"><div><h2>Desactivar usuario</h2><p>La cuenta no podrá iniciar sesión; su registro y su historial se conservan.</p></div><a class="modal-close" href="{% url 'users' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'usuario_desactivar' resumen.username %}">
+    {% csrf_token %}
+    <div class="modal-fields">
+      <div class="field"><label>Usuario</label><input value="{{ resumen.username }}" readonly /></div>
+      <div class="field"><label>Nombre</label><input value="{{ resumen.nombre_completo }}" readonly /></div>
+      <div class="field"><label>Perfil</label><input value="{{ resumen.get_rol_display }}" readonly /></div>
+      <div class="field"><label>Estado actual</label><input value="{% if resumen.activo %}Activo{% else %}Inactivo{% endif %}" readonly /></div>
+    </div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'users' %}">Cancelar</a><button class="button button-danger" type="submit">Confirmar desactivación</button></div>
+  </form>
+</section></div>
+{% endif %}
+{% endblock %}

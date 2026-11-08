@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import auth, pages
+from .views import administracion, auth, pages
 
 urlpatterns = [
     path("", pages.index, name="index"),
@@ -12,6 +12,10 @@ urlpatterns = [
     path("panel/catalogo-cuentas/", pages.render_screen, {"screen": "accounts"}, name="accounts"),
     path("panel/estados-financieros/", pages.render_screen, {"screen": "reports"}, name="reports"),
     path("panel/ventas-costos/", pages.render_screen, {"screen": "operations"}, name="operations"),
-    path("panel/usuarios/", pages.render_screen, {"screen": "users"}, name="users"),
-    path("panel/auditoria/", pages.render_screen, {"screen": "audit"}, name="audit"),
+    path("panel/usuarios/", administracion.usuarios, name="users"),
+    path("panel/usuarios/nuevo/", administracion.usuario_nuevo, name="usuario_nuevo"),
+    path("panel/usuarios/<str:username>/", administracion.usuario_detalle, name="usuario_detalle"),
+    path("panel/usuarios/<str:username>/desactivar/", administracion.usuario_desactivar, name="usuario_desactivar"),
+    path("panel/auditoria/", administracion.auditoria, name="audit"),
+    path("panel/auditoria/descargar/<str:formato>/", administracion.auditoria_descargar, name="auditoria_descargar"),
 ]

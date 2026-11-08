@@ -12,6 +12,9 @@
   const initialScreen = $('#appShell').dataset.screen || 'dashboard';
   const initialParams = new URLSearchParams(window.location.search);
   const savedUser = JSON.parse($('#currentUser').textContent);
+  const modulos = JSON.parse($('#modulos').textContent);
+  const serverRendered = $('#appContent').dataset.serverRendered === 'true';
+  const serverScreens = ['users', 'audit'];
 
   const navGroups = [
     { label: 'Inicio', items: [{ id: 'dashboard', title: 'Dashboard', icon: '⌂' }] },
@@ -79,15 +82,16 @@
   };
 
   function renderNavigation() {
-    const visibleGroups = navGroups.map(group => ({ ...group, items: group.items.filter(item => !['users', 'audit'].includes(item.id) || state.currentUser?.role === 'Administrador') })).filter(group => group.items.length);
+    const visibleGroups = navGroups.map(group => ({ ...group, items: group.items.filter(item => modulos.includes(item.id)) })).filter(group => group.items.length);
     $('#navigation').innerHTML = visibleGroups.map(group => `<div class="nav-label">${group.label}</div>${group.items.map(item => `<button type="button" class="nav-link ${state.current === item.id ? 'active' : ''}" data-view="${item.id}"><span class="nav-icon" aria-hidden="true">${item.icon}</span><span>${item.title}</span></button>`).join('')}`).join('');
   }
 
   function canView(view) {
-    return !['users', 'audit'].includes(view) || state.currentUser?.role === 'Administrador';
+    return modulos.includes(view);
   }
 
   function setScreen(view, params = {}, replace = false) {
+    if (serverScreens.includes(view) || serverRendered) { window.location.assign(screenUrls[view]); return; }
     const target = new URL(screenUrls[view], window.location.origin);
     Object.entries(params).forEach(([key, value]) => {
       if (value) target.searchParams.set(key, value);
@@ -123,10 +127,8 @@
 
   function page() {
     if (!canView(state.current)) {
-      state.current = 'dashboard';
-      $('#appShell').dataset.screen = 'dashboard';
-      const dashboardUrl = new URL(screenUrls.dashboard, window.location.origin);
-      window.history.replaceState({ screen: 'dashboard' }, '', `${dashboardUrl.pathname}${dashboardUrl.search}`);
+      window.location.replace(screenUrls[modulos.includes('dashboard') ? 'dashboard' : modulos[0]] || screenUrls.logout);
+      return;
     }
     renderNavigation();
     const titles = { dashboard: 'Dashboard', ledger: 'Libro Mayor', accounts: 'Catálogo de cuentas', reports: 'Estados financieros', operations: 'Ventas y costos', users: 'Usuarios', audit: 'Auditoría' };
@@ -136,7 +138,8 @@
     $('.sidebar-period span:last-child').textContent = periodLabel;
     $('.sidebar-period .status-dot').classList.toggle('is-closed', periodClosed);
     $('.topbar-period').innerHTML = `<span class="status-dot ${periodClosed ? 'is-closed' : ''}"></span>${periodLabel}`;
-    const renderers = { dashboard: dashboardPage, ledger: ledgerPage, accounts: accountsPage, reports: reportsPage, operations: operationsPage, users: usersPage, audit: auditPage };
+    if (serverRendered) return;
+    const renderers = { dashboard: dashboardPage, ledger: ledgerPage, accounts: accountsPage, reports: reportsPage, operations: operationsPage };
     $('#appContent').innerHTML = (renderers[state.current] || dashboardPage)();
     if ($('#provisionalFrom') && state.provisionalFrom) $('#provisionalFrom').value = state.provisionalFrom;
     syncScreenUrl();
@@ -561,16 +564,6 @@
     return `<section class="card steam-card"><div class="card-header"><div><h2>Estado de Steam API</h2></div><span class="tag tag-demo">Estado de conexión</span></div><div class="card-body"><div class="steam-status-panel ${statusStyle}"><span class="steam-status-icon">${statusIcon}</span><div><strong>${safe(state.steamStatus)}</strong><small>Estado de conexión</small></div></div><div class="filter-bar steam-status-controls"><div class="field"><label for="steamStatusSelect">Estado de conexión</label><select id="steamStatusSelect"><option ${state.steamStatus === 'Conectado' ? 'selected' : ''}>Conectado</option><option ${state.steamStatus === 'En espera' ? 'selected' : ''}>En espera</option><option ${state.steamStatus === 'Fuera de servicio' ? 'selected' : ''}>Fuera de servicio</option></select></div><button class="button button-primary" type="button" data-action="steam-check">Mostrar estado</button></div></div></section>`;
   }
 
-  function usersPage() {
-    // TODO(CU-02): la consulta, alta y desactivación de usuarios se harán contra el servidor.
-    return `${heading('Usuarios', 'Consulta los usuarios, su perfil y el estado de acceso.', '')}<section class="card"><div class="card-body"><p>La administración de usuarios estará disponible próximamente.</p></div></section>`;
-  }
-
-  function auditPage() {
-    // TODO(CU-03.1, CU-03.2): la consulta y descarga de logs se harán contra el servidor.
-    return `${heading('Auditoría', 'Consulta las acciones registradas en el sistema.', '')}<section class="card"><div class="card-body"><p>La consulta de la bitácora estará disponible próximamente.</p></div></section>`;
-  }
-
   function showToast(message, type = 'success') {
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
@@ -760,12 +753,7 @@
       return;
     }
     const screen = Object.keys(screenUrls).find(name => !['login', 'logout'].includes(name) && new URL(screenUrls[name], window.location.origin).pathname === window.location.pathname) || 'dashboard';
-    if (!canView(screen)) {
-      window.history.replaceState({ screen: 'dashboard' }, '', screenUrls.dashboard);
-      state.current = 'dashboard';
-    } else {
-      state.current = screen;
-    }
+    state.current = screen;
     const params = new URLSearchParams(window.location.search);
     state.report = params.get('report') || state.report;
     state.operation = params.get('operation') || state.operation;
@@ -777,4 +765,5 @@
 
   window.addEventListener('popstate', showScreenFromUrl);
   showScreenFromUrl();
+  JSON.parse($('#serverMessages').textContent).forEach(message => showToast(message.text, message.level === 'success' ? 'success' : message.level === 'warning' ? 'warning' : 'error'));
 })();

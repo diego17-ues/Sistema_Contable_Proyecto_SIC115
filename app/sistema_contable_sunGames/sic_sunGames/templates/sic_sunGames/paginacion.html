@@ -1,0 +1,7 @@
+{% if pagina.has_other_pages %}
+<div class="table-footer">
+  {% if pagina.has_previous %}<a class="text-button" href="?pagina={{ pagina.previous_page_number }}">← Anterior</a>{% endif %}
+  <span>Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</span>
+  {% if pagina.has_next %}<a class="text-button" href="?pagina={{ pagina.next_page_number }}">Siguiente →</a>{% endif %}
+</div>
+{% endif %}

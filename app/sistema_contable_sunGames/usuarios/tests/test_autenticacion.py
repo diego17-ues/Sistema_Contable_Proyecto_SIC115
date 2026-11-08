@@ -6,7 +6,6 @@ from django.test import SimpleTestCase
 from bitacora.eventos import Accion, Resultado
 from bitacora.services import BitacoraService
 from usuarios.exceptions import (
-    AreaInicialPendienteError,
     CredencialesInvalidasError,
     CuentaNoHabilitadaError,
     RolNoAutorizadoError,
@@ -187,9 +186,15 @@ class AccesoServiceTests(SimpleTestCase):
             self.servicio.area_inicial(self.contador), "dashboard"
         )
 
-    def test_area_inicial_del_administrador_pendiente(self):
-        with self.assertRaises(AreaInicialPendienteError):
-            self.servicio.area_inicial(self.admin)
+    def test_area_inicial_del_administrador_es_usuarios(self):
+        self.assertEqual(self.servicio.area_inicial(self.admin), "users")
+
+    def test_administrador_accede_solo_a_usuarios_y_auditoria(self):
+        for modulo in ("users", "audit"):
+            self.servicio.verificar_acceso(self.admin, modulo)
+        for modulo in ("dashboard", "ledger"):
+            with self.assertRaises(RolNoAutorizadoError):
+                self.servicio.verificar_acceso(self.admin, modulo)
 
     def test_contador_general_accede_a_sus_modulos(self):
         for modulo in ("dashboard", "ledger", "accounts", "reports",
