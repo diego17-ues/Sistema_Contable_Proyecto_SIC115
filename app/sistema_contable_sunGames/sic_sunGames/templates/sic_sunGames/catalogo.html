@@ -1,0 +1,109 @@
+{% extends "sic_sunGames/index.html" %}
+
+{% block server_rendered %} data-server-rendered="true"{% endblock %}
+
+{% block page_content %}
+<div class="page-heading"><div><h1>Catálogo de cuentas</h1><p>Consulta las cuentas contables.</p></div><div class="heading-actions">{% if puede_modificar %}<a class="button button-primary" href="{% url 'cuenta_nueva' %}">＋ Nueva cuenta</a>{% endif %}</div></div>
+<form class="filter-bar" method="get" action="{% url 'accounts' %}" novalidate>
+  {% for campo in filtro %}
+  <div class="field{% if campo.name == 'denominacion' %} grow{% endif %}">
+    <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+    {{ campo }}
+    {% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+  </div>
+  {% endfor %}
+  <button class="button button-secondary" type="submit">Filtrar</button>
+  {% if filtrando %}<a class="text-button" href="{% url 'accounts' %}">Limpiar</a>{% endif %}
+</form>
+<section class="card">
+  <div class="card-header"><div><h2>Cuentas contables</h2></div><span class="tag">{{ pagina.paginator.count }} cuenta{{ pagina.paginator.count|pluralize }}</span></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Código</th><th>Denominación</th><th>Rubro</th><th>Naturaleza</th><th>Estado</th><th></th></tr></thead>
+      <tbody>
+        {% for cuenta in pagina %}
+        <tr>
+          <td><strong>{{ cuenta.codigo }}</strong></td>
+          <td><strong>{{ cuenta.denominacion }}</strong>{% if cuenta.descripcion %}<small>{{ cuenta.descripcion|truncatechars:90 }}</small>{% endif %}</td>
+          <td>{{ cuenta.rubro.nombre }}</td>
+          <td>{{ cuenta.naturaleza.nombre }}</td>
+          <td><span class="tag {% if cuenta.activa %}tag-open{% else %}tag-muted{% endif %}">{% if cuenta.activa %}Activa{% else %}Inactiva{% endif %}</span></td>
+          <td class="num"><a class="text-button" href="{% url 'cuenta_detalle' cuenta.codigo %}">Consultar</a>{% if puede_modificar %} <a class="text-button" href="{% url 'cuenta_modificar' cuenta.codigo %}">Modificar</a>{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6"><div class="empty-state">{% if filtro.errors %}<strong>Revisa los filtros señalados.</strong>{% elif filtrando %}<strong>No hay cuentas para los criterios indicados.</strong>{% else %}<strong>El catálogo no tiene cuentas registradas.</strong>{% endif %}</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="table-footer"><span>Registros: {{ pagina.paginator.count }}</span></div>
+  {% include "sic_sunGames/paginacion.html" %}
+</section>
+{% endblock %}
+
+{% block modal %}
+{% if form_alta %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Registrar cuenta">
+  <div class="modal-header"><div><h2>Registrar cuenta</h2><p>El código se asigna al guardar: siguiente número libre del rubro y la naturaleza. No se admiten subcuentas.</p></div><a class="modal-close" href="{% url 'accounts' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'cuenta_nueva' %}" novalidate>
+    {% csrf_token %}
+    {% if sin_naturalezas %}<div class="notice"><span class="notice-icon">i</span><span>No hay naturalezas ni grupos configurados en el catálogo; no se pueden registrar cuentas hasta cargarlos.</span></div>{% endif %}
+    {% for error in form_alta.non_field_errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+    {% include "sic_sunGames/cuenta_campos.html" with form=form_alta %}
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'accounts' %}">Cancelar</a><button class="button button-primary" type="submit">Registrar cuenta</button></div>
+  </form>
+</section></div>
+{% elif ficha %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Consultar cuenta">
+  <div class="modal-header"><div><h2>Consultar cuenta</h2><p>Datos de la cuenta seleccionada.</p></div><a class="modal-close" href="{% url 'accounts' %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-form">
+    <div class="modal-fields">
+      <div class="field"><label>Código</label><input value="{{ ficha.codigo }}" readonly /></div>
+      <div class="field"><label>Denominación</label><input value="{{ ficha.denominacion }}" readonly /></div>
+      <div class="field"><label>Rubro</label><input value="{{ ficha.rubro }}" readonly /></div>
+      <div class="field"><label>Naturaleza</label><input value="{{ ficha.naturaleza }}" readonly /></div>
+      <div class="field"><label>Estado</label><input value="{% if ficha.activa %}Activa{% else %}Inactiva{% endif %}" readonly /></div>
+      <div class="field full"><label>Descripción</label><textarea rows="3" readonly>{{ ficha.descripcion }}</textarea></div>
+      <div class="field full"><label>Reglas de uso</label><textarea rows="3" readonly>{{ ficha.reglas_uso }}</textarea></div>
+    </div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'accounts' %}">Volver</a>{% if puede_modificar %}<a class="button button-primary" href="{% url 'cuenta_modificar' ficha.codigo %}">Modificar</a>{% endif %}</div>
+  </div>
+</section></div>
+{% elif revision %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Revisar cambios">
+  <div class="modal-header"><div><h2>Revisar cambios · {{ cuenta.codigo }}</h2><p>Confirma los datos propuestos antes de guardarlos.</p></div><a class="modal-close" href="{% url 'accounts' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'cuenta_modificar' cuenta.codigo %}">
+    {% csrf_token %}
+    {% for campo in form_cambio %}{{ campo.as_hidden }}{% endfor %}
+    {% if revision.conserva_codigo %}<div class="notice"><span class="notice-icon">i</span><span>Cambia el rubro o la naturaleza, pero la cuenta conserva su código original {{ cuenta.codigo }}.</span></div>{% endif %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Campo</th><th>Valor actual</th><th>Valor propuesto</th></tr></thead>
+        <tbody>
+          {% for cambio in revision.cambios %}
+          <tr><td><strong>{{ cambio.etiqueta }}</strong></td><td>{{ cambio.anterior|default:"—" }}</td><td>{{ cambio.nuevo|default:"—" }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="modal-fields">
+      {% for campo in form_cambio.campos_documentacion %}
+      <div class="field{% if campo.name == 'justificacion' %} full{% endif %}"><label>{{ campo.label }}</label><input value="{{ campo.value }}" readonly /></div>
+      {% endfor %}
+    </div>
+    <div class="modal-actions"><button class="button button-secondary" type="submit" name="editar" value="1">Volver a editar</button><button class="button button-primary" type="submit" name="confirmar" value="1">Confirmar cambios</button></div>
+  </form>
+</section></div>
+{% elif form_cambio %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Modificar cuenta">
+  <div class="modal-header"><div><h2>Modificar cuenta</h2><p>El código es de solo lectura. Los cambios requieren justificación, respaldo y acuerdo de Junta Directiva.</p></div><a class="modal-close" href="{% url 'accounts' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'cuenta_modificar' cuenta.codigo %}" novalidate>
+    {% csrf_token %}
+    {% for error in form_cambio.non_field_errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+    <div class="modal-fields"><div class="field"><label>Código</label><input value="{{ cuenta.codigo }}" readonly disabled /></div></div>
+    {% include "sic_sunGames/cuenta_campos.html" with form=form_cambio %}
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'accounts' %}">Cancelar</a><button class="button button-primary" type="submit">Revisar cambios</button></div>
+  </form>
+</section></div>
+{% endif %}
+{% endblock %}

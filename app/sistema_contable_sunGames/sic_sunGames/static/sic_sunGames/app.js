@@ -14,7 +14,7 @@
   const savedUser = JSON.parse($('#currentUser').textContent);
   const modulos = JSON.parse($('#modulos').textContent);
   const serverRendered = $('#appContent').dataset.serverRendered === 'true';
-  const serverScreens = ['users', 'audit'];
+  const serverScreens = ['users', 'audit', 'accounts'];
 
   const navGroups = [
     { label: 'Inicio', items: [{ id: 'dashboard', title: 'Dashboard', icon: '⌂' }] },
@@ -74,7 +74,7 @@
   const state = {
     current: initialScreen, report: initialParams.get('report') || 'results', operation: initialParams.get('operation') || 'verify', period: 'month',
     currentUser: savedUser, ledgerMode: initialParams.get('mode') || 'ledger', trialBalanceTo: today(),
-    ledgerFilter: { account: '5101', from: '', to: '' }, salesQuery: '', accountQuery: '', accountGroup: '',
+    ledgerFilter: { account: '5101', from: '', to: '' }, salesQuery: '',
     periodStatus: 'ABIERTO', closedRange: null, worksheet: null, provisionalFrom: '2026-10-01', provisionalTo: '2026-10-31',
     steamStatus: 'En espera',
     nextLedgerId: 9,
@@ -139,7 +139,7 @@
     $('.sidebar-period .status-dot').classList.toggle('is-closed', periodClosed);
     $('.topbar-period').innerHTML = `<span class="status-dot ${periodClosed ? 'is-closed' : ''}"></span>${periodLabel}`;
     if (serverRendered) return;
-    const renderers = { dashboard: dashboardPage, ledger: ledgerPage, accounts: accountsPage, reports: reportsPage, operations: operationsPage };
+    const renderers = { dashboard: dashboardPage, ledger: ledgerPage, reports: reportsPage, operations: operationsPage };
     $('#appContent').innerHTML = (renderers[state.current] || dashboardPage)();
     if ($('#provisionalFrom') && state.provisionalFrom) $('#provisionalFrom').value = state.provisionalFrom;
     syncScreenUrl();
@@ -208,20 +208,6 @@
     return `${heading('Balance de Comprobación', `Al ${safe(state.trialBalanceTo)} · expresado en USD`, `<button class="button button-secondary" type="button" data-action="export" data-source="trial-balance" data-format="pdf">↓ PDF</button><button class="button button-secondary" type="button" data-action="export" data-source="trial-balance" data-format="xlsx">↓ Excel</button>`)}
       <div class="filter-bar"><div class="field"><label for="trialBalanceTo">Fecha de corte</label><input id="trialBalanceTo" type="date" value="${safe(state.trialBalanceTo)}"/></div><button class="button button-secondary" type="button" data-action="refresh-trial-balance">Generar</button><button class="text-button" type="button" data-action="back-ledger">Volver al Libro Mayor</button></div>
       <section class="card statement-card"><div class="statement-heading"><img src="${safe(logoUrl)}" alt="SunGames"/><strong>SunGames S.A. de C.V.</strong><h2>Balance de Comprobación</h2><p>Al ${safe(state.trialBalanceTo)}</p><span>Expresado en USD</span></div><div class="table-wrap"><table class="statement-table" id="trialBalanceTable"><thead><tr><th>Cuenta y detalle</th><th class="num">Debe</th><th class="num">Haber</th></tr></thead><tbody>${rows.map(row => `<tr><td><strong>${safe(row.code)} · ${safe(row.name)}</strong></td><td class="num">${row.debit ? money(row.debit) : '—'}</td><td class="num">${row.credit ? money(row.credit) : '—'}</td></tr>`).join('')}<tr class="statement-total"><td><strong>Totales</strong></td><td class="num"><strong>${money(totalDebit)}</strong></td><td class="num"><strong>${money(totalCredit)}</strong></td></tr></tbody></table></div><div class="statement-status ${balanced ? 'is-balanced' : 'is-unbalanced'}"><span>${balanced ? '✓' : '⚠'}</span><strong>${balanced ? 'Balanceado' : `Diferencia ${money(totalDebit - totalCredit)}`}</strong></div></section>`;
-  }
-
-  function accountsPage() {
-    const actions = state.currentUser?.role === 'Administrador' ? `<button class="button button-primary" type="button" data-action="new-account">＋ Nueva cuenta</button>` : '';
-    return `${heading('Catálogo de cuentas', 'Consulta las cuentas contables.', actions)}
-      <div class="filter-bar"><div class="field grow"><label for="accountQuery">Buscar cuenta</label><input id="accountQuery" value="${safe(state.accountQuery)}" placeholder="Código o denominación"/></div><div class="field"><label for="accountGroup">Tipo de cuenta</label><select id="accountGroup"><option value="">Todos</option>${['Activo', 'Pasivo', 'Patrimonio', 'Desarrollo', 'Egreso', 'Ingreso'].map(group => `<option ${state.accountGroup === group ? 'selected' : ''}>${group}</option>`).join('')}</select></div></div>
-      <div id="accountResults">${accountResultsMarkup()}</div>`;
-  }
-
-  function accountResultsMarkup() {
-    const query = state.accountQuery.toLowerCase();
-    const isAdmin = state.currentUser?.role === 'Administrador';
-    const filtered = accounts.filter(account => (!query || `${account.code} ${account.name}`.toLowerCase().includes(query)) && (!state.accountGroup || account.group === state.accountGroup));
-    return `<section class="card"><div class="card-header"><div><h2>Cuentas contables</h2></div><span class="tag">${filtered.length} cuentas</span></div><div class="table-wrap"><table><thead><tr><th>Código</th><th>Denominación</th><th>Tipo</th><th>Naturaleza</th><th>Estado</th>${isAdmin ? '<th></th>' : ''}</tr></thead><tbody>${filtered.map(account => `<tr><td><strong>${safe(account.code)}</strong></td><td><strong>${safe(account.name)}</strong><small>${safe(account.description)}</small></td><td>${safe(account.group)}</td><td>${safe(account.nature)}</td><td><span class="tag ${account.status === 'Activa' ? 'tag-open' : 'tag-muted'}">${safe(account.status)}</span></td>${isAdmin ? `<td class="num"><button class="text-button" type="button" data-action="edit-account" data-code="${safe(account.code)}">Editar</button><button class="text-button" type="button" data-action="toggle-account" data-code="${safe(account.code)}">${account.status === 'Activa' ? 'Desactivar' : 'Activar'}</button></td>` : ''}</tr>`).join('') || `<tr><td colspan="6"><div class="empty-state">Sin cuentas coincidentes</div></td></tr>`}</tbody></table></div><div class="table-footer"><span>Registros: ${filtered.length}</span></div></section>`;
   }
 
   const reportTabs = [
@@ -584,11 +570,6 @@
     $('.modal-backdrop').addEventListener('click', event => { if (event.target === $('.modal-backdrop')) $('#modalRoot').innerHTML = ''; });
   }
 
-  function withAdminAuthorization() {
-    // TODO(CU-06): la autorización de administrador para cambios del catálogo no está definida en la especificación.
-    showToast('La autorización de administrador está pendiente de definición.', 'warning');
-  }
-
   function onAction(action, target) {
     if (action === 'simulate-sale') {
       const id = `V-${1049 + Math.max(0, sales.length - 5)}`;
@@ -610,7 +591,6 @@
       page();
     }
     if (action === 'clear-ledger-filter') { state.ledgerFilter = { account: state.ledgerFilter.account || '5101', from: '', to: '' }; page(); }
-    if (['new-account', 'edit-account', 'toggle-account'].includes(action)) withAdminAuthorization();
     if (action === 'show-trial-balance') { state.ledgerMode = 'trial-balance'; page(); }
     if (action === 'back-ledger') { state.ledgerMode = 'ledger'; page(); }
     if (action === 'refresh-trial-balance') { state.trialBalanceTo = $('#trialBalanceTo').value || today(); page(); }
@@ -729,10 +709,6 @@
   $('#appShell').addEventListener('change', event => {
     if (event.target.id === 'dashboardPeriod') { state.period = event.target.value; page(); }
     if (event.target.id === 'ledgerAccountFilter') { state.ledgerFilter.account = event.target.value; page(); }
-    if (event.target.id === 'accountGroup') { state.accountGroup = event.target.value; $('#accountResults').innerHTML = accountResultsMarkup(); }
-  });
-  $('#appShell').addEventListener('input', event => {
-    if (event.target.id === 'accountQuery') { state.accountQuery = event.target.value; $('#accountResults').innerHTML = accountResultsMarkup(); }
   });
   $('#modalRoot').addEventListener('click', event => {
     const action = event.target.closest('[data-action]')?.dataset.action;

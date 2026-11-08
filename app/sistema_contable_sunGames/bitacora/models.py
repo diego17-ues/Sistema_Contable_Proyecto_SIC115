@@ -25,6 +25,9 @@ class RegistroBitacora(models.Model):
         blank=True,
         related_name="afectaciones_bitacora",
     )
+    referencia = models.CharField(
+        "registro afectado", max_length=60, blank=True, default=""
+    )
     accion = models.CharField("acción", max_length=40, choices=Accion.choices)
     resultado = models.CharField(
         "resultado", max_length=40, choices=Resultado.choices

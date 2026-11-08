@@ -1,0 +1,19 @@
+<div class="modal-fields">
+  {% for campo in form.campos_cuenta %}
+  <div class="field{% if campo.name == 'denominacion' or campo.name == 'descripcion' or campo.name == 'reglas_uso' %} full{% endif %}">
+    <label for="{{ campo.id_for_label }}">{{ campo.label }}{% if campo.field.required %} *{% endif %}</label>
+    {{ campo }}
+    {% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+  </div>
+  {% endfor %}
+</div>
+<p class="form-section">Documentación de respaldo</p>
+<div class="modal-fields">
+  {% for campo in form.campos_documentacion %}
+  <div class="field{% if campo.name == 'justificacion' %} full{% endif %}">
+    <label for="{{ campo.id_for_label }}">{{ campo.label }}{% if campo.field.required %} *{% endif %}</label>
+    {{ campo }}
+    {% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+  </div>
+  {% endfor %}
+</div>

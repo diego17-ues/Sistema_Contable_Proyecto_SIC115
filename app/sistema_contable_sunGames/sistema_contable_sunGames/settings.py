@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'sic_sunGames',
     'usuarios',
     'bitacora',
+    'catalogo',
 ]
 
 AUTH_USER_MODEL = 'usuarios.Usuario'
