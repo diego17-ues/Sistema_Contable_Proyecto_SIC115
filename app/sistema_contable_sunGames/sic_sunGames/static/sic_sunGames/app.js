@@ -740,10 +740,12 @@
   }
 
   function wireAccountForm() {
-    const rubro = $('#id_rubro');
-    const subtipo = $('#id_subtipo');
+    const form = $('#modalRoot [data-cuenta-form]');
+    if (!form) return;
+    const rubro = $('[name="rubro"]', form);
+    const subtipo = $('[name="subtipo"]', form);
     if (!rubro || !subtipo) return;
-    const preview = $('#codigoPropuesto');
+    const preview = $('#codigoPropuesto', form);
     const filterSubtypes = () => {
       $$('option', subtipo).forEach(option => { option.hidden = Boolean(option.value) && !option.value.startsWith(rubro.value); });
       if (subtipo.value && !subtipo.value.startsWith(rubro.value)) subtipo.value = '';

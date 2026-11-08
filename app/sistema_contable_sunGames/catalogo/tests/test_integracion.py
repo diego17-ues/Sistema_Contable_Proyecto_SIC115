@@ -255,4 +255,6 @@ class CatalogoIntegracionTests(TestCase):
         self.assertNotIn('name="codigo"', formulario)
         self.assertIn('name="subtipo"', formulario)
         self.assertNotIn('name="justificacion"', formulario)
+        self.assertEqual(html.count('id="id_rubro"'), 1)
+        self.assertEqual(html.count('id="filtro_rubro"'), 1)
         self.assertNotIn('name="descripcion"', formulario)

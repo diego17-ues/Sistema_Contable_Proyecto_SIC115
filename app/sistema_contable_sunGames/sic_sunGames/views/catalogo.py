@@ -24,7 +24,9 @@ def _render(request, servicio, **extra):
     contexto = contexto_panel(request, "accounts")
     try:
         opciones = servicio.opciones(request.user)
-        filtro = CuentaFiltroForm(request.GET or None, **opciones)
+        filtro = CuentaFiltroForm(
+            request.GET or None, auto_id="filtro_%s", **opciones
+        )
         cuentas = []
         if not filtro.is_bound or filtro.is_valid():
             cuentas = servicio.listar(request.user, **filtro.filtros())
