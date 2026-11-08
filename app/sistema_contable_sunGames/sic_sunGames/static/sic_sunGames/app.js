@@ -752,7 +752,7 @@
       window.location.replace(screenUrls.login);
       return;
     }
-    const screen = Object.keys(screenUrls).find(name => !['login', 'logout'].includes(name) && new URL(screenUrls[name], window.location.origin).pathname === window.location.pathname) || 'dashboard';
+    const screen = serverRendered ? initialScreen : Object.keys(screenUrls).find(name => !['login', 'logout'].includes(name) && new URL(screenUrls[name], window.location.origin).pathname === window.location.pathname) || 'dashboard';
     state.current = screen;
     const params = new URLSearchParams(window.location.search);
     state.report = params.get('report') || state.report;
