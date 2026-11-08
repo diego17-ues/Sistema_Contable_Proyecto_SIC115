@@ -1,3 +1,4 @@
+import secrets
 from unittest.mock import Mock
 
 from django.test import SimpleTestCase
@@ -17,6 +18,9 @@ from usuarios.roles import Rol
 from usuarios.services import AccesoService, AutenticacionService
 
 from .fakes import UsuarioRepositoryEnMemoria
+
+CLAVE_CONTADOR = secrets.token_urlsafe(12)
+CLAVE_INACTIVO = secrets.token_urlsafe(12)
 
 
 class AutenticadorFalso:
@@ -60,8 +64,8 @@ class AutenticacionServiceTests(SimpleTestCase):
     def servicio(self, **kwargs):
         self.autenticador = AutenticadorFalso(
             {
-                "contador": (self.contador, "clave-1"),
-                "inactivo": (self.inactivo, "clave-2"),
+                "contador": (self.contador, CLAVE_CONTADOR),
+                "inactivo": (self.inactivo, CLAVE_INACTIVO),
             },
             **kwargs,
         )
@@ -76,7 +80,7 @@ class AutenticacionServiceTests(SimpleTestCase):
 
     def test_credenciales_validas_abren_sesion_y_se_registran(self):
         usuario = self.servicio().iniciar_sesion(
-            self.request, "contador", "clave-1"
+            self.request, "contador", CLAVE_CONTADOR
         )
 
         self.assertIs(usuario, self.contador)
@@ -94,7 +98,9 @@ class AutenticacionServiceTests(SimpleTestCase):
 
     def test_usuario_inexistente_se_registra_sin_actor(self):
         with self.assertRaises(CredencialesInvalidasError):
-            self.servicio().iniciar_sesion(self.request, "nadie", "clave-1")
+            self.servicio().iniciar_sesion(
+                self.request, "nadie", CLAVE_CONTADOR
+            )
 
         self.assertEqual(self.autenticador.sesiones, [])
         self.assert_registrado(Resultado.CREDENCIALES_INCORRECTAS, None)
@@ -102,7 +108,7 @@ class AutenticacionServiceTests(SimpleTestCase):
     def test_mensaje_de_credenciales_no_revela_el_dato_fallido(self):
         servicio = self.servicio()
         with self.assertRaises(CredencialesInvalidasError) as usuario_malo:
-            servicio.iniciar_sesion(self.request, "nadie", "clave-1")
+            servicio.iniciar_sesion(self.request, "nadie", CLAVE_CONTADOR)
         with self.assertRaises(CredencialesInvalidasError) as clave_mala:
             servicio.iniciar_sesion(self.request, "contador", "otra")
 
@@ -117,7 +123,7 @@ class AutenticacionServiceTests(SimpleTestCase):
     def test_cuenta_inactiva_se_rechaza_y_se_registra(self):
         with self.assertRaises(CuentaNoHabilitadaError) as error:
             self.servicio().iniciar_sesion(
-                self.request, "inactivo", "clave-2"
+                self.request, "inactivo", CLAVE_INACTIVO
             )
 
         self.assertEqual(
@@ -130,7 +136,7 @@ class AutenticacionServiceTests(SimpleTestCase):
     def test_falla_al_verificar_no_abre_sesion_y_se_registra(self):
         with self.assertRaises(ServicioAutenticacionError) as error:
             self.servicio(falla_verificar=True).iniciar_sesion(
-                self.request, "contador", "clave-1"
+                self.request, "contador", CLAVE_CONTADOR
             )
 
         self.assertEqual(
@@ -143,7 +149,7 @@ class AutenticacionServiceTests(SimpleTestCase):
     def test_falla_al_abrir_sesion_se_informa_y_se_registra(self):
         with self.assertRaises(ServicioAutenticacionError):
             self.servicio(falla_sesion=True).iniciar_sesion(
-                self.request, "contador", "clave-1"
+                self.request, "contador", CLAVE_CONTADOR
             )
 
         self.assertEqual(self.autenticador.sesiones, [])
@@ -154,7 +160,7 @@ class AutenticacionServiceTests(SimpleTestCase):
 
         with self.assertRaises(ServicioAutenticacionError):
             self.servicio(falla_verificar=True).iniciar_sesion(
-                self.request, "contador", "clave-1"
+                self.request, "contador", CLAVE_CONTADOR
             )
 
     def test_intento_con_campo_vacio_se_registra(self):

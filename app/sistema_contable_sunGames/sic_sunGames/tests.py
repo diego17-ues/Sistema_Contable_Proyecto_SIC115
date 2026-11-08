@@ -1,6 +1,8 @@
+import secrets
 from unittest.mock import patch
 
 from django.contrib.auth import SESSION_KEY
+from django.contrib.staticfiles import finders
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
@@ -13,6 +15,7 @@ from usuarios.roles import Rol
 
 from .forms import LoginForm
 
+CLAVE = secrets.token_urlsafe(12)
 CREDENCIALES_INCORRECTAS = "Nombre de usuario o contraseña incorrectos."
 CUENTA_NO_HABILITADA = "La cuenta no está habilitada para iniciar sesión."
 FALLA_SERVICIO = "No se pudo iniciar sesión; intente nuevamente."
@@ -51,7 +54,7 @@ class LoginIntegracionTests(TestCase):
             username=username, nombre_completo="Ana Gómez", rol=rol,
             activo=activo,
         )
-        usuario.set_password("clave-1")
+        usuario.set_password(CLAVE)
         usuario.save()
         return usuario
 
@@ -83,7 +86,7 @@ class LoginIntegracionTests(TestCase):
         )
 
     def test_credenciales_validas_crean_sesion(self):
-        respuesta = self.post("contador", "clave-1")
+        respuesta = self.post("contador", CLAVE)
 
         self.assertRedirects(respuesta, reverse("dashboard"))
         self.assertEqual(
@@ -116,7 +119,7 @@ class LoginIntegracionTests(TestCase):
             "inactivo", Rol.CONTADOR_GENERAL, activo=False
         )
 
-        respuesta = self.post("inactivo", "clave-1")
+        respuesta = self.post("inactivo", CLAVE)
 
         self.assertContains(respuesta, CUENTA_NO_HABILITADA)
         self.assert_sin_sesion()
@@ -139,7 +142,7 @@ class LoginIntegracionTests(TestCase):
             AutenticadorDjango, "verificar_credenciales",
             side_effect=ServicioAutenticacionError(),
         ):
-            respuesta = self.post("contador", "clave-1")
+            respuesta = self.post("contador", CLAVE)
 
         self.assertContains(respuesta, FALLA_SERVICIO)
         self.assert_sin_sesion()
@@ -150,7 +153,7 @@ class LoginIntegracionTests(TestCase):
     def test_administrador_queda_sin_area_inicial(self):
         self.crear_usuario("admin", Rol.ADMINISTRADOR)
 
-        respuesta = self.post("admin", "clave-1")
+        respuesta = self.post("admin", CLAVE)
 
         self.assertContains(
             respuesta, "El área inicial de su rol todavía no está disponible."
@@ -173,3 +176,22 @@ class LoginIntegracionTests(TestCase):
 
         self.assertRedirects(respuesta, self.url)
         self.assert_sin_sesion()
+
+
+class AppJsSinDatosDeDemostracionTests(SimpleTestCase):
+    def setUp(self):
+        ruta = finders.find("sic_sunGames/app.js")
+        with open(ruta, encoding="utf-8") as archivo:
+            self.codigo = archivo.read()
+
+    def test_sin_contrasena_de_sesion_en_el_cliente(self):
+        self.assertNotIn("sessionPassword", self.codigo)
+        self.assertNotIn("data.password", self.codigo)
+
+    def test_sin_usuarios_fijos_ni_perfiles_inexistentes(self):
+        self.assertNotIn("username:", self.codigo)
+        self.assertNotIn("Auxiliar Contable", self.codigo)
+
+    def test_sin_bitacora_en_el_cliente(self):
+        self.assertNotIn("addAudit", self.codigo)
+        self.assertNotIn("state.audit", self.codigo)
