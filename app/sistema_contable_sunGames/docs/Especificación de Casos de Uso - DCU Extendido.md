@@ -737,7 +737,7 @@ Documento de trabajo para prototipado | Sistema Contable SunGames
 **Prioridad / Fuente:** No indicada en el DCU | DCU; decisión vigente del usuario de negocios; SRS RF-017 y RF-018 para consulta 
 
 #### **Descripción** 
-Permite registrar transacciones que pueden involucrar dos o más cuentas. Cada movimiento tiene una cuenta y un importe firmado. La transacción se guarda solo si la suma de sus movimientos es exactamente cero. Si falla cualquier movimiento, no se guarda ninguno.
+Permite registrar movimientos contables sobre cuentas de detalle. Cada movimiento tiene cuenta, fecha, concepto e importe firmado. Varios movimientos pueden agruparse en una transacción para consulta. El sistema valida cada movimiento, pero no exige que las transacciones cuadren al registrarse: esa verificación corresponde al Balance de comprobación.
 
 #### **Pantallas del caso** 
 
