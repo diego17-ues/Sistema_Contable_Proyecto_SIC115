@@ -142,3 +142,5 @@ Los pasos completos de instalación están en `README.md`.
 **Contador General:**
 - CU-04, CU-05, CU-07, CU-08 (con sus subcasos)
 - CU-06 Catálogo de Cuentas: solo consulta.
+
+Toda transacción tiene al menos dos movimientos sobre cuentas distintas, y la suma de sus importes firmados es exactamente cero. Se guarda con todos sus movimientos en una sola operación atómica. No se guardan movimientos sueltos.
