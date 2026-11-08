@@ -158,11 +158,12 @@ class AccesoService:
         Rol.CONTADOR_GENERAL: "dashboard",
         Rol.ADMINISTRADOR: "users",
     }
+    MODULOS_CONTADOR_GENERAL = frozenset(
+        {"dashboard", "ledger", "accounts", "reports", "operations"}
+    )
     MODULOS = {
-        Rol.CONTADOR_GENERAL: frozenset(
-            {"dashboard", "ledger", "accounts", "reports", "operations"}
-        ),
-        Rol.ADMINISTRADOR: frozenset({"users", "audit"}),
+        Rol.CONTADOR_GENERAL: MODULOS_CONTADOR_GENERAL,
+        Rol.ADMINISTRADOR: MODULOS_CONTADOR_GENERAL | {"users", "audit"},
     }
 
     def area_inicial(self, usuario):

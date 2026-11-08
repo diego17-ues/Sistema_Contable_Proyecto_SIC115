@@ -218,6 +218,15 @@ class AdministracionIntegracionTests(TestCase):
         self.assertNotContains(usuarios, "Guardar cambios")
         self.assertContains(auditoria, "Registro de actividad")
 
+    def test_administrador_accede_a_pantallas_del_contador(self):
+        self.client.force_login(self.admin)
+
+        for nombre in ("dashboard", "ledger", "accounts", "reports",
+                       "operations"):
+            self.assertEqual(
+                self.client.get(reverse(nombre)).status_code, 200, nombre
+            )
+
     def test_contador_recibe_403_en_usuarios_y_auditoria(self):
         self.client.force_login(self.contador)
         urls = [
