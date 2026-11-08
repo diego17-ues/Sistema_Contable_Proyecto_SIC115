@@ -22,7 +22,7 @@ class ClasificacionInvalidaError(CatalogoError):
 
 
 class RubroInvalidoError(ClasificacionInvalidaError):
-    mensaje = "El rubro no pertenece al catálogo."
+    mensaje = "El tipo de cuenta no pertenece al catálogo."
     campo = "rubro"
 
 
@@ -31,19 +31,19 @@ class NaturalezaInvalidaError(ClasificacionInvalidaError):
     campo = "naturaleza"
 
 
-class GrupoInvalidoError(ClasificacionInvalidaError):
-    mensaje = "La combinación de rubro y naturaleza no es un grupo válido."
-    campo = "naturaleza"
+class SubtipoInvalidoError(ClasificacionInvalidaError):
+    mensaje = "El subtipo no pertenece al tipo de cuenta seleccionado."
+    campo = "subtipo"
 
 
 class DocumentacionIncompletaError(CatalogoError):
-    mensaje = "Falta la justificación, el respaldo o el acuerdo de Junta."
+    mensaje = "Falta el respaldo o el acuerdo de Junta Directiva."
 
 
 class CodigoNoAsignableError(CatalogoError):
     mensaje = (
-        "No hay códigos disponibles en el grupo: se usaron los 99 números. "
-        "La cuenta no se registró."
+        "No hay códigos disponibles en el subtipo: se usaron los 99 "
+        "números. La cuenta no se registró."
     )
 
 

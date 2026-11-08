@@ -7,30 +7,36 @@ from django.urls import reverse
 
 from bitacora.eventos import Accion
 from bitacora.models import RegistroBitacora
-from catalogo.models import (
-    AprobacionCuenta,
-    Cuenta,
-    Grupo,
-    HistorialCuenta,
-    Naturaleza,
-    Rubro,
-)
-from catalogo.services import normalizar_denominacion
+from catalogo.models import AprobacionCuenta, Cuenta, HistorialCuenta, Subtipo
 from usuarios.models import Usuario
 from usuarios.roles import Rol
 
 CLAVE = secrets.token_urlsafe(12)
 
 
+class CatalogoInicialTests(TestCase):
+    def test_migracion_carga_el_catalogo(self):
+        self.assertEqual(Cuenta.objects.count(), 64)
+        self.assertEqual(Subtipo.objects.count(), 13)
+        caja = Cuenta.objects.get(codigo="1101")
+        self.assertEqual(caja.denominacion, "Caja general")
+        self.assertEqual(str(caja.subtipo), "11 Activo corriente")
+        self.assertEqual(caja.naturaleza.nombre, "Deudora")
+        self.assertEqual(
+            Cuenta.objects.get(codigo="1203").naturaleza.nombre, "Acreedora"
+        )
+        self.assertEqual(
+            Cuenta.objects.get(codigo="5103").naturaleza.nombre, "Deudora"
+        )
+        self.assertEqual(
+            str(Cuenta.objects.get(codigo="3101").subtipo), "31 Patrimonio"
+        )
+
+
 class CatalogoIntegracionTests(TestCase):
     def setUp(self):
         self.admin = self.crear_usuario("admin", Rol.ADMINISTRADOR)
         self.contador = self.crear_usuario("cont", Rol.CONTADOR_GENERAL)
-        self.activo = Rubro.objects.get(codigo="1")
-        self.pasivo = Rubro.objects.get(codigo="2")
-        self.deudora = Naturaleza.objects.create(codigo="1", nombre="Deudora")
-        Grupo.objects.create(rubro=self.activo, naturaleza=self.deudora)
-        Grupo.objects.create(rubro=self.pasivo, naturaleza=self.deudora)
 
     def crear_usuario(self, username, rol):
         usuario = Usuario(username=username, nombre_completo="Ana", rol=rol)
@@ -38,31 +44,21 @@ class CatalogoIntegracionTests(TestCase):
         usuario.save()
         return usuario
 
-    def crear_cuenta(self, codigo, denominacion, activa=True):
-        return Cuenta.objects.create(
-            codigo=codigo, denominacion=denominacion,
-            denominacion_normalizada=normalizar_denominacion(denominacion),
-            rubro=self.activo, naturaleza=self.deudora, activa=activa,
-        )
-
-    def datos(self, denominacion="Caja de eventos", rubro="1", **extra):
+    def datos(self, denominacion="Caja de eventos", rubro="1", subtipo="11",
+              naturaleza="D", **extra):
         return {
-            "denominacion": denominacion, "rubro": rubro, "naturaleza": "1",
-            "descripcion": "Efectivo de eventos.",
-            "reglas_uso": "Solo para eventos.",
-            "justificacion": "Control de efectivo.",
-            "referencia_respaldo": "SOL-2026-014",
+            "denominacion": denominacion, "rubro": rubro, "subtipo": subtipo,
+            "naturaleza": naturaleza, "referencia_respaldo": "SOL-2026-014",
             "acuerdo_numero": "JD-07/2026", "acuerdo_fecha": "2026-11-03",
             **extra,
         }
 
     def test_administrador_registra_con_codigo_asignado(self):
-        self.crear_cuenta("1101", "Caja general")
-        self.crear_cuenta("1102", "Caja chica", activa=False)
+        Cuenta.objects.filter(codigo="1112").update(activa=False)
         self.client.force_login(self.admin)
 
         self.assertContains(
-            self.client.get(reverse("cuenta_nueva")), "Registrar cuenta"
+            self.client.get(reverse("cuenta_nueva")), "Código asignado"
         )
         respuesta = self.client.post(
             reverse("cuenta_nueva"), self.datos(codigo="1199")
@@ -70,7 +66,8 @@ class CatalogoIntegracionTests(TestCase):
 
         self.assertRedirects(respuesta, reverse("accounts"))
         cuenta = Cuenta.objects.get(denominacion="Caja de eventos")
-        self.assertEqual(cuenta.codigo, "1103")
+        self.assertEqual(cuenta.codigo, "1113")
+        self.assertEqual(cuenta.naturaleza.nombre, "Deudora")
         self.assertFalse(Cuenta.objects.filter(codigo="1199").exists())
         aprobacion = AprobacionCuenta.objects.get(cuenta=cuenta)
         self.assertEqual(aprobacion.tipo, AprobacionCuenta.Tipo.ALTA)
@@ -78,7 +75,30 @@ class CatalogoIntegracionTests(TestCase):
         registro = RegistroBitacora.objects.latest("id")
         self.assertEqual(registro.accion, Accion.ALTA_CUENTA)
         self.assertEqual(registro.actor, self.admin)
-        self.assertEqual(registro.referencia, "Cuenta 1103")
+        self.assertEqual(registro.referencia, "Cuenta 1113")
+
+    def test_vista_previa_del_codigo(self):
+        self.client.force_login(self.admin)
+        url = reverse("cuenta_siguiente_codigo")
+
+        respuesta = self.client.get(url, {"rubro": "4", "subtipo": "45"})
+        invalida = self.client.get(url, {"rubro": "4", "subtipo": "11"})
+
+        self.assertEqual(respuesta.json(), {"codigo": "4504"})
+        self.assertEqual(invalida.status_code, 400)
+        self.assertIn("subtipo", invalida.json()["error"])
+
+    def test_subtipo_de_otro_tipo_se_rechaza(self):
+        self.client.force_login(self.admin)
+
+        respuesta = self.client.post(
+            reverse("cuenta_nueva"), self.datos(rubro="2", subtipo="11")
+        )
+
+        self.assertContains(
+            respuesta, "El subtipo no pertenece al tipo de cuenta"
+        )
+        self.assertEqual(Cuenta.objects.count(), 64)
 
     def test_alta_sin_acuerdo_señala_el_campo(self):
         self.client.force_login(self.admin)
@@ -89,30 +109,30 @@ class CatalogoIntegracionTests(TestCase):
 
         self.assertContains(respuesta, "Este campo es obligatorio.")
         self.assertContains(respuesta, 'value="Caja de eventos"')
-        self.assertFalse(Cuenta.objects.exists())
+        self.assertEqual(Cuenta.objects.count(), 64)
 
     def test_alta_duplicada_se_bloquea(self):
-        self.crear_cuenta("1101", "Caja de eventos")
         self.client.force_login(self.admin)
 
         respuesta = self.client.post(
-            reverse("cuenta_nueva"), self.datos("CAJA DE EVÉNTOS")
+            reverse("cuenta_nueva"), self.datos("CAJA  GENERÁL")
         )
 
         self.assertContains(respuesta, "Ya existe una cuenta")
-        self.assertEqual(Cuenta.objects.count(), 1)
+        self.assertEqual(Cuenta.objects.count(), 64)
 
     def test_administrador_modifica_con_revision_previa(self):
-        cuenta = self.crear_cuenta("1101", "Caja general")
         self.client.force_login(self.admin)
         url = reverse("cuenta_modificar", args=["1101"])
-        propuesta = self.datos("Caja central", rubro="2", codigo="2101")
+        propuesta = self.datos(
+            "Caja central", rubro="2", subtipo="21", codigo="2199"
+        )
 
         self.assertContains(self.client.get(url), 'value="Caja general"')
         revision = self.client.post(url, propuesta)
         self.assertContains(revision, "Revisar cambios")
         self.assertContains(revision, "conserva su código original 1101")
-        cuenta.refresh_from_db()
+        cuenta = Cuenta.objects.get(codigo="1101")
         self.assertEqual(cuenta.denominacion, "Caja general")
         self.assertFalse(HistorialCuenta.objects.exists())
 
@@ -124,10 +144,9 @@ class CatalogoIntegracionTests(TestCase):
             respuesta, "La cuenta conserva su código original 1101."
         )
         cuenta.refresh_from_db()
-        self.assertEqual(cuenta.codigo, "1101")
         self.assertEqual(cuenta.denominacion, "Caja central")
-        self.assertEqual(cuenta.rubro, self.pasivo)
-        self.assertFalse(Cuenta.objects.filter(codigo="2101").exists())
+        self.assertEqual(str(cuenta.subtipo), "21 Pasivo corriente")
+        self.assertFalse(Cuenta.objects.filter(codigo="2199").exists())
         cambio = HistorialCuenta.objects.get(campo="denominacion")
         self.assertEqual(cambio.valor_anterior, "Caja general")
         self.assertEqual(cambio.valor_nuevo, "Caja central")
@@ -138,7 +157,6 @@ class CatalogoIntegracionTests(TestCase):
         self.assertEqual(registro.referencia, "Cuenta 1101")
 
     def test_falla_al_guardar_conserva_los_valores(self):
-        cuenta = self.crear_cuenta("1101", "Caja general")
         self.client.force_login(self.admin)
 
         with patch(
@@ -151,7 +169,7 @@ class CatalogoIntegracionTests(TestCase):
             )
 
         self.assertContains(respuesta, "conserva sus valores anteriores")
-        cuenta.refresh_from_db()
+        cuenta = Cuenta.objects.get(codigo="1101")
         self.assertEqual(cuenta.denominacion, "Caja general")
         self.assertFalse(AprobacionCuenta.objects.exists())
         self.assertFalse(
@@ -161,7 +179,6 @@ class CatalogoIntegracionTests(TestCase):
         )
 
     def test_contador_consulta_sin_opciones_de_cambio(self):
-        self.crear_cuenta("1101", "Caja general")
         self.client.force_login(self.contador)
 
         listado = self.client.get(reverse("accounts"))
@@ -173,14 +190,16 @@ class CatalogoIntegracionTests(TestCase):
             listado, reverse("cuenta_modificar", args=["1101"])
         )
         self.assertContains(detalle, "Consultar cuenta")
+        self.assertContains(detalle, "11 Activo corriente")
 
     def test_contador_recibe_403_al_registrar_o_modificar(self):
-        cuenta = self.crear_cuenta("1101", "Caja general")
         self.client.force_login(self.contador)
         modificar = reverse("cuenta_modificar", args=["1101"])
         peticiones = [
             ("get", reverse("cuenta_nueva"), {}),
             ("post", reverse("cuenta_nueva"), self.datos()),
+            ("get", reverse("cuenta_siguiente_codigo"),
+             {"rubro": "1", "subtipo": "11"}),
             ("get", modificar, {}),
             ("post", modificar, self.datos("Otra")),
             ("post", modificar, {**self.datos("Otra"), "confirmar": "1"}),
@@ -190,18 +209,21 @@ class CatalogoIntegracionTests(TestCase):
             with self.subTest(metodo=metodo, url=url):
                 respuesta = getattr(self.client, metodo)(url, datos)
                 self.assertEqual(respuesta.status_code, 403)
-        cuenta.refresh_from_db()
-        self.assertEqual(cuenta.denominacion, "Caja general")
-        self.assertEqual(Cuenta.objects.count(), 1)
+        self.assertEqual(
+            Cuenta.objects.get(codigo="1101").denominacion, "Caja general"
+        )
+        self.assertEqual(Cuenta.objects.count(), 64)
         self.assertFalse(AprobacionCuenta.objects.exists())
 
     def test_filtros_y_sin_coincidencias(self):
-        self.crear_cuenta("1101", "Caja general")
-        self.crear_cuenta("1102", "Caja chica", activa=False)
+        Cuenta.objects.filter(codigo="1102").update(activa=False)
         self.client.force_login(self.contador)
 
         inactivas = self.client.get(
             reverse("accounts"), {"estado": "inactiva"}
+        )
+        acreedoras = self.client.get(
+            reverse("accounts"), {"rubro": "1", "naturaleza": "A"}
         )
         sin_resultados = self.client.get(
             reverse("accounts"), {"denominacion": "zzz"}
@@ -210,6 +232,8 @@ class CatalogoIntegracionTests(TestCase):
 
         self.assertContains(inactivas, "Caja chica")
         self.assertNotContains(inactivas, "Caja general")
+        self.assertContains(acreedoras, "Depreciación acumulada")
+        self.assertNotContains(acreedoras, "Caja general")
         self.assertContains(
             sin_resultados, "No hay cuentas para los criterios indicados."
         )
@@ -225,4 +249,6 @@ class CatalogoIntegracionTests(TestCase):
         inicio = html.index(f'action="{reverse("cuenta_nueva")}"')
         formulario = html[inicio:]
         self.assertNotIn('name="codigo"', formulario)
-        self.assertIn('name="acuerdo_numero"', formulario)
+        self.assertIn('name="subtipo"', formulario)
+        self.assertNotIn('name="justificacion"', formulario)
+        self.assertNotIn('name="descripcion"', formulario)

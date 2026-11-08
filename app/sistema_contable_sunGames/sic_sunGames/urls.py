@@ -11,6 +11,7 @@ urlpatterns = [
     path("panel/libro-mayor/", pages.render_screen, {"screen": "ledger"}, name="ledger"),
     path("panel/catalogo-cuentas/", catalogo.cuentas, name="accounts"),
     path("panel/catalogo-cuentas/nueva/", catalogo.cuenta_nueva, name="cuenta_nueva"),
+    path("panel/catalogo-cuentas/siguiente-codigo/", catalogo.cuenta_siguiente_codigo, name="cuenta_siguiente_codigo"),
     path("panel/catalogo-cuentas/<str:codigo>/", catalogo.cuenta_detalle, name="cuenta_detalle"),
     path("panel/catalogo-cuentas/<str:codigo>/modificar/", catalogo.cuenta_modificar, name="cuenta_modificar"),
     path("panel/estados-financieros/", pages.render_screen, {"screen": "reports"}, name="reports"),

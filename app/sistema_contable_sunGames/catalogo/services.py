@@ -14,25 +14,23 @@ from .exceptions import (
     CodigoNoAsignableError,
     CuentaDuplicadaError,
     DocumentacionIncompletaError,
-    GrupoInvalidoError,
     SinCambiosError,
     SubcuentaNoPermitidaError,
+    SubtipoInvalidoError,
 )
 from .models import AprobacionCuenta
 
 ULTIMO_NUMERO_DEL_GRUPO = 99
 CAMPOS_DOCUMENTACION = {
-    "justificacion": "Falta la justificación.",
     "referencia_respaldo": "Falta la referencia de respaldo.",
     "acuerdo_numero": "Falta el número del acuerdo de Junta Directiva.",
     "acuerdo_fecha": "Falta la fecha del acuerdo de Junta Directiva.",
 }
 ETIQUETAS_MODIFICABLES = {
     "denominacion": "Denominación",
-    "rubro": "Rubro",
+    "rubro": "Tipo de cuenta",
+    "subtipo": "Subtipo",
     "naturaleza": "Naturaleza",
-    "descripcion": "Descripción",
-    "reglas_uso": "Reglas de uso",
 }
 CAMPOS_DE_SUBCUENTA = ("cuenta_padre", "codigo_padre", "subcuenta")
 
@@ -55,8 +53,8 @@ class Revision:
 
     @property
     def conserva_codigo(self):
-        """Cambió el rubro o la naturaleza, pero el código se conserva."""
-        return any(c.campo in ("rubro", "naturaleza") for c in self.cambios)
+        """Cambió el tipo o el subtipo, pero el código se conserva."""
+        return any(c.campo in ("rubro", "subtipo") for c in self.cambios)
 
 
 def normalizar_denominacion(texto):
@@ -80,10 +78,11 @@ class CatalogoCuentasService:
         self._transaccion = transaccion
 
     def opciones(self, actor):
-        """Rubros y naturalezas de la fuente configurable."""
+        """Rubros, subtipos y naturalezas de la fuente configurable."""
         self._verificar(actor, self.ROLES_CONSULTA)
         return {
             "rubros": list(self._repositorio.rubros()),
+            "subtipos": list(self._repositorio.subtipos()),
             "naturalezas": list(self._repositorio.naturalezas()),
         }
 
@@ -101,25 +100,34 @@ class CatalogoCuentasService:
     def verificar_escritura(self, actor):
         self._verificar(actor, self.ROLES_ESCRITURA)
 
+    def siguiente_codigo(self, actor, rubro, subtipo):
+        """Código que recibiría una cuenta nueva del subtipo (vista previa).
+
+        El código definitivo se asigna al guardar, dentro de la transacción.
+        """
+        self.verificar_escritura(actor)
+        rubro = self._repositorio.obtener_rubro(rubro)
+        subtipo = self._subtipo(rubro, subtipo)
+        return self._siguiente_codigo(subtipo.prefijo)
+
     def registrar(self, actor, datos):
-        """CU-06.1: alta con el siguiente código libre del grupo."""
+        """CU-06.1: alta con el siguiente correlativo libre del subtipo."""
         self.verificar_escritura(actor)
         self._rechazar_campos_no_editables(datos, codigo_actual=None)
         documentacion = self._documentacion(datos)
-        rubro, naturaleza = self._clasificacion(datos)
+        rubro, subtipo, naturaleza = self._clasificacion(datos)
         denominacion = datos["denominacion"].strip()
         normalizada = self._denominacion_disponible(denominacion)
         with self._transaccion():
-            self._repositorio.bloquear_grupo(rubro, naturaleza)
-            codigo = self._siguiente_codigo(rubro.codigo + naturaleza.codigo)
+            self._repositorio.bloquear_subtipo(subtipo)
+            codigo = self._siguiente_codigo(subtipo.prefijo)
             cuenta = self._repositorio.nueva(
                 codigo=codigo,
                 denominacion=denominacion,
                 denominacion_normalizada=normalizada,
                 rubro=rubro,
+                subtipo=subtipo,
                 naturaleza=naturaleza,
-                descripcion=datos.get("descripcion", ""),
-                reglas_uso=datos.get("reglas_uso", ""),
             )
             cuenta = self._repositorio.guardar(cuenta)
             self._repositorio.registrar_aprobacion(
@@ -135,7 +143,7 @@ class CatalogoCuentasService:
         cuenta = self._repositorio.obtener_por_codigo(codigo)
         self._rechazar_campos_no_editables(datos, codigo_actual=cuenta.codigo)
         self._documentacion(datos)
-        rubro, naturaleza = self._clasificacion(datos)
+        rubro, subtipo, naturaleza = self._clasificacion(datos)
         denominacion = datos["denominacion"].strip()
         propuesta = copy(cuenta)
         propuesta.denominacion = denominacion
@@ -143,9 +151,8 @@ class CatalogoCuentasService:
             denominacion, excluir_codigo=cuenta.codigo
         )
         propuesta.rubro = rubro
+        propuesta.subtipo = subtipo
         propuesta.naturaleza = naturaleza
-        propuesta.descripcion = datos.get("descripcion", "")
-        propuesta.reglas_uso = datos.get("reglas_uso", "")
         cambios = tuple(self._cambios(cuenta, propuesta))
         if not cambios:
             raise SinCambiosError()
@@ -189,12 +196,18 @@ class CatalogoCuentasService:
 
     def _clasificacion(self, datos):
         rubro = self._repositorio.obtener_rubro(datos.get("rubro"))
+        subtipo = self._subtipo(rubro, datos.get("subtipo"))
         naturaleza = self._repositorio.obtener_naturaleza(
             datos.get("naturaleza")
         )
-        if not self._repositorio.existe_grupo(rubro, naturaleza):
-            raise GrupoInvalidoError()
-        return rubro, naturaleza
+        return rubro, subtipo, naturaleza
+
+    def _subtipo(self, rubro, prefijo):
+        """El subtipo llega como prefijo de dos dígitos, p. ej. «11»."""
+        prefijo = str(prefijo or "")
+        if len(prefijo) != 2 or not prefijo.startswith(rubro.codigo):
+            raise SubtipoInvalidoError()
+        return self._repositorio.obtener_subtipo(rubro, prefijo[1])
 
     def _denominacion_disponible(self, denominacion, excluir_codigo=None):
         normalizada = normalizar_denominacion(denominacion)
@@ -213,15 +226,19 @@ class CatalogoCuentasService:
                 return codigo
         raise CodigoNoAsignableError()
 
-    @staticmethod
-    def _cambios(actual, propuesta):
+    @classmethod
+    def _cambios(cls, actual, propuesta):
         for campo, etiqueta in ETIQUETAS_MODIFICABLES.items():
             anterior = getattr(actual, campo)
             nuevo = getattr(propuesta, campo)
-            clave_anterior = getattr(anterior, "codigo", anterior)
-            clave_nueva = getattr(nuevo, "codigo", nuevo)
+            clave_anterior = cls._clave(anterior)
+            clave_nueva = cls._clave(nuevo)
             if clave_anterior != clave_nueva:
                 yield Cambio(campo, etiqueta, str(anterior), str(nuevo))
+
+    @staticmethod
+    def _clave(valor):
+        return getattr(valor, "prefijo", getattr(valor, "codigo", valor))
 
     def _registrar(self, accion, actor, cuenta):
         self._bitacora.registrar(

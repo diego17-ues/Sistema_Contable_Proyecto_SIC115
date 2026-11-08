@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods
 
@@ -39,7 +40,7 @@ def _render(request, servicio, **extra):
         consulta=consulta.urlencode(),
         filtrando=bool(consulta),
         puede_modificar=servicio.puede_modificar(request.user),
-        sin_naturalezas=not opciones["naturalezas"],
+        sin_subtipos=not opciones["subtipos"],
         **extra,
     )
     return render(request, CATALOGO_TEMPLATE, contexto)
@@ -60,9 +61,8 @@ def _valores_actuales(cuenta):
     return {
         "denominacion": cuenta.denominacion,
         "rubro": cuenta.rubro.codigo,
+        "subtipo": cuenta.subtipo.prefijo,
         "naturaleza": cuenta.naturaleza.codigo,
-        "descripcion": cuenta.descripcion,
-        "reglas_uso": cuenta.reglas_uso,
     }
 
 
@@ -109,6 +109,22 @@ def cuenta_nueva(request):
             )
             return redirect("accounts")
     return _render(request, servicio, form_alta=form)
+
+
+@login_required
+@require_http_methods(["GET"])
+def cuenta_siguiente_codigo(request):
+    """Vista previa del código al elegir tipo y subtipo (CU-06.1)."""
+    servicio = crear_catalogo_service()
+    try:
+        codigo = servicio.siguiente_codigo(
+            request.user, request.GET.get("rubro"), request.GET.get("subtipo")
+        )
+    except SIN_PERMISO as error:
+        raise PermissionDenied(str(error)) from error
+    except CatalogoError as error:
+        return JsonResponse({"error": str(error)}, status=400)
+    return JsonResponse({"codigo": codigo})
 
 
 @login_required

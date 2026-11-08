@@ -23,11 +23,12 @@ class Rubro(models.Model):
 
 
 class Naturaleza(models.Model):
-    """Posición 2 del código de cuenta. Fuente configurable (CU-06)."""
+    """Saldo normal de la cuenta (deudora o acreedora); no forma parte
+    del código. Fuente configurable (CU-06)."""
 
     codigo = models.CharField(
         "código", max_length=1, unique=True,
-        validators=[RegexValidator(r"^[0-9]$")],
+        validators=[RegexValidator(r"^[A-Z]$")],
     )
     nombre = models.CharField("nombre", max_length=80)
 
@@ -35,25 +36,35 @@ class Naturaleza(models.Model):
         ordering = ["codigo"]
 
     def __str__(self):
-        return f"{self.codigo} {self.nombre}"
+        return self.nombre
 
 
-class Grupo(models.Model):
-    """Combinación válida de rubro y naturaleza (posiciones 1 y 2)."""
+class Subtipo(models.Model):
+    """Posición 2 del código dentro de su rubro, p. ej. 11 Activo
+    corriente. Fuente configurable (CU-06)."""
 
-    rubro = models.ForeignKey(Rubro, on_delete=models.PROTECT)
-    naturaleza = models.ForeignKey(Naturaleza, on_delete=models.PROTECT)
+    rubro = models.ForeignKey(
+        Rubro, on_delete=models.PROTECT, related_name="subtipos"
+    )
+    codigo = models.CharField(
+        "código", max_length=1, validators=[RegexValidator(r"^[0-9]$")]
+    )
+    nombre = models.CharField("nombre", max_length=80)
 
     class Meta:
-        ordering = ["rubro__codigo", "naturaleza__codigo"]
+        ordering = ["rubro__codigo", "codigo"]
         constraints = [
             models.UniqueConstraint(
-                fields=["rubro", "naturaleza"], name="grupo_unico"
+                fields=["rubro", "codigo"], name="subtipo_unico_por_rubro"
             ),
         ]
 
+    @property
+    def prefijo(self):
+        return f"{self.rubro.codigo}{self.codigo}"
+
     def __str__(self):
-        return f"{self.rubro.codigo}{self.naturaleza.codigo}"
+        return f"{self.prefijo} {self.nombre}"
 
 
 class Cuenta(models.Model):
@@ -67,9 +78,8 @@ class Cuenta(models.Model):
         max_length=DENOMINACION_MAX_LENGTH, unique=True, editable=False
     )
     rubro = models.ForeignKey(Rubro, on_delete=models.PROTECT)
+    subtipo = models.ForeignKey(Subtipo, on_delete=models.PROTECT)
     naturaleza = models.ForeignKey(Naturaleza, on_delete=models.PROTECT)
-    descripcion = models.TextField("descripción", blank=True)
-    reglas_uso = models.TextField("reglas de uso", blank=True)
     activa = models.BooleanField("activa", default=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
@@ -97,7 +107,6 @@ class AprobacionCuenta(models.Model):
         Cuenta, on_delete=models.PROTECT, related_name="aprobaciones"
     )
     tipo = models.CharField(max_length=20, choices=Tipo.choices)
-    justificacion = models.TextField("justificación")
     referencia_respaldo = models.CharField(
         "referencia de respaldo", max_length=150
     )

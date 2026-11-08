@@ -24,8 +24,8 @@
         {% for cuenta in pagina %}
         <tr>
           <td><strong>{{ cuenta.codigo }}</strong></td>
-          <td><strong>{{ cuenta.denominacion }}</strong>{% if cuenta.descripcion %}<small>{{ cuenta.descripcion|truncatechars:90 }}</small>{% endif %}</td>
-          <td>{{ cuenta.rubro.nombre }}</td>
+          <td><strong>{{ cuenta.denominacion }}</strong></td>
+          <td>{{ cuenta.rubro.nombre }}<small>{{ cuenta.subtipo }}</small></td>
           <td>{{ cuenta.naturaleza.nombre }}</td>
           <td><span class="tag {% if cuenta.activa %}tag-open{% else %}tag-muted{% endif %}">{% if cuenta.activa %}Activa{% else %}Inactiva{% endif %}</span></td>
           <td class="num"><a class="text-button" href="{% url 'cuenta_detalle' cuenta.codigo %}">Consultar</a>{% if puede_modificar %} <a class="text-button" href="{% url 'cuenta_modificar' cuenta.codigo %}">Modificar</a>{% endif %}</td>
@@ -44,12 +44,12 @@
 {% block modal %}
 {% if form_alta %}
 <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Registrar cuenta">
-  <div class="modal-header"><div><h2>Registrar cuenta</h2><p>El código se asigna al guardar: siguiente número libre del rubro y la naturaleza. No se admiten subcuentas.</p></div><a class="modal-close" href="{% url 'accounts' %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-header"><div><h2>Registrar cuenta</h2><p>El código se forma con el tipo de cuenta, el subtipo y el siguiente correlativo libre. No se admiten subcuentas.</p></div><a class="modal-close" href="{% url 'accounts' %}" aria-label="Cerrar">×</a></div>
   <form class="modal-form" method="post" action="{% url 'cuenta_nueva' %}" novalidate>
     {% csrf_token %}
-    {% if sin_naturalezas %}<div class="notice"><span class="notice-icon">i</span><span>No hay naturalezas ni grupos configurados en el catálogo; no se pueden registrar cuentas hasta cargarlos.</span></div>{% endif %}
+    {% if sin_subtipos %}<div class="notice"><span class="notice-icon">i</span><span>No hay subtipos configurados en el catálogo; no se pueden registrar cuentas hasta cargarlos.</span></div>{% endif %}
     {% for error in form_alta.non_field_errors %}<span class="form-error">{{ error }}</span>{% endfor %}
-    {% include "sic_sunGames/cuenta_campos.html" with form=form_alta %}
+    {% include "sic_sunGames/cuenta_campos.html" with form=form_alta vista_previa=True %}
     <div class="modal-actions"><a class="button button-secondary" href="{% url 'accounts' %}">Cancelar</a><button class="button button-primary" type="submit">Registrar cuenta</button></div>
   </form>
 </section></div>
@@ -60,11 +60,10 @@
     <div class="modal-fields">
       <div class="field"><label>Código</label><input value="{{ ficha.codigo }}" readonly /></div>
       <div class="field"><label>Denominación</label><input value="{{ ficha.denominacion }}" readonly /></div>
-      <div class="field"><label>Rubro</label><input value="{{ ficha.rubro }}" readonly /></div>
+      <div class="field"><label>Tipo de cuenta</label><input value="{{ ficha.rubro }}" readonly /></div>
+      <div class="field"><label>Subtipo</label><input value="{{ ficha.subtipo }}" readonly /></div>
       <div class="field"><label>Naturaleza</label><input value="{{ ficha.naturaleza }}" readonly /></div>
       <div class="field"><label>Estado</label><input value="{% if ficha.activa %}Activa{% else %}Inactiva{% endif %}" readonly /></div>
-      <div class="field full"><label>Descripción</label><textarea rows="3" readonly>{{ ficha.descripcion }}</textarea></div>
-      <div class="field full"><label>Reglas de uso</label><textarea rows="3" readonly>{{ ficha.reglas_uso }}</textarea></div>
     </div>
     <div class="modal-actions"><a class="button button-secondary" href="{% url 'accounts' %}">Volver</a>{% if puede_modificar %}<a class="button button-primary" href="{% url 'cuenta_modificar' ficha.codigo %}">Modificar</a>{% endif %}</div>
   </div>
@@ -75,7 +74,7 @@
   <form class="modal-form" method="post" action="{% url 'cuenta_modificar' cuenta.codigo %}">
     {% csrf_token %}
     {% for campo in form_cambio %}{{ campo.as_hidden }}{% endfor %}
-    {% if revision.conserva_codigo %}<div class="notice"><span class="notice-icon">i</span><span>Cambia el rubro o la naturaleza, pero la cuenta conserva su código original {{ cuenta.codigo }}.</span></div>{% endif %}
+    {% if revision.conserva_codigo %}<div class="notice"><span class="notice-icon">i</span><span>Cambia el tipo de cuenta o el subtipo, pero la cuenta conserva su código original {{ cuenta.codigo }}.</span></div>{% endif %}
     <div class="table-wrap">
       <table>
         <thead><tr><th>Campo</th><th>Valor actual</th><th>Valor propuesto</th></tr></thead>
@@ -88,7 +87,7 @@
     </div>
     <div class="modal-fields">
       {% for campo in form_cambio.campos_documentacion %}
-      <div class="field{% if campo.name == 'justificacion' %} full{% endif %}"><label>{{ campo.label }}</label><input value="{{ campo.value }}" readonly /></div>
+      <div class="field"><label>{{ campo.label }}</label><input value="{{ campo.value }}" readonly /></div>
       {% endfor %}
     </div>
     <div class="modal-actions"><button class="button button-secondary" type="submit" name="editar" value="1">Volver a editar</button><button class="button button-primary" type="submit" name="confirmar" value="1">Confirmar cambios</button></div>
@@ -96,7 +95,7 @@
 </section></div>
 {% elif form_cambio %}
 <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Modificar cuenta">
-  <div class="modal-header"><div><h2>Modificar cuenta</h2><p>El código es de solo lectura. Los cambios requieren justificación, respaldo y acuerdo de Junta Directiva.</p></div><a class="modal-close" href="{% url 'accounts' %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-header"><div><h2>Modificar cuenta</h2><p>El código es de solo lectura. Los cambios requieren respaldo y acuerdo de Junta Directiva.</p></div><a class="modal-close" href="{% url 'accounts' %}" aria-label="Cerrar">×</a></div>
   <form class="modal-form" method="post" action="{% url 'cuenta_modificar' cuenta.codigo %}" novalidate>
     {% csrf_token %}
     {% for error in form_cambio.non_field_errors %}<span class="form-error">{{ error }}</span>{% endfor %}

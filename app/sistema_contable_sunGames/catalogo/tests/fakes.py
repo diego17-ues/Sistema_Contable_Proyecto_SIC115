@@ -1,35 +1,40 @@
 from catalogo.exceptions import (
     CuentaNoEncontradaError,
-    GrupoInvalidoError,
     GuardadoCuentaError,
     NaturalezaInvalidaError,
     RubroInvalidoError,
+    SubtipoInvalidoError,
 )
-from catalogo.models import Cuenta, Naturaleza, Rubro
+from catalogo.models import Cuenta, Naturaleza, Rubro, Subtipo
 from catalogo.services import normalizar_denominacion
 
 ACTIVO = Rubro(codigo="1", nombre="Activo")
 PASIVO = Rubro(codigo="2", nombre="Pasivo")
-DEUDORA = Naturaleza(codigo="1", nombre="Deudora")
-ACREEDORA = Naturaleza(codigo="2", nombre="Acreedora")
+CORRIENTE = Subtipo(rubro=ACTIVO, codigo="1", nombre="Activo corriente")
+NO_CORRIENTE = Subtipo(rubro=ACTIVO, codigo="2", nombre="Activo no corriente")
+PASIVO_CORRIENTE = Subtipo(rubro=PASIVO, codigo="1", nombre="Pasivo corriente")
+DEUDORA = Naturaleza(codigo="D", nombre="Deudora")
+ACREEDORA = Naturaleza(codigo="A", nombre="Acreedora")
 
 
-def crear_cuenta(codigo, denominacion, rubro=ACTIVO, naturaleza=DEUDORA,
-                 activa=True):
+def crear_cuenta(codigo, denominacion, subtipo=CORRIENTE,
+                 naturaleza=DEUDORA, activa=True):
     return Cuenta(
         codigo=codigo, denominacion=denominacion,
         denominacion_normalizada=normalizar_denominacion(denominacion),
-        rubro=rubro, naturaleza=naturaleza, activa=activa,
-        descripcion="Descripción", reglas_uso="Reglas",
+        rubro=subtipo.rubro, subtipo=subtipo, naturaleza=naturaleza,
+        activa=activa,
     )
 
 
 class CuentaRepositoryEnMemoria:
-    def __init__(self, cuentas=(), grupos=((ACTIVO, DEUDORA),)):
+    def __init__(self, cuentas=()):
         self.cuentas = {cuenta.codigo: cuenta for cuenta in cuentas}
         self._rubros = {r.codigo: r for r in (ACTIVO, PASIVO)}
+        self._subtipos = {
+            s.prefijo: s for s in (CORRIENTE, NO_CORRIENTE, PASIVO_CORRIENTE)
+        }
         self._naturalezas = {n.codigo: n for n in (DEUDORA, ACREEDORA)}
-        self._grupos = {(r.codigo, n.codigo) for r, n in grupos}
         self.aprobaciones = []
         self.falla_al_guardar = False
 
@@ -59,6 +64,9 @@ class CuentaRepositoryEnMemoria:
     def rubros(self):
         return list(self._rubros.values())
 
+    def subtipos(self):
+        return list(self._subtipos.values())
+
     def naturalezas(self):
         return list(self._naturalezas.values())
 
@@ -74,12 +82,14 @@ class CuentaRepositoryEnMemoria:
         except KeyError as exc:
             raise NaturalezaInvalidaError() from exc
 
-    def existe_grupo(self, rubro, naturaleza):
-        return (rubro.codigo, naturaleza.codigo) in self._grupos
+    def obtener_subtipo(self, rubro, codigo):
+        try:
+            return self._subtipos[rubro.codigo + codigo]
+        except KeyError as exc:
+            raise SubtipoInvalidoError() from exc
 
-    def bloquear_grupo(self, rubro, naturaleza):
-        if not self.existe_grupo(rubro, naturaleza):
-            raise GrupoInvalidoError()
+    def bloquear_subtipo(self, subtipo):
+        return subtipo
 
     def codigos_con_prefijo(self, prefijo):
         return [c for c in self.cuentas if c.startswith(prefijo)]

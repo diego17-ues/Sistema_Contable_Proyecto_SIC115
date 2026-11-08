@@ -2,8 +2,6 @@ from django.db import migrations
 
 # Elementos (posición 1) según el Manual de aplicación del catálogo de
 # SunGames, sección 2.2.
-# TODO(CU-06.1): el manual no asigna un dígito a cada naturaleza ni define
-# grupos por naturaleza; Naturaleza y Grupo quedan vacíos hasta confirmarlos.
 RUBROS = (
     ("1", "Activo"),
     ("2", "Pasivo"),

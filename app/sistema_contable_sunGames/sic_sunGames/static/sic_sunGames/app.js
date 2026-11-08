@@ -739,6 +739,34 @@
     page();
   }
 
+  function wireAccountForm() {
+    const rubro = $('#id_rubro');
+    const subtipo = $('#id_subtipo');
+    if (!rubro || !subtipo) return;
+    const preview = $('#codigoPropuesto');
+    const filterSubtypes = () => {
+      $$('option', subtipo).forEach(option => { option.hidden = Boolean(option.value) && !option.value.startsWith(rubro.value); });
+      if (subtipo.value && !subtipo.value.startsWith(rubro.value)) subtipo.value = '';
+    };
+    const updatePreview = async () => {
+      if (!preview) return;
+      preview.value = '';
+      if (!rubro.value || !subtipo.value) return;
+      const url = new URL(preview.dataset.url, window.location.origin);
+      url.searchParams.set('rubro', rubro.value);
+      url.searchParams.set('subtipo', subtipo.value);
+      const response = await fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+      const data = await response.json().catch(() => ({}));
+      preview.value = data.codigo || '';
+      preview.placeholder = data.error || 'Elige tipo y subtipo';
+    };
+    rubro.addEventListener('change', () => { filterSubtypes(); updatePreview(); });
+    subtipo.addEventListener('change', updatePreview);
+    filterSubtypes();
+    updatePreview();
+  }
+
+  wireAccountForm();
   window.addEventListener('popstate', showScreenFromUrl);
   showScreenFromUrl();
   JSON.parse($('#serverMessages').textContent).forEach(message => showToast(message.text, message.level === 'success' ? 'success' : message.level === 'warning' ? 'warning' : 'error'));

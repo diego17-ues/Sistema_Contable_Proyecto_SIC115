@@ -8,8 +8,14 @@ OPCION_INVALIDA = "Seleccione una opción válida."
 CODIGO_INVALIDO = "El código admite solo dígitos, hasta 4."
 
 
-def _opciones(elementos, vacio):
-    return [("", vacio)] + [(e.codigo, str(e)) for e in elementos]
+def _opciones(elementos, vacio, valor="codigo", etiqueta=str):
+    return [("", vacio)] + [
+        (getattr(e, valor), etiqueta(e)) for e in elementos
+    ]
+
+
+def _nombre(elemento):
+    return elemento.nombre
 
 
 def _seleccion(label, required=True):
@@ -39,7 +45,7 @@ class CuentaFiltroForm(forms.Form):
         max_length=DENOMINACION_MAX_LENGTH,
         widget=forms.TextInput(attrs={"placeholder": "Denominación"}),
     )
-    rubro = _seleccion("Rubro", required=False)
+    rubro = _seleccion("Tipo de cuenta", required=False)
     naturaleza = _seleccion("Naturaleza", required=False)
     estado = forms.ChoiceField(
         label="Estado", required=False,
@@ -49,10 +55,12 @@ class CuentaFiltroForm(forms.Form):
         error_messages={"invalid_choice": OPCION_INVALIDA},
     )
 
-    def __init__(self, *args, rubros, naturalezas, **kwargs):
+    def __init__(self, *args, rubros, naturalezas, subtipos=(), **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["rubro"].choices = _opciones(rubros, "Todos")
-        self.fields["naturaleza"].choices = _opciones(naturalezas, "Todas")
+        self.fields["naturaleza"].choices = _opciones(
+            naturalezas, "Todas", etiqueta=_nombre
+        )
 
     def filtros(self):
         if not self.is_bound:
@@ -70,9 +78,7 @@ class CuentaFiltroForm(forms.Form):
 class CuentaForm(forms.Form):
     """Datos y documentación de CU-06.1 y CU-06.3; sin campo de código."""
 
-    CAMPOS_CUENTA = (
-        "denominacion", "rubro", "naturaleza", "descripcion", "reglas_uso"
-    )
+    CAMPOS_CUENTA = ("denominacion", "rubro", "subtipo", "naturaleza")
 
     denominacion = forms.CharField(
         label="Denominación", max_length=DENOMINACION_MAX_LENGTH,
@@ -81,20 +87,9 @@ class CuentaForm(forms.Form):
             "max_length": "La denominación admite hasta 150 caracteres.",
         },
     )
-    rubro = _seleccion("Rubro")
+    rubro = _seleccion("Tipo de cuenta")
+    subtipo = _seleccion("Subtipo")
     naturaleza = _seleccion("Naturaleza")
-    descripcion = forms.CharField(
-        label="Descripción", required=False,
-        widget=forms.Textarea(attrs={"rows": 3}),
-    )
-    reglas_uso = forms.CharField(
-        label="Reglas de uso", required=False,
-        widget=forms.Textarea(attrs={"rows": 3}),
-    )
-    justificacion = forms.CharField(
-        label="Justificación", widget=forms.Textarea(attrs={"rows": 3}),
-        error_messages={"required": CAMPO_OBLIGATORIO},
-    )
     referencia_respaldo = forms.CharField(
         label="Referencia de respaldo", max_length=150,
         error_messages={"required": CAMPO_OBLIGATORIO},
@@ -113,11 +108,14 @@ class CuentaForm(forms.Form):
         },
     )
 
-    def __init__(self, *args, rubros, naturalezas, **kwargs):
+    def __init__(self, *args, rubros, subtipos, naturalezas, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["rubro"].choices = _opciones(rubros, "Seleccione")
+        self.fields["subtipo"].choices = _opciones(
+            subtipos, "Seleccione", valor="prefijo"
+        )
         self.fields["naturaleza"].choices = _opciones(
-            naturalezas, "Seleccione"
+            naturalezas, "Seleccione", etiqueta=_nombre
         )
 
     def campos_cuenta(self):

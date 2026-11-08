@@ -1,9 +1,9 @@
 from django.contrib import admin
 
-from .models import Grupo, Naturaleza, Rubro
+from .models import Naturaleza, Rubro, Subtipo
 
-# Fuente configurable de rubros, naturalezas y grupos válidos (CU-06).
+# Fuente configurable de rubros, subtipos y naturalezas (CU-06).
 # Las cuentas no se registran aquí: solo cambian por CatalogoCuentasService.
 admin.site.register(Rubro)
+admin.site.register(Subtipo)
 admin.site.register(Naturaleza)
-admin.site.register(Grupo)

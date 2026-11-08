@@ -8,12 +8,12 @@ from catalogo.exceptions import (
     CodigoNoAsignableError,
     CuentaDuplicadaError,
     DocumentacionIncompletaError,
-    GrupoInvalidoError,
     GuardadoCuentaError,
     NaturalezaInvalidaError,
     RubroInvalidoError,
     SinCambiosError,
     SubcuentaNoPermitidaError,
+    SubtipoInvalidoError,
 )
 from catalogo.models import AprobacionCuenta
 from catalogo.services import CatalogoCuentasService, normalizar_denominacion
@@ -22,29 +22,27 @@ from usuarios.roles import Rol
 from usuarios.tests.fakes import crear_usuario
 
 from .fakes import (
-    ACREEDORA,
     ACTIVO,
-    DEUDORA,
+    NO_CORRIENTE,
     PASIVO,
+    PASIVO_CORRIENTE,
     BitacoraEnMemoria,
     CuentaRepositoryEnMemoria,
     crear_cuenta,
 )
 
 DOCUMENTACION = {
-    "justificacion": "Se requiere controlar el efectivo de eventos.",
     "referencia_respaldo": "SOL-2026-014",
     "acuerdo_numero": "JD-07/2026",
     "acuerdo_fecha": datetime.date(2026, 11, 3),
 }
 
 
-def datos(denominacion="Caja de eventos", rubro="1", naturaleza="1",
-          **extra):
+def datos(denominacion="Caja de eventos", rubro="1", subtipo="11",
+          naturaleza="D", **extra):
     return {
-        "denominacion": denominacion, "rubro": rubro,
-        "naturaleza": naturaleza, "descripcion": "Efectivo de eventos.",
-        "reglas_uso": "Solo para eventos.", **DOCUMENTACION, **extra,
+        "denominacion": denominacion, "rubro": rubro, "subtipo": subtipo,
+        "naturaleza": naturaleza, **DOCUMENTACION, **extra,
     }
 
 
@@ -55,8 +53,8 @@ class CatalogoTestCase(SimpleTestCase):
         self.bitacora = BitacoraEnMemoria()
         self.preparar()
 
-    def preparar(self, cuentas=(), grupos=((ACTIVO, DEUDORA),)):
-        self.repositorio = CuentaRepositoryEnMemoria(cuentas, grupos)
+    def preparar(self, cuentas=()):
+        self.repositorio = CuentaRepositoryEnMemoria(cuentas)
         self.servicio = CatalogoCuentasService(
             self.repositorio, self.bitacora
         )
@@ -74,26 +72,41 @@ class RegistrarCuentaTest(CatalogoTestCase):
         self.assertEqual(cuenta.codigo, "1101")
         self.assertTrue(cuenta.activa)
 
-    def test_asigna_siguiente_numero_libre_del_grupo(self):
-        self.preparar(
-            cuentas=[
-                crear_cuenta("1101", "Caja general"),
-                crear_cuenta("1102", "Caja chica"),
-                crear_cuenta("1201", "Mobiliario", naturaleza=ACREEDORA),
-                crear_cuenta("2101", "Proveedores", rubro=PASIVO),
-            ],
-            grupos=[(ACTIVO, DEUDORA), (ACTIVO, ACREEDORA)],
-        )
+    def test_asigna_siguiente_correlativo_libre_del_subtipo(self):
+        self.preparar(cuentas=[
+            crear_cuenta("1101", "Caja general"),
+            crear_cuenta("1102", "Caja chica"),
+            crear_cuenta("1201", "Mobiliario", subtipo=NO_CORRIENTE),
+            crear_cuenta("2101", "Proveedores", subtipo=PASIVO_CORRIENTE),
+        ])
 
         self.assertEqual(
             self.servicio.registrar(self.admin, datos()).codigo, "1103"
         )
         self.assertEqual(
             self.servicio.registrar(
-                self.admin, datos("Equipo", naturaleza="2")
+                self.admin, datos("Equipo", subtipo="12", naturaleza="A")
             ).codigo,
             "1202",
         )
+
+    def test_la_naturaleza_no_cambia_el_codigo(self):
+        cuenta = self.servicio.registrar(
+            self.admin, datos("Depreciación", naturaleza="A")
+        )
+
+        self.assertEqual(cuenta.codigo, "1101")
+        self.assertEqual(cuenta.naturaleza.nombre, "Acreedora")
+
+    def test_vista_previa_del_codigo(self):
+        self.preparar(cuentas=[crear_cuenta("1101", "Caja general")])
+
+        codigo = self.servicio.siguiente_codigo(self.admin, "1", "11")
+
+        self.assertEqual(codigo, "1102")
+        self.assertSinEscrituras(1)
+        with self.assertRaises(RolNoAutorizadoError):
+            self.servicio.siguiente_codigo(self.contador, "1", "11")
 
     def test_codigo_dado_de_baja_no_se_reutiliza(self):
         self.preparar(cuentas=[
@@ -139,11 +152,13 @@ class RegistrarCuentaTest(CatalogoTestCase):
             )
         self.assertSinEscrituras(1)
 
-    def test_rechaza_rubro_naturaleza_o_grupo_invalidos(self):
+    def test_rechaza_tipo_subtipo_o_naturaleza_invalidos(self):
         casos = [
             (datos(rubro="9"), RubroInvalidoError),
-            (datos(naturaleza="9"), NaturalezaInvalidaError),
-            (datos(rubro="2"), GrupoInvalidoError),
+            (datos(naturaleza="X"), NaturalezaInvalidaError),
+            (datos(rubro="2"), SubtipoInvalidoError),
+            (datos(subtipo="19"), SubtipoInvalidoError),
+            (datos(subtipo="1"), SubtipoInvalidoError),
         ]
         for propuesta, error in casos:
             with self.subTest(error=error.__name__):
@@ -159,13 +174,12 @@ class RegistrarCuentaTest(CatalogoTestCase):
                 self.assertEqual(ctx.exception.campo, campo)
         self.assertSinEscrituras(0)
 
-    def test_rechaza_sin_justificacion_ni_respaldo(self):
-        for campo in ("justificacion", "referencia_respaldo"):
-            with self.subTest(campo=campo):
-                with self.assertRaises(DocumentacionIncompletaError):
-                    self.servicio.registrar(
-                        self.admin, datos(**{campo: "   "})
-                    )
+    def test_rechaza_sin_respaldo(self):
+        with self.assertRaises(DocumentacionIncompletaError) as ctx:
+            self.servicio.registrar(
+                self.admin, datos(referencia_respaldo="   ")
+            )
+        self.assertEqual(ctx.exception.campo, "referencia_respaldo")
         self.assertSinEscrituras(0)
 
     def test_rechaza_subcuenta(self):
@@ -195,13 +209,10 @@ class RegistrarCuentaTest(CatalogoTestCase):
 class ModificarCuentaTest(CatalogoTestCase):
     def setUp(self):
         super().setUp()
-        self.preparar(
-            cuentas=[
-                crear_cuenta("1101", "Caja general"),
-                crear_cuenta("1102", "Caja chica"),
-            ],
-            grupos=[(ACTIVO, DEUDORA), (PASIVO, ACREEDORA)],
-        )
+        self.preparar(cuentas=[
+            crear_cuenta("1101", "Caja general"),
+            crear_cuenta("1102", "Caja chica"),
+        ])
         self.cuenta = self.repositorio.cuentas["1101"]
 
     def test_codigo_inmodificable_aunque_se_envie(self):
@@ -226,7 +237,7 @@ class ModificarCuentaTest(CatalogoTestCase):
     def test_cambio_conserva_codigo_y_guarda_historial(self):
         revision = self.servicio.modificar(
             self.admin, "1101",
-            datos("Caja central", rubro="2", naturaleza="2"),
+            datos("Caja central", rubro="2", subtipo="21", naturaleza="A"),
         )
 
         guardada = self.repositorio.obtener_por_codigo("1101")
@@ -246,12 +257,26 @@ class ModificarCuentaTest(CatalogoTestCase):
             cambios["denominacion"], ("Caja general", "Caja central")
         )
         self.assertEqual(cambios["rubro"], ("1 Activo", "2 Pasivo"))
-        self.assertEqual(cambios["naturaleza"], ("1 Deudora", "2 Acreedora"))
+        self.assertEqual(
+            cambios["subtipo"], ("11 Activo corriente", "21 Pasivo corriente")
+        )
+        self.assertEqual(cambios["naturaleza"], ("Deudora", "Acreedora"))
         self.assertEqual(self.bitacora.registros, [{
             "accion": Accion.MODIFICACION_CUENTA,
             "resultado": Resultado.EXITOSO, "actor": self.admin,
             "referencia": "Cuenta 1101",
         }])
+
+    def test_cambio_de_naturaleza_no_toca_el_codigo(self):
+        revision = self.servicio.modificar(
+            self.admin, "1101", datos("Caja general", naturaleza="A")
+        )
+
+        self.assertFalse(revision.conserva_codigo)
+        self.assertEqual(
+            [c.campo for c in revision.cambios], ["naturaleza"]
+        )
+        self.assertEqual(self.cuenta.codigo, "1101")
 
     def test_revisar_no_guarda(self):
         revision = self.servicio.revisar(
@@ -278,8 +303,8 @@ class ModificarCuentaTest(CatalogoTestCase):
 
         with self.assertRaises(GuardadoCuentaError):
             self.servicio.modificar(
-                self.admin, "1101", datos("Caja central", rubro="2",
-                                          naturaleza="2")
+                self.admin, "1101",
+                datos("Caja central", rubro="2", subtipo="21")
             )
         guardada = self.repositorio.obtener_por_codigo("1101")
         self.assertEqual(guardada.denominacion, "Caja general")
@@ -291,11 +316,8 @@ class ModificarCuentaTest(CatalogoTestCase):
             self.servicio.modificar(self.admin, "1101", datos("caja chica"))
 
     def test_sin_cambios(self):
-        propuesta = datos("Caja general")
-        propuesta.update(descripcion="Descripción", reglas_uso="Reglas")
-
         with self.assertRaises(SinCambiosError):
-            self.servicio.modificar(self.admin, "1101", propuesta)
+            self.servicio.modificar(self.admin, "1101", datos("Caja general"))
 
     def test_rechaza_subcuenta(self):
         with self.assertRaises(SubcuentaNoPermitidaError):

@@ -5,18 +5,18 @@ from django.db import DatabaseError, IntegrityError, transaction
 from .exceptions import (
     CuentaDuplicadaError,
     CuentaNoEncontradaError,
-    GrupoInvalidoError,
     GuardadoCuentaError,
     NaturalezaInvalidaError,
     RubroInvalidoError,
+    SubtipoInvalidoError,
 )
 from .models import (
     AprobacionCuenta,
     Cuenta,
-    Grupo,
     HistorialCuenta,
     Naturaleza,
     Rubro,
+    Subtipo,
 )
 
 
@@ -38,7 +38,9 @@ def _traducir_errores_de_guardado(metodo):
 class CuentaRepository:
     def listar(self, *, codigo="", denominacion="", rubro="", naturaleza="",
                activa=None):
-        cuentas = Cuenta.objects.select_related("rubro", "naturaleza")
+        cuentas = Cuenta.objects.select_related(
+            "rubro", "subtipo__rubro", "naturaleza"
+        )
         if codigo:
             cuentas = cuentas.filter(codigo__startswith=codigo)
         if denominacion:
@@ -54,7 +56,7 @@ class CuentaRepository:
     def obtener_por_codigo(self, codigo):
         try:
             return Cuenta.objects.select_related(
-                "rubro", "naturaleza"
+                "rubro", "subtipo__rubro", "naturaleza"
             ).get(codigo=codigo)
         except Cuenta.DoesNotExist as exc:
             raise CuentaNoEncontradaError() from exc
@@ -68,8 +70,13 @@ class CuentaRepository:
     def rubros(self):
         return Rubro.objects.order_by("codigo")
 
+    def subtipos(self):
+        return Subtipo.objects.select_related("rubro").order_by(
+            "rubro__codigo", "codigo"
+        )
+
     def naturalezas(self):
-        return Naturaleza.objects.order_by("codigo")
+        return Naturaleza.objects.order_by("nombre")
 
     def obtener_rubro(self, codigo):
         try:
@@ -77,28 +84,26 @@ class CuentaRepository:
         except Rubro.DoesNotExist as exc:
             raise RubroInvalidoError() from exc
 
+    def obtener_subtipo(self, rubro, codigo):
+        try:
+            return Subtipo.objects.select_related("rubro").get(
+                rubro=rubro, codigo=codigo
+            )
+        except Subtipo.DoesNotExist as exc:
+            raise SubtipoInvalidoError() from exc
+
     def obtener_naturaleza(self, codigo):
         try:
             return Naturaleza.objects.get(codigo=codigo)
         except Naturaleza.DoesNotExist as exc:
             raise NaturalezaInvalidaError() from exc
 
-    def existe_grupo(self, rubro, naturaleza):
-        return Grupo.objects.filter(
-            rubro=rubro, naturaleza=naturaleza
-        ).exists()
-
-    def bloquear_grupo(self, rubro, naturaleza):
-        """Serializa la asignación de códigos dentro del mismo grupo."""
-        try:
-            return Grupo.objects.select_for_update().get(
-                rubro=rubro, naturaleza=naturaleza
-            )
-        except Grupo.DoesNotExist as exc:
-            raise GrupoInvalidoError() from exc
+    def bloquear_subtipo(self, subtipo):
+        """Serializa la asignación de códigos dentro del mismo subtipo."""
+        return Subtipo.objects.select_for_update().get(pk=subtipo.pk)
 
     def codigos_con_prefijo(self, prefijo):
-        """Códigos usados en el grupo, activos o dados de baja."""
+        """Códigos usados en el subtipo, activos o dados de baja."""
         return list(
             Cuenta.objects.filter(codigo__startswith=prefijo)
             .values_list("codigo", flat=True)
