@@ -185,6 +185,10 @@ class CatalogoIntegracionTests(TestCase):
         detalle = self.client.get(reverse("cuenta_detalle", args=["1101"]))
 
         self.assertContains(listado, "Caja general")
+        self.assertContains(listado, "1. ACTIVO")
+        self.assertContains(listado, "11 · Activo corriente")
+        self.assertContains(listado, "3. PATRIMONIO")
+        self.assertNotContains(listado, "31 · Patrimonio")
         self.assertNotContains(listado, reverse("cuenta_nueva"))
         self.assertNotContains(
             listado, reverse("cuenta_modificar", args=["1101"])

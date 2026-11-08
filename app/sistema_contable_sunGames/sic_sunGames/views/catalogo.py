@@ -16,7 +16,7 @@ from usuarios.exceptions import RolNoAutorizadoError, UsuarioInactivoError
 from .pages import contexto_panel
 
 CATALOGO_TEMPLATE = "sic_sunGames/catalogo.html"
-REGISTROS_POR_PAGINA = 20
+REGISTROS_POR_PAGINA = 100
 SIN_PERMISO = (RolNoAutorizadoError, UsuarioInactivoError)
 
 

@@ -22,6 +22,8 @@
       <thead><tr><th>Código</th><th>Denominación</th><th>Rubro</th><th>Naturaleza</th><th>Estado</th><th></th></tr></thead>
       <tbody>
         {% for cuenta in pagina %}
+        {% ifchanged cuenta.rubro_id %}<tr class="account-group-row"><td colspan="6">{{ cuenta.rubro.codigo }}. {{ cuenta.rubro.nombre|upper }}</td></tr>{% endifchanged %}
+        {% ifchanged cuenta.subtipo_id %}{% if cuenta.subtipo.nombre != cuenta.rubro.nombre %}<tr class="account-subgroup-row"><td colspan="6">{{ cuenta.subtipo.prefijo }} · {{ cuenta.subtipo.nombre }}</td></tr>{% endif %}{% endifchanged %}
         <tr>
           <td><strong>{{ cuenta.codigo }}</strong></td>
           <td><strong>{{ cuenta.denominacion }}</strong></td>

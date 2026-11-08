@@ -51,7 +51,9 @@ class CuentaRepository:
             cuentas = cuentas.filter(naturaleza__codigo=naturaleza)
         if activa is not None:
             cuentas = cuentas.filter(activa=activa)
-        return cuentas.order_by("codigo")
+        return cuentas.order_by(
+            "rubro__codigo", "subtipo__codigo", "codigo"
+        )
 
     def obtener_por_codigo(self, codigo):
         try:
