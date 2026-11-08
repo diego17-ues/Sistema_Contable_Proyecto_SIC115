@@ -17,6 +17,10 @@ class UsuarioInactivoError(UsuarioError):
     mensaje = "El usuario está inactivo."
 
 
+class UsuarioActivoError(UsuarioError):
+    mensaje = "El usuario ya está activo."
+
+
 class RolInvalidoError(UsuarioError):
     mensaje = "Seleccione un rol permitido."
 

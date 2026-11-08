@@ -9,6 +9,7 @@ from .exceptions import (
     RolInvalidoError,
     RolNoAutorizadoError,
     ServicioAutenticacionError,
+    UsuarioActivoError,
     UsuarioDuplicadoError,
     UsuarioInactivoError,
     UsuarioNoEncontradoError,
@@ -54,6 +55,29 @@ class UsuarioService:
                 usuario, activo=False
             )
             self._registrar(Accion.DESACTIVACION_USUARIO, actor, usuario)
+        return usuario
+
+    def reactivar(self, actor, username):
+        """Vuelve a habilitar una cuenta inactiva; su historial se conserva."""
+        self._verificar_administrador(actor)
+        usuario = self._repositorio.obtener_por_username(username)
+        if usuario.activo:
+            raise UsuarioActivoError()
+        with self._transaccion():
+            usuario = self._repositorio.actualizar_estado(
+                usuario, activo=True
+            )
+            self._registrar(Accion.REACTIVACION_USUARIO, actor, usuario)
+        return usuario
+
+    def cambiar_contrasena(self, actor, username, contrasena):
+        """Asigna una nueva contraseña; los demás datos no cambian."""
+        self._verificar_administrador(actor)
+        usuario = self._repositorio.obtener_por_username(username)
+        usuario.set_password(contrasena)
+        with self._transaccion():
+            usuario = self._repositorio.guardar_contrasena(usuario)
+            self._registrar(Accion.CAMBIO_CONTRASENA, actor, usuario)
         return usuario
 
     def listar(self, actor):

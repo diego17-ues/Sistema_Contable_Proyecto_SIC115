@@ -233,6 +233,8 @@ class AdministracionIntegracionTests(TestCase):
             reverse("users"), reverse("audit"), reverse("usuario_nuevo"),
             reverse("usuario_detalle", args=["admin"]),
             reverse("usuario_desactivar", args=["admin"]),
+            reverse("usuario_reactivar", args=["admin"]),
+            reverse("usuario_contrasena", args=["admin"]),
             reverse("auditoria_descargar", args=["pdf"]),
             reverse("auditoria_descargar", args=["excel"]),
         ]
@@ -244,6 +246,14 @@ class AdministracionIntegracionTests(TestCase):
         )
         self.assertEqual(respuesta.status_code, 403)
         self.assertTrue(Usuario.objects.get(username="admin").activo)
+        respuesta = self.client.post(
+            reverse("usuario_contrasena", args=["admin"]),
+            {"contrasena": CLAVE + "x", "confirmacion": CLAVE + "x"},
+        )
+        self.assertEqual(respuesta.status_code, 403)
+        self.assertTrue(
+            Usuario.objects.get(username="admin").check_password(CLAVE)
+        )
 
     def test_alta_crea_cuenta_con_contrasena_y_registra(self):
         self.client.force_login(self.admin)
@@ -305,6 +315,74 @@ class AdministracionIntegracionTests(TestCase):
         )
 
         self.assertContains(respuesta, "El usuario ya está inactivo.")
+
+    def test_reactivar_permite_volver_a_iniciar_sesion(self):
+        Usuario.objects.filter(username="cont").update(activo=False)
+        self.client.force_login(self.admin)
+        url = reverse("usuario_reactivar", args=["cont"])
+
+        self.assertContains(self.client.get(url), "Confirmar reactivación")
+        self.assertRedirects(self.client.post(url), reverse("users"))
+        self.assertTrue(Usuario.objects.get(username="cont").activo)
+        registro = RegistroBitacora.objects.latest("id")
+        self.assertEqual(registro.accion, Accion.REACTIVACION_USUARIO)
+        self.client.logout()
+
+        respuesta = self.client.post(
+            reverse("login"), {"username": "cont", "password": CLAVE}
+        )
+
+        self.assertRedirects(respuesta, reverse("dashboard"))
+
+    def test_reactivar_cuenta_activa_informa_la_causa(self):
+        self.client.force_login(self.admin)
+
+        respuesta = self.client.post(
+            reverse("usuario_reactivar", args=["cont"]), follow=True
+        )
+
+        self.assertContains(respuesta, "El usuario ya está activo.")
+
+    def test_cambiar_contrasena_reemplaza_la_anterior(self):
+        self.client.force_login(self.admin)
+        url = reverse("usuario_contrasena", args=["cont"])
+        nueva = CLAVE + "-nueva"
+
+        self.assertContains(
+            self.client.get(url), "Confirmar cambio de contraseña"
+        )
+        respuesta = self.client.post(
+            url, {"contrasena": nueva, "confirmacion": nueva}
+        )
+
+        self.assertRedirects(respuesta, reverse("users"))
+        registro = RegistroBitacora.objects.latest("id")
+        self.assertEqual(registro.accion, Accion.CAMBIO_CONTRASENA)
+        self.assertEqual(registro.afectado.username, "cont")
+        self.client.logout()
+        anterior = self.client.post(
+            reverse("login"), {"username": "cont", "password": CLAVE}
+        )
+        self.assertNotIn(SESSION_KEY, self.client.session)
+        self.assertEqual(anterior.status_code, 200)
+        login = self.client.post(
+            reverse("login"), {"username": "cont", "password": nueva}
+        )
+        self.assertRedirects(login, reverse("dashboard"))
+
+    def test_cambiar_contrasena_con_error_no_la_reemplaza(self):
+        self.client.force_login(self.admin)
+
+        respuesta = self.client.post(
+            reverse("usuario_contrasena", args=["cont"]),
+            {"contrasena": CLAVE + "a", "confirmacion": CLAVE + "b"},
+        )
+
+        self.assertContains(respuesta, "Las contraseñas no coinciden.")
+        self.assertNotContains(respuesta, CLAVE + "a")
+        self.assertTrue(
+            Usuario.objects.get(username="cont").check_password(CLAVE)
+        )
 
     def test_descargas_devuelven_archivo_no_vacio(self):
         RegistroBitacora.objects.create(

@@ -16,7 +16,7 @@
           <td>{{ usuario.username }}</td>
           <td>{{ usuario.get_rol_display }}</td>
           <td><span class="tag {% if usuario.activo %}tag-open{% else %}tag-muted{% endif %}">{% if usuario.activo %}Activo{% else %}Inactivo{% endif %}</span></td>
-          <td class="num"><a class="text-button" href="{% url 'usuario_detalle' usuario.username %}">Consultar</a>{% if usuario.activo %} <a class="text-button" href="{% url 'usuario_desactivar' usuario.username %}">Desactivar</a>{% endif %}</td>
+          <td class="num"><a class="text-button" href="{% url 'usuario_detalle' usuario.username %}">Consultar</a> <a class="text-button" href="{% url 'usuario_contrasena' usuario.username %}">Cambiar contraseña</a> {% if usuario.activo %}<a class="text-button" href="{% url 'usuario_desactivar' usuario.username %}">Desactivar</a>{% else %}<a class="text-button" href="{% url 'usuario_reactivar' usuario.username %}">Reactivar</a>{% endif %}</td>
         </tr>
         {% empty %}
         <tr><td class="empty-cell" colspan="5">No hay usuarios registrados.</td></tr>
@@ -58,6 +58,37 @@
     </div>
     <div class="modal-actions"><a class="button button-secondary" href="{% url 'users' %}">Volver</a></div>
   </div>
+</section></div>
+{% elif form_contrasena %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Cambiar contraseña">
+  <div class="modal-header"><div><h2>Cambiar contraseña</h2><p>Nueva contraseña para {{ cambio.username }} ({{ cambio.nombre_completo }}).</p></div><a class="modal-close" href="{% url 'users' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'usuario_contrasena' cambio.username %}" novalidate>
+    {% csrf_token %}
+    <div class="modal-fields">
+      {% for campo in form_contrasena %}
+      <div class="field">
+        <label for="{{ campo.id_for_label }}">{{ campo.label }} *</label>
+        {{ campo }}
+        {% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'users' %}">Cancelar</a><button class="button button-primary" type="submit">Confirmar cambio de contraseña</button></div>
+  </form>
+</section></div>
+{% elif resumen and reactivar %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Reactivar usuario">
+  <div class="modal-header"><div><h2>Reactivar usuario</h2><p>La cuenta podrá volver a iniciar sesión con su contraseña actual.</p></div><a class="modal-close" href="{% url 'users' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'usuario_reactivar' resumen.username %}">
+    {% csrf_token %}
+    <div class="modal-fields">
+      <div class="field"><label>Usuario</label><input value="{{ resumen.username }}" readonly /></div>
+      <div class="field"><label>Nombre</label><input value="{{ resumen.nombre_completo }}" readonly /></div>
+      <div class="field"><label>Perfil</label><input value="{{ resumen.get_rol_display }}" readonly /></div>
+      <div class="field"><label>Estado actual</label><input value="{% if resumen.activo %}Activo{% else %}Inactivo{% endif %}" readonly /></div>
+    </div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'users' %}">Cancelar</a><button class="button button-primary" type="submit">Confirmar reactivación</button></div>
+  </form>
 </section></div>
 {% elif resumen %}
 <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Desactivar usuario">

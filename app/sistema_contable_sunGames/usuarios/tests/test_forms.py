@@ -1,6 +1,7 @@
 from django.test import SimpleTestCase
 
-from usuarios.forms import UsuarioAltaForm
+from usuarios.forms import CambioContrasenaForm, UsuarioAltaForm
+from usuarios.models import Usuario
 from usuarios.roles import Rol
 
 from .fakes import CLAVE_NUEVA
@@ -97,3 +98,41 @@ class UsuarioAltaFormTest(SimpleTestCase):
         etiquetas = [etiqueta for _, etiqueta in choices]
 
         self.assertEqual(etiquetas, ["Administrador", "Contador General"])
+
+
+class CambioContrasenaFormTest(SimpleTestCase):
+    def setUp(self):
+        self.usuario = Usuario(username="jperez", nombre_completo="Juan")
+
+    def form(self, contrasena, confirmacion):
+        return CambioContrasenaForm(
+            data={"contrasena": contrasena, "confirmacion": confirmacion},
+            usuario=self.usuario,
+        )
+
+    def test_datos_validos(self):
+        form = self.form(CLAVE_NUEVA, CLAVE_NUEVA)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data, {"contrasena": CLAVE_NUEVA})
+
+    def test_campos_obligatorios(self):
+        form = self.form("", "")
+
+        self.assertFalse(form.is_valid())
+        self.assertEqual(
+            form.errors["contrasena"], ["Este campo es obligatorio."]
+        )
+
+    def test_confirmacion_distinta(self):
+        form = self.form(CLAVE_NUEVA, CLAVE_NUEVA + "x")
+
+        self.assertEqual(
+            form.errors["confirmacion"], ["Las contraseñas no coinciden."]
+        )
+
+    def test_rechaza_contrasena_parecida_al_usuario(self):
+        form = self.form("jperez2026", "jperez2026")
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("contrasena", form.errors)

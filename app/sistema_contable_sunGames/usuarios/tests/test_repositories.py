@@ -116,3 +116,20 @@ class UsuarioServiceIntegracionTest(TestCase):
                 contrasena=CLAVE_NUEVA, rol=Rol.ADMINISTRADOR,
             )
         self.assertEqual(Usuario.objects.filter(username="jperez").count(), 1)
+
+    def test_reactivacion_y_contrasena_se_guardan(self):
+        self.servicio.agregar(
+            self.admin, username="jperez", nombre_completo="Juan Pérez",
+            contrasena=CLAVE_NUEVA, rol=Rol.CONTADOR_GENERAL,
+        )
+        self.servicio.desactivar(self.admin, "jperez")
+        otra = CLAVE_NUEVA + "-2"
+
+        self.servicio.reactivar(self.admin, "jperez")
+        self.servicio.cambiar_contrasena(self.admin, "jperez", otra)
+
+        guardado = Usuario.objects.get(username="jperez")
+        self.assertTrue(guardado.activo)
+        self.assertTrue(guardado.check_password(otra))
+        self.assertFalse(guardado.check_password(CLAVE_NUEVA))
+        self.assertEqual(guardado.nombre_completo, "Juan Pérez")

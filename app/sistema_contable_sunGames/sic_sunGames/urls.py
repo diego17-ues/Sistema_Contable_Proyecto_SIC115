@@ -16,6 +16,8 @@ urlpatterns = [
     path("panel/usuarios/nuevo/", administracion.usuario_nuevo, name="usuario_nuevo"),
     path("panel/usuarios/<str:username>/", administracion.usuario_detalle, name="usuario_detalle"),
     path("panel/usuarios/<str:username>/desactivar/", administracion.usuario_desactivar, name="usuario_desactivar"),
+    path("panel/usuarios/<str:username>/reactivar/", administracion.usuario_reactivar, name="usuario_reactivar"),
+    path("panel/usuarios/<str:username>/contrasena/", administracion.usuario_contrasena, name="usuario_contrasena"),
     path("panel/auditoria/", administracion.auditoria, name="audit"),
     path("panel/auditoria/descargar/<str:formato>/", administracion.auditoria_descargar, name="auditoria_descargar"),
 ]

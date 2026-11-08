@@ -16,12 +16,13 @@ from usuarios.composition import (
 from usuarios.exceptions import (
     RolInvalidoError,
     RolNoAutorizadoError,
+    UsuarioActivoError,
     UsuarioDuplicadoError,
     UsuarioError,
     UsuarioInactivoError,
     UsuarioNoEncontradoError,
 )
-from usuarios.forms import UsuarioAltaForm
+from usuarios.forms import CambioContrasenaForm, UsuarioAltaForm
 
 from .pages import contexto_panel
 
@@ -110,6 +111,64 @@ def usuario_desactivar(request, username):
     else:
         messages.success(request, f"Usuario {username} desactivado.")
     return redirect("users")
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def usuario_reactivar(request, username):
+    servicio = crear_usuario_service()
+    try:
+        if request.method != "POST":
+            resumen = servicio.obtener(request.user, username)
+            return _render_usuarios(
+                request, servicio, resumen=resumen, reactivar=True
+            )
+        servicio.reactivar(request.user, username)
+    except (RolNoAutorizadoError, UsuarioInactivoError) as error:
+        raise _sin_permiso(error) from error
+    except (UsuarioActivoError, UsuarioNoEncontradoError) as error:
+        messages.error(request, str(error))
+    else:
+        messages.success(request, f"Usuario {username} reactivado.")
+    return redirect("users")
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def usuario_contrasena(request, username):
+    servicio = crear_usuario_service()
+    try:
+        usuario = servicio.obtener(request.user, username)
+    except (RolNoAutorizadoError, UsuarioInactivoError) as error:
+        raise _sin_permiso(error) from error
+    except UsuarioNoEncontradoError as error:
+        messages.error(request, str(error))
+        return redirect("users")
+
+    if request.method != "POST":
+        form = CambioContrasenaForm(usuario=usuario)
+        return _render_usuarios(
+            request, servicio, cambio=usuario, form_contrasena=form
+        )
+
+    form = CambioContrasenaForm(request.POST, usuario=usuario)
+    if form.is_valid():
+        try:
+            servicio.cambiar_contrasena(
+                request.user, username, form.cleaned_data["contrasena"]
+            )
+        except (RolNoAutorizadoError, UsuarioInactivoError) as error:
+            raise _sin_permiso(error) from error
+        except UsuarioNoEncontradoError as error:
+            messages.error(request, str(error))
+        else:
+            messages.success(
+                request, f"Contraseña de {username} actualizada."
+            )
+        return redirect("users")
+    return _render_usuarios(
+        request, servicio, cambio=usuario, form_contrasena=form
+    )
 
 
 @login_required

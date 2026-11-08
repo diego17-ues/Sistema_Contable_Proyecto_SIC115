@@ -38,6 +38,9 @@ class UsuarioRepositoryEnMemoria:
         usuario.activo = activo
         return usuario
 
+    def guardar_contrasena(self, usuario):
+        return usuario
+
 
 def crear_usuario(username="admin", rol=Rol.ADMINISTRADOR, activo=True):
     return Usuario(

@@ -6,6 +6,7 @@ from bitacora.eventos import Accion, Resultado
 from usuarios.exceptions import (
     RolInvalidoError,
     RolNoAutorizadoError,
+    UsuarioActivoError,
     UsuarioDuplicadoError,
     UsuarioInactivoError,
     UsuarioNoEncontradoError,
@@ -284,3 +285,85 @@ class BitacoraDeUsuariosTest(SimpleTestCase):
 
         with self.assertRaises(RolNoAutorizadoError):
             self.servicio.obtener(contador, "admin")
+
+
+class ReactivarUsuarioTest(SimpleTestCase):
+    def setUp(self):
+        self.admin = crear_usuario("admin")
+        self.bitacora = BitacoraEnMemoria()
+        self.repositorio = UsuarioRepositoryEnMemoria([self.admin])
+        self.servicio = UsuarioService(self.repositorio, self.bitacora)
+
+    def test_reactiva_cuenta_inactiva_y_registra(self):
+        inactivo = crear_usuario("inact", Rol.CONTADOR_GENERAL, activo=False)
+        self.repositorio.guardar(inactivo)
+
+        self.servicio.reactivar(self.admin, "inact")
+
+        self.assertTrue(inactivo.activo)
+        self.assertEqual(self.bitacora.registros, [{
+            "accion": Accion.REACTIVACION_USUARIO,
+            "resultado": Resultado.EXITOSO,
+            "actor": self.admin, "afectado": inactivo,
+        }])
+
+    def test_cuenta_ya_activa_informa_la_causa(self):
+        with self.assertRaisesMessage(
+            UsuarioActivoError, "El usuario ya está activo."
+        ):
+            self.servicio.reactivar(self.admin, "admin")
+        self.assertEqual(self.bitacora.registros, [])
+
+    def test_exige_administrador(self):
+        contador = crear_usuario("cont", Rol.CONTADOR_GENERAL)
+        self.repositorio.guardar(
+            crear_usuario("inact", Rol.CONTADOR_GENERAL, activo=False)
+        )
+
+        with self.assertRaises(RolNoAutorizadoError):
+            self.servicio.reactivar(contador, "inact")
+        self.assertFalse(self.repositorio.obtener_por_username("inact").activo)
+
+    def test_usuario_inexistente(self):
+        with self.assertRaises(UsuarioNoEncontradoError):
+            self.servicio.reactivar(self.admin, "nadie")
+
+
+class CambiarContrasenaTest(SimpleTestCase):
+    def setUp(self):
+        self.admin = crear_usuario("admin")
+        self.contador = crear_usuario("cont", Rol.CONTADOR_GENERAL)
+        self.bitacora = BitacoraEnMemoria()
+        self.repositorio = UsuarioRepositoryEnMemoria(
+            [self.admin, self.contador]
+        )
+        self.servicio = UsuarioService(self.repositorio, self.bitacora)
+
+    def test_asigna_contrasena_con_hash_y_registra(self):
+        self.servicio.cambiar_contrasena(self.admin, "cont", CLAVE_NUEVA)
+
+        self.assertTrue(self.contador.check_password(CLAVE_NUEVA))
+        self.assertNotEqual(self.contador.password, CLAVE_NUEVA)
+        self.assertEqual(self.bitacora.registros, [{
+            "accion": Accion.CAMBIO_CONTRASENA,
+            "resultado": Resultado.EXITOSO,
+            "actor": self.admin, "afectado": self.contador,
+        }])
+
+    def test_no_cambia_rol_ni_estado(self):
+        self.servicio.cambiar_contrasena(self.admin, "cont", CLAVE_NUEVA)
+
+        self.assertEqual(self.contador.rol, Rol.CONTADOR_GENERAL)
+        self.assertTrue(self.contador.activo)
+
+    def test_exige_administrador(self):
+        with self.assertRaises(RolNoAutorizadoError):
+            self.servicio.cambiar_contrasena(
+                self.contador, "admin", CLAVE_NUEVA
+            )
+        self.assertFalse(self.admin.check_password(CLAVE_NUEVA))
+        self.assertEqual(self.bitacora.registros, [])
+
+    def test_usuario_inexistente(self):
+        with self.assertRaises(UsuarioNoEncontradoError):
+            self.servicio.cambiar_contrasena(self.admin, "nadie", CLAVE_NUEVA)
