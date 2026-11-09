@@ -55,20 +55,25 @@ class TransaccionRepositoryEnMemoria:
     def tiene_subcuentas(self, cuenta):
         return cuenta.codigo in self._con_subcuentas
 
-    def crear_transaccion(self, *, fecha, concepto, usuario):
+    def crear_transaccion(self, *, usuario):
         transaccion = Transaccion(
-            pk=len(self.transacciones) + 1, fecha=fecha, concepto=concepto,
-            usuario=usuario,
+            pk=len(self.transacciones) + 1, usuario=usuario
         )
         self.transacciones.append(transaccion)
         return transaccion
 
-    def crear_movimiento(self, *, transaccion, cuenta, importe):
+    def crear_movimiento(self, *, transaccion, cuenta, **datos):
         if len(self.guardados) + 1 == self.fallar_en_movimiento:
             raise GuardadoTransaccionError()
         movimiento = Movimiento(
-            transaccion=transaccion, cuenta=cuenta, importe=importe
+            pk=len(self.guardados) + 1, transaccion=transaccion,
+            cuenta=cuenta, **datos,
         )
+        movimiento.numero = sum(
+            1 for m in self.guardados
+            if m.tipo == movimiento.tipo
+            and m.fecha.year == movimiento.fecha.year
+        ) + 1
         self.guardados.append(movimiento)
         return movimiento
 
@@ -76,17 +81,17 @@ class TransaccionRepositoryEnMemoria:
         return [m for m in self.guardados if m.cuenta is cuenta]
 
     def movimientos(self, cuenta, *, desde=None, hasta=None):
-        return [
+        return sorted((
             m for m in self.movimientos_de(cuenta)
-            if (not desde or m.transaccion.fecha >= desde)
-            and (not hasta or m.transaccion.fecha <= hasta)
-        ]
+            if (not desde or m.fecha >= desde)
+            and (not hasta or m.fecha <= hasta)
+        ), key=lambda m: (m.fecha, m.pk))
 
     def totales(self, cuenta, *, hasta=None, antes_de=None):
         importes = [
             m.importe for m in self.movimientos_de(cuenta)
-            if (not hasta or m.transaccion.fecha <= hasta)
-            and (not antes_de or m.transaccion.fecha < antes_de)
+            if (not hasta or m.fecha <= hasta)
+            and (not antes_de or m.fecha < antes_de)
         ]
         cargos = [i for i in importes if i > 0]
         abonos = [i for i in importes if i < 0]
@@ -94,6 +99,18 @@ class TransaccionRepositoryEnMemoria:
             "cargos": sum(cargos) if cargos else None,
             "abonos": sum(abonos) if abonos else None,
         }
+
+    def saldos_por_cuenta(self, *, hasta):
+        resultado = []
+        for cuenta in sorted(self._cuentas.values(), key=lambda c: c.codigo):
+            importes = [
+                m.importe for m in self.movimientos_de(cuenta)
+                if m.fecha <= hasta
+            ]
+            if importes:
+                cuenta.saldo = sum(importes)
+                resultado.append(cuenta)
+        return resultado
 
 
 def periodo(inicio, fin, cerrado=False):

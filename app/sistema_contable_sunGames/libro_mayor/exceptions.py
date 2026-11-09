@@ -19,21 +19,8 @@ class MovimientoInvalidoError(LibroMayorError):
     mensaje = "El movimiento no es válido."
 
 
-class CuentaRepetidaError(LibroMayorError):
-    mensaje = "La cuenta aparece más de una vez en la transacción."
-
-
 class CuentaNoRegistrableError(LibroMayorError):
     mensaje = "La cuenta no admite registros."
-
-
-class TransaccionDescuadradaError(LibroMayorError):
-    def __init__(self, diferencia):
-        super().__init__(
-            f"La transacción no cuadra: la suma de los importes es "
-            f"{diferencia:,.2f} y debe ser 0.00."
-        )
-        self.diferencia = diferencia
 
 
 class PeriodoCerradoError(LibroMayorError):
@@ -50,5 +37,6 @@ class ConceptoInvalidoError(LibroMayorError):
 
 class GuardadoTransaccionError(LibroMayorError):
     mensaje = (
-        "No se pudo guardar la transacción; no se registró ningún cambio."
+        "No se pudieron guardar los movimientos; no se registró ningún "
+        "cambio."
     )

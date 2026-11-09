@@ -1,11 +1,15 @@
 """CU-05 Libro Mayor y CU-05.1 Consultar Saldo de Cuentas.
 
-Convención de signo: un importe positivo carga (debita) la cuenta y uno
-negativo la abona (acredita). No hay columnas de debe ni haber.
+Captura: cada movimiento se registra sobre la cuenta seleccionada con un
+monto en Debe o en Haber (uno de los dos). Se guarda como importe firmado:
+Debe es positivo (cargo) y Haber es negativo (abono).
+
+Cuadre: el sistema no exige que los movimientos de un envío sumen cero. El
+Contador General es responsable de registrar completas sus transacciones y
+lo verifica en el Balance de comprobación, que no se bloquea por diferencia.
 
 Saldo: suma de los importes firmados de la cuenta hasta la fecha de corte.
-La naturaleza solo afecta la presentación: una cuenta acreedora muestra su
-saldo con el signo invertido, de modo que su saldo normal se lee positivo.
+La naturaleza solo afecta la presentación.
 """
 
 import unicodedata
@@ -21,13 +25,15 @@ from .exceptions import (
     CampoObligatorioError,
     ConceptoInvalidoError,
     CuentaNoRegistrableError,
-    CuentaRepetidaError,
     FechaInvalidaError,
     MovimientoInvalidoError,
     PeriodoCerradoError,
-    TransaccionDescuadradaError,
 )
-from .models import CONCEPTO_MAX_LENGTH
+from .models import (
+    CONCEPTO_MAX_LENGTH,
+    REFERENCIA_MAX_LENGTH,
+    TipoMovimiento,
+)
 
 CERO = Decimal("0.00")
 CENTAVO = Decimal("0.01")
@@ -45,10 +51,43 @@ class ConfiguracionLibroMayor:
     concepto_max: int = CONCEPTO_MAX_LENGTH
 
 
+def sentido(saldo):
+    if saldo > 0:
+        return "Deudor"
+    if saldo < 0:
+        return "Acreedor"
+    return "Saldado"
+
+
 @dataclass(frozen=True)
 class LineaMayor:
     movimiento: object
     saldo: Decimal
+
+    @property
+    def debe(self):
+        return self.movimiento.importe if self.movimiento.importe > 0 else None
+
+    @property
+    def haber(self):
+        importe = self.movimiento.importe
+        return -importe if importe < 0 else None
+
+    @property
+    def saldo_absoluto(self):
+        return abs(self.saldo)
+
+    @property
+    def sentido(self):
+        return sentido(self.saldo)
+
+    @property
+    def correlativo(self):
+        movimiento = self.movimiento
+        return (
+            f"{movimiento.get_tipo_display()}-{movimiento.fecha.year}-"
+            f"{movimiento.numero:05d}"
+        )
 
 
 @dataclass(frozen=True)
@@ -77,11 +116,11 @@ class SaldoCuenta:
 
     @property
     def sentido(self):
-        if self.saldo > 0:
-            return "Deudor"
-        if self.saldo < 0:
-            return "Acreedor"
-        return "Saldado"
+        return sentido(self.saldo)
+
+    @property
+    def saldo_absoluto(self):
+        return abs(self.saldo)
 
     @property
     def saldo_presentado(self):
@@ -89,6 +128,42 @@ class SaldoCuenta:
         if self.cuenta.naturaleza.codigo == NATURALEZA_ACREEDORA:
             return -self.saldo
         return self.saldo
+
+
+@dataclass(frozen=True)
+class FilaBalance:
+    cuenta: object
+    saldo: Decimal
+
+    @property
+    def debe(self):
+        return self.saldo if self.saldo > 0 else CERO
+
+    @property
+    def haber(self):
+        return -self.saldo if self.saldo < 0 else CERO
+
+
+@dataclass(frozen=True)
+class BalanceComprobacion:
+    fecha_corte: object
+    filas: tuple
+
+    @property
+    def total_debe(self):
+        return sum((fila.debe for fila in self.filas), CERO)
+
+    @property
+    def total_haber(self):
+        return sum((fila.haber for fila in self.filas), CERO)
+
+    @property
+    def diferencia(self):
+        return self.total_debe - self.total_haber
+
+    @property
+    def balanceado(self):
+        return self.diferencia == 0
 
 
 class LibroMayorService:
@@ -112,23 +187,23 @@ class LibroMayorService:
         self._verificar(actor, self.ROLES_CONSULTA)
         return list(self._repositorio.cuentas())
 
-    def registrar(self, actor, *, fecha, concepto, movimientos):
-        """Guarda la transacción y todos sus movimientos, o nada."""
+    def registrar(self, actor, *, cuenta, movimientos):
+        """Guarda en la cuenta todos los movimientos del envío, o ninguno."""
         self.verificar_registro(actor)
-        self._validar_fecha(fecha)
-        concepto = self._validar_concepto(concepto)
+        cuenta = self._cuenta_registrable(self._codigo(cuenta))
         lineas = self._validar_movimientos(movimientos)
         with self._transaccion():
-            transaccion = self._repositorio.crear_transaccion(
-                fecha=fecha, concepto=concepto, usuario=actor
-            )
-            for cuenta, importe in lineas:
+            transaccion = self._repositorio.crear_transaccion(usuario=actor)
+            for linea in lineas:
                 self._repositorio.crear_movimiento(
-                    transaccion=transaccion, cuenta=cuenta, importe=importe
+                    transaccion=transaccion, cuenta=cuenta, **linea
                 )
             self._bitacora.registrar(
                 Accion.REGISTRO_TRANSACCION, Resultado.EXITOSO, actor=actor,
-                referencia=f"Transacción {transaccion.pk}",
+                referencia=(
+                    f"Transacción {transaccion.pk} · cuenta {cuenta.codigo} "
+                    f"· {len(lineas)} movimiento(s)"
+                ),
             )
         return transaccion
 
@@ -168,134 +243,186 @@ class LibroMayorService:
             totales["cargos"] or CERO, totales["abonos"] or CERO,
         )
 
-    def _validar_fecha(self, fecha):
-        if fecha is None:
-            raise CampoObligatorioError(campo="fecha")
-        periodo = self._repositorio.periodo_de(fecha)
-        if periodo.cerrado:
-            raise PeriodoCerradoError(campo="fecha")
+    def balance_comprobacion(self, actor, fecha_corte):
+        """Saldos a la fecha de corte de las cuentas con movimientos."""
+        self._verificar(actor, self.ROLES_CONSULTA)
+        if fecha_corte is None:
+            raise CampoObligatorioError(campo="corte")
+        filas = tuple(
+            FilaBalance(cuenta, cuenta.saldo)
+            for cuenta in self._repositorio.saldos_por_cuenta(
+                hasta=fecha_corte
+            )
+        )
+        return BalanceComprobacion(fecha_corte, filas)
 
-    def _validar_concepto(self, concepto):
+    def _validar_movimientos(self, movimientos):
+        movimientos = list(movimientos)
+        if not movimientos:
+            raise MovimientoInvalidoError(
+                "Registra al menos un movimiento."
+            )
+        if len(movimientos) > self._config.max_movimientos:
+            raise MovimientoInvalidoError(
+                "Se admiten como máximo "
+                f"{self._config.max_movimientos} movimientos por registro."
+            )
+        return [
+            self._validar_linea(datos, linea)
+            for linea, datos in enumerate(movimientos)
+        ]
+
+    def _validar_linea(self, datos, linea):
+        return {
+            "fecha": self._validar_fecha(datos.get("fecha"), linea),
+            "concepto": self._validar_concepto(datos.get("concepto"), linea),
+            "referencia": self._validar_referencia(
+                datos.get("referencia"), linea
+            ),
+            "tipo": self._validar_tipo(datos.get("tipo"), linea),
+            "importe": self._importe_firmado(
+                datos.get("debe"), datos.get("haber"), linea
+            ),
+        }
+
+    def _validar_fecha(self, fecha, linea):
+        if fecha is None:
+            raise CampoObligatorioError(campo="fecha", linea=linea)
+        try:
+            periodo = self._repositorio.periodo_de(fecha)
+        except FechaInvalidaError as exc:
+            raise FechaInvalidaError(campo="fecha", linea=linea) from exc
+        if periodo.cerrado:
+            raise PeriodoCerradoError(campo="fecha", linea=linea)
+        return fecha
+
+    def _validar_concepto(self, concepto, linea):
         concepto = (concepto or "").strip()
         if not concepto:
-            raise CampoObligatorioError(campo="concepto")
-        if any(unicodedata.category(c) == "Cc" for c in concepto):
-            raise ConceptoInvalidoError(
-                "El concepto contiene caracteres de control.",
-                campo="concepto",
-            )
+            raise CampoObligatorioError(campo="concepto", linea=linea)
+        self._rechazar_control(concepto, "concepto", linea)
         if not self._config.concepto_min <= len(concepto) <= (
             self._config.concepto_max
         ):
             raise ConceptoInvalidoError(
-                f"El concepto debe tener entre {self._config.concepto_min} "
-                f"y {self._config.concepto_max} caracteres.",
-                campo="concepto",
+                f"La descripción debe tener entre "
+                f"{self._config.concepto_min} y {self._config.concepto_max} "
+                "caracteres.", campo="concepto", linea=linea,
             )
         return concepto
 
-    def _validar_movimientos(self, movimientos):
-        movimientos = list(movimientos)
-        if len(movimientos) < 2:
+    def _validar_referencia(self, referencia, linea):
+        referencia = (referencia or "").strip()
+        self._rechazar_control(referencia, "referencia", linea)
+        if len(referencia) > REFERENCIA_MAX_LENGTH:
             raise MovimientoInvalidoError(
-                "La transacción requiere al menos dos movimientos."
+                "La referencia admite como máximo "
+                f"{REFERENCIA_MAX_LENGTH} caracteres.",
+                campo="referencia", linea=linea,
             )
-        if len(movimientos) > self._config.max_movimientos:
-            raise MovimientoInvalidoError(
-                "La transacción admite como máximo "
-                f"{self._config.max_movimientos} movimientos."
-            )
-        codigos = [
-            self._codigo(m.get("cuenta"), linea)
-            for linea, m in enumerate(movimientos)
-        ]
-        importes = [
-            self._importe(m.get("importe"), linea)
-            for linea, m in enumerate(movimientos)
-        ]
-        self._rechazar_repetidas(codigos)
-        cuentas = [
-            self._cuenta_registrable(codigo, linea)
-            for linea, codigo in enumerate(codigos)
-        ]
-        diferencia = sum(importes, CERO)
-        if diferencia != 0:
-            raise TransaccionDescuadradaError(diferencia)
-        return list(zip(cuentas, importes))
+        return referencia
 
     @staticmethod
-    def _codigo(valor, linea):
-        codigo = str(valor or "").strip()
-        if not codigo:
-            raise CampoObligatorioError(campo="cuenta", linea=linea)
-        return codigo
+    def _rechazar_control(texto, campo, linea):
+        if any(unicodedata.category(c) == "Cc" for c in texto):
+            raise ConceptoInvalidoError(
+                "El texto contiene caracteres de control.",
+                campo=campo, linea=linea,
+            )
 
-    def _importe(self, valor, linea):
+    @staticmethod
+    def _validar_tipo(tipo, linea):
+        tipo = (tipo or "").strip()
+        if not tipo:
+            raise CampoObligatorioError(campo="tipo", linea=linea)
+        if tipo not in TipoMovimiento.values:
+            raise MovimientoInvalidoError(
+                "El tipo de transacción no es válido.",
+                campo="tipo", linea=linea,
+            )
+        return tipo
+
+    def _importe_firmado(self, debe, haber, linea):
+        """Debe se guarda positivo y Haber negativo; solo uno por línea."""
+        debe, haber = self._vacio_a_none(debe), self._vacio_a_none(haber)
+        if debe is None and haber is None:
+            raise CampoObligatorioError(
+                "Registra un monto en Debe o en Haber.",
+                campo="debe", linea=linea,
+            )
+        if debe is not None and haber is not None:
+            raise MovimientoInvalidoError(
+                "Registra el monto solo en Debe o solo en Haber.",
+                campo="haber", linea=linea,
+            )
+        if debe is not None:
+            return self._importe(debe, linea, "debe")
+        return -self._importe(haber, linea, "haber")
+
+    @staticmethod
+    def _vacio_a_none(valor):
         if isinstance(valor, str):
             valor = valor.strip()
-        if valor is None or valor == "":
-            raise CampoObligatorioError(campo="importe", linea=linea)
+        return None if valor is None or valor == "" else valor
+
+    def _importe(self, valor, linea, campo):
         if not isinstance(valor, (Decimal, str, int)) or isinstance(
             valor, bool
         ):
             raise MovimientoInvalidoError(
-                "El importe debe ser un número decimal.",
-                campo="importe", linea=linea,
+                "El monto debe ser un número decimal.",
+                campo=campo, linea=linea,
             )
         try:
             importe = Decimal(valor)
         except InvalidOperation as exc:
             raise MovimientoInvalidoError(
-                "El importe no es un número válido.",
-                campo="importe", linea=linea,
+                "El monto no es un número válido.",
+                campo=campo, linea=linea,
             ) from exc
         if not importe.is_finite():
             raise MovimientoInvalidoError(
-                "El importe no es un número válido.",
-                campo="importe", linea=linea,
+                "El monto no es un número válido.",
+                campo=campo, linea=linea,
             )
         if importe != importe.quantize(CENTAVO):
             raise MovimientoInvalidoError(
-                "El importe admite como máximo dos decimales.",
-                campo="importe", linea=linea,
+                "El monto admite como máximo dos decimales.",
+                campo=campo, linea=linea,
             )
-        if importe == 0:
+        if importe <= 0:
             raise MovimientoInvalidoError(
-                "El importe debe ser distinto de cero.",
-                campo="importe", linea=linea,
+                "El monto debe ser mayor que cero.",
+                campo=campo, linea=linea,
             )
         maximo = self._config.importe_maximo or IMPORTE_MAXIMO_COLUMNA
-        if abs(importe) > maximo:
+        if importe > maximo:
             raise MovimientoInvalidoError(
-                f"El importe supera el máximo permitido ({maximo:,.2f}).",
-                campo="importe", linea=linea,
+                f"El monto supera el máximo permitido ({maximo:,.2f}).",
+                campo=campo, linea=linea,
             )
         return importe.quantize(CENTAVO)
 
     @staticmethod
-    def _rechazar_repetidas(codigos):
-        repetidas = [
-            linea for linea, codigo in enumerate(codigos)
-            if codigos.count(codigo) > 1
-        ]
-        if repetidas:
-            raise CuentaRepetidaError(campo="cuenta", lineas=repetidas)
+    def _codigo(valor):
+        codigo = str(valor or "").strip()
+        if not codigo:
+            raise CampoObligatorioError(campo="cuenta")
+        return codigo
 
-    def _cuenta_registrable(self, codigo, linea):
+    def _cuenta_registrable(self, codigo):
         try:
             cuenta = self._repositorio.obtener_cuenta(codigo)
         except CuentaNoRegistrableError as exc:
-            raise CuentaNoRegistrableError(
-                str(exc), campo="cuenta", linea=linea
-            ) from exc
+            raise CuentaNoRegistrableError(str(exc), campo="cuenta") from exc
         if not cuenta.activa:
             raise CuentaNoRegistrableError(
-                "La cuenta está dada de baja.", campo="cuenta", linea=linea
+                "La cuenta está dada de baja.", campo="cuenta"
             )
         if self._repositorio.tiene_subcuentas(cuenta):
             raise CuentaNoRegistrableError(
                 "La cuenta tiene subcuentas; solo se registran cuentas de "
-                "detalle.", campo="cuenta", linea=linea,
+                "detalle.", campo="cuenta",
             )
         return cuenta
 

@@ -6,6 +6,14 @@ from catalogo.models import Cuenta
 IMPORTE_MAX_DIGITS = 14
 IMPORTE_DECIMALES = 2
 CONCEPTO_MAX_LENGTH = 200
+REFERENCIA_MAX_LENGTH = 40
+
+
+class TipoMovimiento(models.TextChoices):
+    DIARIO = "DIARIO", "Diario"
+    COMPROBANTE_INGRESO = "COMPROBANTE_INGRESO", "Comprobante de Ingreso"
+    COMPROBANTE_EGRESO = "COMPROBANTE_EGRESO", "Comprobante de Egreso"
+    AJUSTE = "AJUSTE", "Ajuste"
 
 
 class PeriodoContable(models.Model):
@@ -30,8 +38,8 @@ class PeriodoContable(models.Model):
 
 
 class Transaccion(models.Model):
-    fecha = models.DateField("fecha")
-    concepto = models.CharField("concepto", max_length=CONCEPTO_MAX_LENGTH)
+    """Agrupa, para consulta, los movimientos guardados en un mismo envío."""
+
     usuario = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
         related_name="transacciones",
@@ -41,14 +49,14 @@ class Transaccion(models.Model):
     )
 
     class Meta:
-        ordering = ["fecha", "id"]
+        ordering = ["id"]
 
     def __str__(self):
         return f"Transacción {self.pk}"
 
 
 class Movimiento(models.Model):
-    """Importe firmado: positivo carga la cuenta, negativo la abona."""
+    """Importe firmado: positivo es Debe (cargo), negativo es Haber (abono)."""
 
     transaccion = models.ForeignKey(
         Transaccion, on_delete=models.PROTECT, related_name="movimientos"
@@ -56,19 +64,23 @@ class Movimiento(models.Model):
     cuenta = models.ForeignKey(
         Cuenta, on_delete=models.PROTECT, related_name="movimientos"
     )
+    fecha = models.DateField("fecha")
+    concepto = models.CharField("descripción", max_length=CONCEPTO_MAX_LENGTH)
+    referencia = models.CharField(
+        "referencia", max_length=REFERENCIA_MAX_LENGTH, blank=True
+    )
+    tipo = models.CharField(
+        "tipo", max_length=20, choices=TipoMovimiento.choices
+    )
     importe = models.DecimalField(
         "importe", max_digits=IMPORTE_MAX_DIGITS,
         decimal_places=IMPORTE_DECIMALES,
     )
 
     class Meta:
-        ordering = ["transaccion__fecha", "transaccion_id", "id"]
+        ordering = ["fecha", "id"]
         constraints = [
             models.CheckConstraint(
                 check=~models.Q(importe=0), name="movimiento_importe_no_cero"
-            ),
-            models.UniqueConstraint(
-                fields=["transaccion", "cuenta"],
-                name="movimiento_cuenta_unica_por_transaccion",
             ),
         ]

@@ -409,7 +409,7 @@
     const table = $(selector);
     if (!table) { showToast('No hay una tabla disponible para exportar.', 'error'); return; }
     const title = reportTitle(source);
-    const period = source === 'trial-balance' ? `Al ${state.trialBalanceTo}` : source === 'worksheet' || source === 'report' ? `${state.worksheet?.from || ''} al ${state.worksheet?.to || ''}` : '';
+    const period = source === 'trial-balance' ? table.dataset.periodo || `Al ${state.trialBalanceTo}` : source === 'worksheet' || source === 'report' ? `${state.worksheet?.from || ''} al ${state.worksheet?.to || ''}` : '';
     const rows = exportTableRows(table);
     const adjustmentTable = source === 'worksheet' ? $('.adjustment-detail-table') : null;
     if (adjustmentTable) rows.push([], ['Detalle de ajustes'], ...exportTableRows(adjustmentTable));
@@ -706,14 +706,35 @@
   wireAccountForm();
 
   function wireLedgerForm() {
-    const add = $('[data-ledger-add]');
-    if (!add) return;
-    add.addEventListener('click', () => {
-      const total = $('#id_mov-TOTAL_FORMS');
-      const index = Number(total.value);
-      const row = $('#movimientoVacio').innerHTML.replace(/__prefix__/g, index).replace(/__numero__/g, String(index + 1).padStart(2, '0'));
-      $('#movimientoFilas').insertAdjacentHTML('beforeend', row);
+    const account = $('[data-ledger-account]');
+    if (account) account.addEventListener('change', () => account.form.submit());
+    const form = $('[data-ledger-form]');
+    if (!form) return;
+    const rows = () => $$('.ledger-input-row', $('#movementRows'));
+    const total = $('#id_mov-TOTAL_FORMS');
+    const renumber = () => {
+      rows().forEach((row, index) => {
+        $('.line-col', row).textContent = String(index + 1).padStart(2, '0');
+        $$('[name^="mov-"]', row).forEach(input => {
+          input.name = input.name.replace(/^mov-\d+-/, `mov-${index}-`);
+          input.id = input.id.replace(/^id_mov-\d+-/, `id_mov-${index}-`);
+        });
+      });
+      total.value = rows().length;
+    };
+    $('[data-ledger-add]', form).addEventListener('click', () => {
+      const index = rows().length;
+      $('#movementRows').insertAdjacentHTML('beforeend', $('#movementRowTemplate').innerHTML.replace(/__prefix__/g, index).replace(/__numero__/g, String(index + 1).padStart(2, '0')));
       total.value = index + 1;
+    });
+    $('#movementRows').addEventListener('click', event => {
+      if (!event.target.closest('[data-ledger-remove]')) return;
+      if (rows().length <= 1) { showToast('Debe permanecer al menos una fila.', 'warning'); return; }
+      event.target.closest('.ledger-input-row').remove();
+      renumber();
+    });
+    form.addEventListener('submit', event => {
+      if (!window.confirm(`¿Guardar ${rows().length} movimiento(s) en el Libro Mayor?`)) event.preventDefault();
     });
   }
 

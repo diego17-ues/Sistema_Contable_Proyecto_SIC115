@@ -1,18 +1,21 @@
-"""CU-05 Libro Mayor y CU-05.1 Consultar Saldo de Cuentas."""
+"""CU-05 Libro Mayor, CU-05.1 Consultar Saldo y Balance de comprobación."""
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect, render
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.http import urlencode
 from django.views.decorators.http import require_POST
 
 from libro_mayor.composition import crear_libro_mayor_service
-from libro_mayor.exceptions import CampoObligatorioError, LibroMayorError
+from libro_mayor.exceptions import LibroMayorError
 from libro_mayor.forms import (
+    BalanceComprobacionForm,
     ConsultaMayorForm,
     MovimientoFormSet,
-    SaldoForm,
-    TransaccionForm,
+    RegistroMayorForm,
 )
 from usuarios.exceptions import RolNoAutorizadoError, UsuarioInactivoError
 
@@ -21,6 +24,7 @@ from .pages import contexto_panel
 LIBRO_MAYOR_TEMPLATE = "sic_sunGames/libro_mayor.html"
 SIN_PERMISO = (RolNoAutorizadoError, UsuarioInactivoError)
 PREFIJO_MOVIMIENTOS = "mov"
+MODO_BALANCE = "trial-balance"
 
 
 def _sin_permiso(error):
@@ -32,67 +36,84 @@ def _asignar_error(error, form):
     form.add_error(campo, str(error))
 
 
-def _consultar(request, prefijo, form_class, cuentas, consulta):
-    """Arma el formulario GET y ejecuta la consulta si se envió."""
-    enviado = f"{prefijo}-cuenta" in request.GET
-    form = form_class(
-        request.GET if enviado else None, prefix=prefijo, cuentas=cuentas
-    )
-    if not enviado or not form.is_valid():
-        return form, None
+def _url_mayor(cuenta, desde=None, hasta=None):
+    filtros = {"cuenta": cuenta, "desde": desde or "", "hasta": hasta or ""}
+    return f"{reverse('ledger')}?{urlencode(filtros)}"
+
+
+def _consultar(request, servicio, filtro):
+    """Detalle de la cuenta y su saldo a la fecha de corte (CU-05.1)."""
+    if not filtro.is_valid():
+        return None, None
+    datos = filtro.cleaned_data
     try:
-        return form, consulta(form.cleaned_data)
+        consulta = servicio.consultar(
+            request.user, datos["cuenta"],
+            desde=datos["desde"], hasta=datos["hasta"],
+        )
+        saldo = servicio.saldo(
+            request.user, datos["cuenta"],
+            datos["hasta"] or timezone.localdate(),
+        )
     except SIN_PERMISO as error:
         raise _sin_permiso(error) from error
     except LibroMayorError as error:
-        _asignar_error(error, form)
-        return form, None
+        _asignar_error(error, filtro)
+        return None, None
+    return consulta, saldo
 
 
-def _render(request, servicio, **extra):
+def _render(request, servicio, filtros, registro=None, formset=None):
     contexto = contexto_panel(request, "ledger")
     try:
         cuentas = servicio.cuentas(request.user)
     except SIN_PERMISO as error:
         raise _sin_permiso(error) from error
     activas = [cuenta for cuenta in cuentas if cuenta.activa]
-
-    def requerir_cuenta(datos):
-        if not datos["cuenta"]:
-            raise CampoObligatorioError(campo="cuenta")
-        return datos["cuenta"]
-
-    consulta_form, consulta = _consultar(
-        request, "consulta", ConsultaMayorForm, cuentas,
-        lambda d: servicio.consultar(
-            request.user, requerir_cuenta(d),
-            desde=d["desde"], hasta=d["hasta"],
-        ),
-    )
-    saldo_form, saldo = _consultar(
-        request, "saldo", SaldoForm, cuentas,
-        lambda d: servicio.saldo(
-            request.user, requerir_cuenta(d), d["fecha_corte"]
-        ),
+    filtros = filtros.copy()
+    if not filtros.get("cuenta") and activas:
+        filtros["cuenta"] = activas[0].codigo
+    filtro = ConsultaMayorForm(filtros, cuentas=activas)
+    consulta, saldo = _consultar(request, servicio, filtro)
+    seleccionada = consulta.cuenta if consulta else next(
+        (c for c in activas if c.codigo == filtros.get("cuenta")), None
     )
     contexto.update(
         puede_registrar=servicio.puede_registrar(request.user),
-        form=TransaccionForm(),
-        formset=MovimientoFormSet(
-            prefix=PREFIJO_MOVIMIENTOS, form_kwargs={"cuentas": activas}
-        ),
-        consulta_form=consulta_form,
+        filtro=filtro,
+        cuenta=seleccionada,
         consulta=consulta,
-        saldo_form=saldo_form,
         saldo=saldo,
+        registro=registro or RegistroMayorForm(initial={
+            "cuenta": filtros.get("cuenta"),
+            "desde": filtros.get("desde"), "hasta": filtros.get("hasta"),
+        }),
+        formset=formset or MovimientoFormSet(prefix=PREFIJO_MOVIMIENTOS),
     )
-    contexto.update(extra)
+    return render(request, LIBRO_MAYOR_TEMPLATE, contexto)
+
+
+def _balance(request, servicio):
+    contexto = contexto_panel(request, "ledger")
+    form = BalanceComprobacionForm(request.GET if "corte" in request.GET
+                                   else None)
+    corte = timezone.localdate()
+    if form.is_bound and form.is_valid() and form.cleaned_data["corte"]:
+        corte = form.cleaned_data["corte"]
+    try:
+        balance = servicio.balance_comprobacion(request.user, corte)
+    except SIN_PERMISO as error:
+        raise _sin_permiso(error) from error
+    contexto.update(modo_balance=True, balance_form=form, balance=balance)
     return render(request, LIBRO_MAYOR_TEMPLATE, contexto)
 
 
 @login_required
 def libro_mayor(request):
-    return _render(request, crear_libro_mayor_service())
+    servicio = crear_libro_mayor_service()
+    if request.GET.get("mode") == MODO_BALANCE:
+        return _balance(request, servicio)
+    return _render(request, servicio, request.GET)
 
 
 @login_required
@@ -101,40 +122,33 @@ def registrar_transaccion(request):
     servicio = crear_libro_mayor_service()
     try:
         servicio.verificar_registro(request.user)
-        cuentas = [c for c in servicio.cuentas(request.user) if c.activa]
     except SIN_PERMISO as error:
         raise _sin_permiso(error) from error
-    form = TransaccionForm(request.POST)
-    formset = MovimientoFormSet(
-        request.POST, prefix=PREFIJO_MOVIMIENTOS,
-        form_kwargs={"cuentas": cuentas},
-    )
-    if form.is_valid() and formset.is_valid():
-        usados = [
-            (indice, fila.cleaned_data)
-            for indice, fila in enumerate(formset.forms) if fila.has_changed()
-        ]
+    registro = RegistroMayorForm(request.POST)
+    formset = MovimientoFormSet(request.POST, prefix=PREFIJO_MOVIMIENTOS)
+    filtros = {
+        clave: request.POST.get(clave, "")
+        for clave in ("cuenta", "desde", "hasta")
+    }
+    if registro.is_valid() and formset.is_valid():
+        lineas = [fila.cleaned_data for fila in formset.forms]
         try:
-            transaccion = servicio.registrar(
-                request.user,
-                fecha=form.cleaned_data["fecha"],
-                concepto=form.cleaned_data["concepto"],
-                movimientos=[datos for _, datos in usados],
+            servicio.registrar(
+                request.user, cuenta=registro.cleaned_data["cuenta"],
+                movimientos=lineas,
             )
         except SIN_PERMISO as error:
             raise _sin_permiso(error) from error
         except LibroMayorError as error:
-            if error.lineas:
-                for linea in error.lineas:
-                    fila = formset.forms[usados[linea][0]]
-                    _asignar_error(error, fila)
+            if error.linea is not None:
+                _asignar_error(error, formset.forms[error.linea])
             else:
-                _asignar_error(error, form)
+                registro.add_error(None, str(error))
         else:
             messages.success(
                 request,
-                f"Transacción {transaccion.pk} registrada con "
-                f"{len(usados)} movimientos.",
+                f"{len(lineas)} movimiento(s) registrado(s) en el Libro "
+                "Mayor.",
             )
-            return redirect("ledger")
-    return _render(request, servicio, form=form, formset=formset)
+            return redirect(_url_mayor(**filtros))
+    return _render(request, servicio, filtros, registro, formset)

@@ -14,16 +14,25 @@ from usuarios.roles import Rol
 CLAVE = secrets.token_urlsafe(12)
 
 
-def datos_post(lineas, fecha="2026-11-03", concepto="Venta del día"):
+def datos_post(cuenta, lineas):
     datos = {
-        "fecha": fecha, "concepto": concepto,
+        "cuenta": cuenta,
         "mov-TOTAL_FORMS": str(len(lineas)), "mov-INITIAL_FORMS": "0",
         "mov-MIN_NUM_FORMS": "0", "mov-MAX_NUM_FORMS": "1000",
     }
-    for indice, (cuenta, importe) in enumerate(lineas):
-        datos[f"mov-{indice}-cuenta"] = cuenta
-        datos[f"mov-{indice}-importe"] = importe
+    for indice, (fecha, concepto, tipo, debe, haber) in enumerate(lineas):
+        datos.update({
+            f"mov-{indice}-fecha": fecha,
+            f"mov-{indice}-concepto": concepto,
+            f"mov-{indice}-referencia": f"V-{indice}",
+            f"mov-{indice}-tipo": tipo,
+            f"mov-{indice}-debe": debe,
+            f"mov-{indice}-haber": haber,
+        })
     return datos
+
+
+INGRESO = "COMPROBANTE_INGRESO"
 
 
 class LibroMayorIntegracionTests(TestCase):
@@ -37,56 +46,80 @@ class LibroMayorIntegracionTests(TestCase):
         usuario.save()
         return usuario
 
-    def test_contador_registra_y_ve_saldos_actualizados(self):
-        self.client.force_login(self.contador)
-        lineas = [("1101", "113.00"), ("5101", "-100.00"),
-                  ("2103", "-13.00"), ("", "")]
-
-        respuesta = self.client.post(
-            reverse("transaccion_registrar"), datos_post(lineas)
+    def registrar(self, cuenta, lineas):
+        return self.client.post(
+            reverse("transaccion_registrar"), datos_post(cuenta, lineas)
         )
 
-        self.assertRedirects(respuesta, reverse("ledger"))
+    def test_pantalla_conserva_los_campos_originales(self):
+        self.client.force_login(self.contador)
+
+        pantalla = self.client.get(reverse("ledger"))
+
+        for texto in ("Cuenta del Libro Mayor", "Registrar transacción",
+                      "<th>Ref.</th>", "<th>Tipo</th>", ">Debe</th>",
+                      ">Haber</th>", "Guardar en Libro Mayor",
+                      "Detalle del Libro Mayor", "Balance de comprobación",
+                      'id="ledgerAccountFilter"', 'id="ledgerFrom"'):
+            self.assertContains(pantalla, texto)
+        self.assertNotContains(pantalla, "Importe")
+
+    def test_contador_registra_en_debe_y_haber_y_consulta_saldos(self):
+        self.client.force_login(self.contador)
+
+        respuesta = self.registrar("1101", [
+            ("2026-11-03", "Venta del día", INGRESO, "113.00", ""),
+            ("2026-11-04", "Pago a proveedor", "COMPROBANTE_EGRESO", "",
+             "20.00"),
+        ])
+
+        self.assertRedirects(
+            respuesta, f"{reverse('ledger')}?cuenta=1101&desde=&hasta="
+        )
         transaccion = Transaccion.objects.get()
-        self.assertEqual(transaccion.movimientos.count(), 3)
+        self.assertEqual(
+            sorted(transaccion.movimientos.values_list("importe", flat=True)),
+            [-20, 113],
+        )
         self.assertEqual(transaccion.usuario, self.contador)
         registro = RegistroBitacora.objects.latest("id")
         self.assertEqual(registro.accion, Accion.REGISTRO_TRANSACCION)
-        saldo = self.client.get(reverse("ledger"), {
-            "saldo-cuenta": "5101", "saldo-fecha_corte": "2026-11-30"
+        detalle = self.client.get(reverse("ledger"), {
+            "cuenta": "1101", "desde": "2026-11-01", "hasta": "2026-11-30",
         })
-        self.assertContains(saldo, "100.00")
-        self.assertContains(saldo, "Saldo acreedor")
-        consulta = self.client.get(reverse("ledger"), {
-            "consulta-cuenta": "1101", "consulta-desde": "2026-11-01",
-            "consulta-hasta": "2026-11-30",
-        })
-        self.assertContains(consulta, "Venta del día")
-        self.assertContains(consulta, "113.00")
+        self.assertContains(detalle, "Venta del día")
+        self.assertContains(detalle, "Comprobante de Ingreso-2026-00001")
+        self.assertContains(detalle, "$113.00")
+        self.assertContains(detalle, "$93.00")
+        self.assertContains(detalle, "Saldo al 30/11/2026")
 
-    def test_descuadrada_muestra_la_diferencia_y_no_guarda(self):
+    def test_no_exige_cuadre_y_el_balance_muestra_solo_cuentas_con_monto(self):
+        self.client.force_login(self.contador)
+        self.registrar("1101", [("2026-11-03", "Venta", INGRESO, "100", "")])
+        self.registrar("5101", [("2026-11-03", "Venta", INGRESO, "", "90")])
+
+        balance = self.client.get(reverse("ledger"), {
+            "mode": "trial-balance", "corte": "2026-11-30",
+        })
+
+        self.assertEqual(Movimiento.objects.count(), 2)
+        self.assertContains(balance, "1101 · Caja general")
+        self.assertContains(balance, "5101 · Ingresos por licencias")
+        self.assertNotContains(balance, "1102 · Caja chica")
+        self.assertContains(balance, "Diferencia $10.00")
+
+    def test_linea_invalida_se_senala_y_no_guarda_nada(self):
         self.client.force_login(self.contador)
 
-        respuesta = self.client.post(
-            reverse("transaccion_registrar"),
-            datos_post([("1101", "100"), ("5101", "-90")]),
-        )
-
-        self.assertContains(respuesta, "la suma de los importes es 10.00")
-        self.assertContains(respuesta, 'value="Venta del día"')
-        self.assertFalse(Transaccion.objects.exists())
-
-    def test_cuenta_repetida_senala_las_lineas(self):
-        self.client.force_login(self.contador)
-
-        respuesta = self.client.post(
-            reverse("transaccion_registrar"),
-            datos_post([("1101", "10"), ("5101", "-20"), ("1101", "10")]),
-        )
+        respuesta = self.registrar("1101", [
+            ("2026-11-03", "Venta del día", INGRESO, "50", ""),
+            ("2026-11-03", "Venta doble", INGRESO, "5", "5"),
+        ])
 
         self.assertContains(
-            respuesta, "La cuenta aparece más de una vez", count=2
+            respuesta, "Registra el monto solo en Debe o solo en Haber."
         )
+        self.assertContains(respuesta, 'value="Venta del día"')
         self.assertFalse(Movimiento.objects.exists())
 
     def test_falla_del_ultimo_movimiento_no_deja_nada(self):
@@ -101,11 +134,11 @@ class LibroMayorIntegracionTests(TestCase):
             return guardar(movimiento, *args, **kwargs)
 
         with patch.object(Movimiento, "save", fallar_en_el_tercero):
-            respuesta = self.client.post(
-                reverse("transaccion_registrar"),
-                datos_post([("1101", "113"), ("5101", "-100"),
-                            ("2103", "-13")]),
-            )
+            respuesta = self.registrar("1101", [
+                ("2026-11-03", "Uno", INGRESO, "1", ""),
+                ("2026-11-03", "Dos", INGRESO, "2", ""),
+                ("2026-11-03", "Tres", INGRESO, "", "3"),
+            ])
 
         self.assertContains(respuesta, "no se registró ningún cambio")
         self.assertFalse(Transaccion.objects.exists())
@@ -116,12 +149,13 @@ class LibroMayorIntegracionTests(TestCase):
     def test_otro_rol_recibe_403_al_registrar(self):
         self.client.force_login(self.admin)
 
-        respuesta = self.client.post(
-            reverse("transaccion_registrar"),
-            datos_post([("1101", "5"), ("5101", "-5")]),
+        respuesta = self.registrar(
+            "1101", [("2026-11-03", "Venta", INGRESO, "5", "")]
         )
         pantalla = self.client.get(reverse("ledger"))
+        balance = self.client.get(reverse("ledger"), {"mode": "trial-balance"})
 
         self.assertEqual(respuesta.status_code, 403)
-        self.assertFalse(Transaccion.objects.exists())
+        self.assertFalse(Movimiento.objects.exists())
         self.assertNotContains(pantalla, reverse("transaccion_registrar"))
+        self.assertEqual(balance.status_code, 200)
