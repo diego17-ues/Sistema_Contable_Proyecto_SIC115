@@ -16,6 +16,7 @@ __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
+*.pyc
 
 # Archivos estáticos recolectados y media subida
 staticfiles/

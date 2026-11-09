@@ -1,0 +1,69 @@
+{% extends "sic_sunGames/index.html" %}
+
+{% block server_rendered %} data-server-rendered="true"{% endblock %}
+
+{% block page_content %}
+{% if modo_balance %}
+<div class="page-heading"><div><h1>Balance de Comprobación</h1><p>Al {{ balance.fecha_corte|date:"d/m/Y" }} · expresado en USD</p></div><div class="heading-actions"><a class="button button-secondary" href="{% url 'balance_pdf' %}?corte={{ balance.fecha_corte|date:'Y-m-d' }}">↓ PDF</a><button class="button button-secondary" type="button" data-action="export" data-source="trial-balance" data-format="xlsx">↓ Excel</button></div></div>
+<form class="filter-bar" method="get" action="{% url 'ledger' %}" novalidate>
+  <input type="hidden" name="mode" value="trial-balance"/>
+  <div class="field"><label for="{{ balance_form.corte.id_for_label }}">{{ balance_form.corte.label }}</label>{{ balance_form.corte }}{% for error in balance_form.corte.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+  <button class="button button-secondary" type="submit">Generar</button>
+  <a class="text-button" href="{% url 'ledger' %}">Volver al Libro Mayor</a>
+</form>
+<section class="card statement-card"><div class="statement-heading"><img src="{{ logo_url }}" alt="SunGames"/><strong>SunGames S.A. de C.V.</strong><h2>Balance de Comprobación</h2><p>Al {{ balance.fecha_corte|date:"d/m/Y" }}</p><span>Expresado en USD</span></div>
+  <div class="table-wrap"><table class="statement-table" id="trialBalanceTable" data-periodo="Al {{ balance.fecha_corte|date:'d/m/Y' }}"><thead><tr><th>Cuenta y detalle</th><th class="num">Debe</th><th class="num">Haber</th></tr></thead><tbody>
+    {% for fila in balance.filas %}
+    <tr><td><strong>{{ fila.cuenta.codigo }} · {{ fila.cuenta.denominacion }}</strong></td><td class="num">{% if fila.debe %}${{ fila.debe|floatformat:"2g" }}{% else %}—{% endif %}</td><td class="num">{% if fila.haber %}${{ fila.haber|floatformat:"2g" }}{% else %}—{% endif %}</td></tr>
+    {% empty %}
+    <tr><td colspan="3"><div class="empty-state"><strong>Sin movimientos registrados a la fecha de corte</strong></div></td></tr>
+    {% endfor %}
+    <tr class="statement-total"><td><strong>Totales</strong></td><td class="num"><strong>${{ balance.total_debe|floatformat:"2g" }}</strong></td><td class="num"><strong>${{ balance.total_haber|floatformat:"2g" }}</strong></td></tr>
+  </tbody></table></div>
+  <div class="statement-status {% if balance.balanceado %}is-balanced{% else %}is-unbalanced{% endif %}"><span>{% if balance.balanceado %}✓{% else %}⚠{% endif %}</span><strong>{% if balance.balanceado %}Balanceado{% else %}Diferencia ${{ balance.diferencia|floatformat:"2g" }}{% endif %}</strong></div>
+</section>
+{% else %}
+<div class="page-heading"><div><h1>Libro Mayor</h1><p>Consulta y registra movimientos por cuenta.</p></div><div class="heading-actions"><a class="button button-secondary" href="{% url 'ledger' %}?mode=trial-balance">Balance de comprobación</a><button class="button button-secondary" type="button" data-action="export" data-source="ledger" data-format="xlsx">↓ Excel</button></div></div>
+<form class="filter-bar ledger-filters" method="get" action="{% url 'ledger' %}" novalidate>
+  {% for campo in filtro %}
+  <div class="field{% if campo.name == 'cuenta' %} grow{% endif %}"><label for="{{ campo.id_for_label }}">{{ campo.label }}</label>{{ campo }}{% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+  {% endfor %}
+  <button class="button button-secondary" type="submit">Consultar</button>
+  {% if cuenta %}<a class="text-button" href="{% url 'ledger' %}?cuenta={{ cuenta.codigo }}">Limpiar fechas</a>{% endif %}
+</form>
+{% for error in filtro.non_field_errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+
+{% if puede_registrar %}
+<section class="card ledger-entry">
+  <form method="post" action="{% url 'transaccion_registrar' %}" novalidate data-ledger-form>
+    {% csrf_token %}
+    {{ registro.cuenta }}{{ registro.desde }}{{ registro.hasta }}
+    <div class="ledger-account-banner"><span class="ledger-account-label">Cuenta contable</span><strong>{% if cuenta %}{{ cuenta.codigo }} · {{ cuenta.denominacion }}{% else %}Selecciona una cuenta{% endif %}</strong><span>{% if cuenta %}{{ cuenta.subtipo.nombre }} · Naturaleza {{ cuenta.naturaleza.nombre|lower }}{% endif %}</span></div>
+    {% for error in registro.non_field_errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+    <div class="entry-title"><div><h2>Registrar transacción</h2></div></div>
+    {{ formset.management_form }}
+    <div class="table-wrap ledger-table-wrap"><table class="ledger-table ledger-input-table"><thead><tr><th class="line-col">N.º</th><th>Fecha</th><th>Descripción</th><th>Ref.</th><th>Tipo</th><th class="num">Debe</th><th class="num">Haber</th><th></th></tr></thead>
+      <tbody id="movementRows">
+        {% for fila in formset %}
+        <tr class="ledger-input-row"><td class="line-col">{{ forloop.counter|stringformat:"02d" }}</td>{% for campo in fila %}<td>{{ campo }}{% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</td>{% endfor %}<td><button class="movement-delete" type="button" data-ledger-remove aria-label="Quitar línea">×</button>{% for error in fila.non_field_errors %}<span class="form-error">{{ error }}</span>{% endfor %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+    <template id="movementRowTemplate"><tr class="ledger-input-row"><td class="line-col">__numero__</td>{% for campo in formset.empty_form %}<td>{{ campo }}</td>{% endfor %}<td><button class="movement-delete" type="button" data-ledger-remove aria-label="Quitar línea">×</button></td></tr></template>
+    <div class="entry-actions"><button class="button button-secondary button-small" type="button" data-ledger-add>＋ Agregar línea</button><div class="entry-actions-right"><button class="button button-primary" type="submit">Guardar en Libro Mayor</button></div></div>
+  </form>
+</section>
+{% endif %}
+
+<section class="card ledger-history section-gap"><div class="card-header"><div><h2>Detalle del Libro Mayor</h2><p>{% if cuenta %}{{ cuenta.denominacion }}{% else %}Cuenta seleccionada{% endif %}</p></div><span class="tag">{{ consulta.lineas|length|default:0 }} transacciones</span></div>
+  <div class="table-wrap ledger-table-wrap"><table class="ledger-table" id="ledgerTable"><thead><tr><th class="line-col">N.º</th><th>Correlativo</th><th>Fecha</th><th>Descripción</th><th>Ref.</th><th class="num">Debe</th><th class="num">Haber</th><th class="num">Saldo</th></tr></thead><tbody>
+    {% for linea in consulta.lineas %}
+    <tr><td class="line-col">{{ forloop.counter|stringformat:"02d" }}</td><td><strong class="correlative-value">{{ linea.correlativo }}</strong></td><td>{{ linea.movimiento.fecha|date:"d/m/Y" }}</td><td>{{ linea.movimiento.concepto }}</td><td>{{ linea.movimiento.referencia|default:"—" }}</td><td class="num">{% if linea.debe %}${{ linea.debe|floatformat:"2g" }}{% else %}—{% endif %}</td><td class="num">{% if linea.haber %}${{ linea.haber|floatformat:"2g" }}{% else %}—{% endif %}</td><td class="num ledger-balance"><strong>${{ linea.saldo_absoluto|floatformat:"2g" }}</strong><small>{{ linea.sentido }}</small></td></tr>
+    {% empty %}
+    <tr><td colspan="8"><div class="empty-state"><strong>Sin movimientos en esta cuenta</strong></div></td></tr>
+    {% endfor %}
+  </tbody></table></div>
+  <div class="table-footer"><span>{{ consulta.lineas|length|default:0 }} registros</span>{% if saldo %}<span id="saldoCuenta">Saldo al {{ saldo.fecha_corte|date:"d/m/Y" }}: <strong>${{ saldo.saldo_absoluto|floatformat:"2g" }}</strong> {{ saldo.sentido|lower }}</span>{% endif %}</div>
+</section>
+{% endif %}
+{% endblock %}

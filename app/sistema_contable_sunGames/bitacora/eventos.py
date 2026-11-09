@@ -9,6 +9,7 @@ class Accion(models.TextChoices):
     CAMBIO_CONTRASENA = "CAMBIO_CONTRASENA", "Cambio de contraseña"
     ALTA_CUENTA = "ALTA_CUENTA", "Alta de cuenta"
     MODIFICACION_CUENTA = "MODIFICACION_CUENTA", "Modificación de cuenta"
+    REGISTRO_TRANSACCION = "REGISTRO_TRANSACCION", "Registro de transacción"
 
 
 class Resultado(models.TextChoices):

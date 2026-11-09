@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'usuarios',
     'bitacora',
     'catalogo',
+    'libro_mayor',
 ]
 
 AUTH_USER_MODEL = 'usuarios.Usuario'
@@ -138,3 +139,12 @@ STATIC_URL = '/static/'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Parámetros del Libro Mayor (CU-05). Valores supuestos hasta que se definan;
+# IMPORTE_MAXIMO = None usa el máximo que admite la columna (12 enteros).
+LIBRO_MAYOR = {
+    "MAX_MOVIMIENTOS": 20,
+    "IMPORTE_MAXIMO": None,
+    "CONCEPTO_MIN": 3,
+    "CONCEPTO_MAX": 200,
+}

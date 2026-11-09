@@ -14,7 +14,7 @@
   const savedUser = JSON.parse($('#currentUser').textContent);
   const modulos = JSON.parse($('#modulos').textContent);
   const serverRendered = $('#appContent').dataset.serverRendered === 'true';
-  const serverScreens = ['users', 'audit', 'accounts'];
+  const serverScreens = ['users', 'audit', 'accounts', 'ledger'];
 
   const navGroups = [
     { label: 'Inicio', items: [{ id: 'dashboard', title: 'Dashboard', icon: '⌂' }] },
@@ -139,7 +139,7 @@
     $('.sidebar-period .status-dot').classList.toggle('is-closed', periodClosed);
     $('.topbar-period').innerHTML = `<span class="status-dot ${periodClosed ? 'is-closed' : ''}"></span>${periodLabel}`;
     if (serverRendered) return;
-    const renderers = { dashboard: dashboardPage, ledger: ledgerPage, reports: reportsPage, operations: operationsPage };
+    const renderers = { dashboard: dashboardPage, reports: reportsPage, operations: operationsPage };
     $('#appContent').innerHTML = (renderers[state.current] || dashboardPage)();
     if ($('#provisionalFrom') && state.provisionalFrom) $('#provisionalFrom').value = state.provisionalFrom;
     syncScreenUrl();
@@ -167,30 +167,6 @@
 
   function accountOptions(selected = '') {
     return accounts.filter(account => account.status === 'Activa').map(account => `<option value="${safe(account.code)}" ${selected === account.code ? 'selected' : ''}>${safe(account.code)} · ${safe(account.name)}</option>`).join('');
-  }
-
-  function ledgerPage() {
-    if (state.ledgerMode === 'trial-balance') return trialBalancePage();
-    const selectedCode = state.ledgerFilter.account || '5101';
-    const selectedAccount = accounts.find(account => account.code === selectedCode);
-    let balance = 0;
-    const accountRows = ledgerRows.filter(row => row.code === selectedCode).sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id).map(row => {
-      balance += row.side === 'Cargo' ? row.amount : -row.amount;
-      return { ...row, balance, balanceSide: balance > 0 ? 'Deudor' : balance < 0 ? 'Acreedor' : 'Saldado' };
-    });
-    const filtered = accountRows.filter(row => (!state.ledgerFilter.from || row.date >= state.ledgerFilter.from) && (!state.ledgerFilter.to || row.date <= state.ledgerFilter.to));
-    return `${heading('Libro Mayor', 'Consulta y registra movimientos por cuenta.', `<button class="button button-secondary" type="button" data-action="show-trial-balance">Balance de comprobación</button><button class="button button-secondary" type="button" data-action="export" data-source="ledger" data-format="xlsx">↓ Excel</button>`)}
-      <div class="filter-bar ledger-filters"><div class="field grow"><label for="ledgerAccountFilter">Cuenta del Libro Mayor</label><select id="ledgerAccountFilter">${accountOptions(selectedCode)}</select></div><div class="field"><label for="ledgerFrom">Desde</label><input id="ledgerFrom" type="date" value="${safe(state.ledgerFilter.from)}"/></div><div class="field"><label for="ledgerTo">Hasta</label><input id="ledgerTo" type="date" value="${safe(state.ledgerFilter.to)}"/></div><button class="button button-secondary" type="button" data-action="filter-ledger">Consultar</button><button class="text-button" type="button" data-action="clear-ledger-filter">Limpiar fechas</button></div>
-      <section class="card ledger-entry"><div class="ledger-account-banner"><span class="ledger-account-label">Cuenta contable</span><strong>${selectedAccount ? `${safe(selectedAccount.code)} · ${safe(selectedAccount.name)}` : 'Selecciona una cuenta'}</strong><span>${selectedAccount ? `${safe(selectedAccount.group)} · Naturaleza ${safe(selectedAccount.nature).toLowerCase()}` : ''}</span></div>
-        <div class="entry-title"><div><h2>Registrar transacción</h2></div></div>
-        <div class="table-wrap ledger-table-wrap"><table class="ledger-table ledger-input-table"><thead><tr><th class="line-col">N.º</th><th>Fecha</th><th>Descripción</th><th>Ref.</th><th>Tipo</th><th class="num">Debe</th><th class="num">Haber</th><th></th></tr></thead><tbody id="movementRows">${movementRowMarkup(1)}</tbody></table></div>
-        <div class="entry-actions"><button class="button button-secondary button-small" type="button" data-action="add-ledger-row">＋ Agregar línea</button><div class="entry-actions-right"><button class="button button-primary" type="button" data-action="save-ledger">Guardar en Libro Mayor</button></div></div>
-      </section>
-      <section class="card ledger-history section-gap"><div class="card-header"><div><h2>Detalle del Libro Mayor</h2><p>${selectedAccount ? safe(selectedAccount.name) : 'Cuenta seleccionada'}</p></div><span class="tag">${filtered.length} transacciones</span></div><div class="table-wrap ledger-table-wrap"><table class="ledger-table" id="ledgerTable"><thead><tr><th class="line-col">N.º</th><th>Correlativo</th><th>Fecha</th><th>Descripción</th><th>Ref.</th><th class="num">Debe</th><th class="num">Haber</th><th class="num">Saldo</th></tr></thead><tbody>${filtered.length ? filtered.map((row, index) => `<tr><td class="line-col">${String(index + 1).padStart(2, '0')}</td><td><strong class="correlative-value">${safe(row.correlativo || '—')}</strong></td><td>${safe(row.date)}</td><td>${safe(row.concept)}</td><td>${safe(row.reference || '—')}</td><td class="num">${row.side === 'Cargo' ? money(row.amount) : '—'}</td><td class="num">${row.side === 'Abono' ? money(row.amount) : '—'}</td><td class="num ledger-balance"><strong>${money(Math.abs(row.balance))}</strong><small>${row.balanceSide}</small></td></tr>`).join('') : `<tr><td colspan="8"><div class="empty-state"><strong>Sin movimientos en esta cuenta</strong></div></td></tr>`}</tbody></table></div><div class="table-footer"><span>${filtered.length} registros</span></div></section>`;
-  }
-
-  function movementRowMarkup(lineNumber = 1) {
-    return `<tr class="ledger-input-row"><td class="line-col">${String(lineNumber).padStart(2, '0')}</td><td><input class="ledger-line-date" type="date" value="${safe(today())}" aria-label="Fecha"/></td><td><input class="ledger-line-concept" aria-label="Descripción"/></td><td><input class="ledger-line-reference" aria-label="Referencia"/></td><td><select class="ledger-line-type" aria-label="Tipo de transacción"><option value="">Tipo</option>${transactionTypes.map(type => `<option value="${safe(type)}">${safe(type)}</option>`).join('')}</select></td><td><input class="ledger-line-debit money-input" type="number" min="0" step="0.01" aria-label="Debe"/></td><td><input class="ledger-line-credit money-input" type="number" min="0" step="0.01" aria-label="Haber"/></td><td><button class="movement-delete" type="button" data-action="remove-ledger-row" aria-label="Quitar línea">×</button></td></tr>`;
   }
 
   function trialBalanceRows(asOf) {
@@ -433,7 +409,7 @@
     const table = $(selector);
     if (!table) { showToast('No hay una tabla disponible para exportar.', 'error'); return; }
     const title = reportTitle(source);
-    const period = source === 'trial-balance' ? `Al ${state.trialBalanceTo}` : source === 'worksheet' || source === 'report' ? `${state.worksheet?.from || ''} al ${state.worksheet?.to || ''}` : '';
+    const period = source === 'trial-balance' ? table.dataset.periodo || `Al ${state.trialBalanceTo}` : source === 'worksheet' || source === 'report' ? `${state.worksheet?.from || ''} al ${state.worksheet?.to || ''}` : '';
     const rows = exportTableRows(table);
     const adjustmentTable = source === 'worksheet' ? $('.adjustment-detail-table') : null;
     if (adjustmentTable) rows.push([], ['Detalle de ajustes'], ...exportTableRows(adjustmentTable));
@@ -578,19 +554,6 @@
       state.salesTotal += amount;
       page(); showToast('Venta agregada.', 'success');
     }
-    if (action === 'add-ledger-row') { $('#movementRows').insertAdjacentHTML('beforeend', movementRowMarkup($$('.ledger-input-row', $('#movementRows')).length + 1)); }
-    if (action === 'remove-ledger-row') {
-      const rows = $$('.ledger-input-row', $('#movementRows'));
-      if (rows.length <= 1) { showToast('Debe permanecer al menos una fila.', 'warning'); return; }
-      target.closest('.ledger-input-row').remove();
-      $$('.ledger-input-row', $('#movementRows')).forEach((row, index) => { $('.line-col', row).textContent = String(index + 1).padStart(2, '0'); });
-    }
-    if (action === 'save-ledger') saveLedger();
-    if (action === 'filter-ledger') {
-      state.ledgerFilter = { account: $('#ledgerAccountFilter').value, from: $('#ledgerFrom').value, to: $('#ledgerTo').value };
-      page();
-    }
-    if (action === 'clear-ledger-filter') { state.ledgerFilter = { account: state.ledgerFilter.account || '5101', from: '', to: '' }; page(); }
     if (action === 'show-trial-balance') { state.ledgerMode = 'trial-balance'; page(); }
     if (action === 'back-ledger') { state.ledgerMode = 'ledger'; page(); }
     if (action === 'refresh-trial-balance') { state.trialBalanceTo = $('#trialBalanceTo').value || today(); page(); }
@@ -607,33 +570,6 @@
     if (action === 'reconcile') showToast('Consulta de conciliación realizada.', 'success');
     if (action === 'steam-check') { state.steamStatus = $('#steamStatusSelect').value; page(); showToast('Estado de conexión actualizado.', 'success'); }
     if (action === 'close-modal') $('#modalRoot').innerHTML = '';
-  }
-
-  function saveLedger() {
-    const code = $('#ledgerAccountFilter').value;
-    const account = accounts.find(item => item.code === code);
-    const rows = $$('.ledger-input-row', $('#movementRows')).map(row => ({
-      date: $('.ledger-line-date', row).value,
-      concept: $('.ledger-line-concept', row).value.trim(),
-      reference: $('.ledger-line-reference', row).value.trim(),
-      type: $('.ledger-line-type', row).value,
-      debit: Number($('.ledger-line-debit', row).value) || 0,
-      credit: Number($('.ledger-line-credit', row).value) || 0,
-    }));
-    if (!code || rows.some(row => !row.date || !row.concept || !row.type || (row.debit <= 0 && row.credit <= 0) || (row.debit > 0 && row.credit > 0))) {
-      showToast('Completa fecha, descripción y tipo; registra un monto en Debe o Haber por línea.', 'error'); return;
-    }
-    if (state.periodStatus === 'CERRADO_PROVISIONAL' && state.closedRange && rows.some(row => row.date >= state.closedRange.from && row.date <= state.closedRange.to)) {
-      showToast('El período está cerrado provisionalmente y no admite nuevos movimientos.', 'warning'); return;
-    }
-    const saved = rows.map(row => {
-      const transaction = { id: state.nextLedgerId++, date: row.date, code, account: account?.name || '', concept: row.concept, reference: row.reference, type: row.type, correlativo: nextCorrelative(row.type, row.date), side: row.debit > 0 ? 'Cargo' : 'Abono', amount: row.debit > 0 ? row.debit : row.credit };
-      ledgerRows.push(transaction);
-      return transaction;
-    });
-    state.worksheet = null;
-    state.ledgerFilter.account = code;
-    page(); showToast(`${saved.length} transacción(es) registradas en Libro Mayor.`, 'success');
   }
 
   function nextCorrelative(type, date) {
@@ -708,7 +644,6 @@
   $('#appShell').addEventListener('submit', handleForm);
   $('#appShell').addEventListener('change', event => {
     if (event.target.id === 'dashboardPeriod') { state.period = event.target.value; page(); }
-    if (event.target.id === 'ledgerAccountFilter') { state.ledgerFilter.account = event.target.value; page(); }
   });
   $('#modalRoot').addEventListener('click', event => {
     const action = event.target.closest('[data-action]')?.dataset.action;
@@ -769,6 +704,41 @@
   }
 
   wireAccountForm();
+
+  function wireLedgerForm() {
+    const account = $('[data-ledger-account]');
+    if (account) account.addEventListener('change', () => account.form.submit());
+    const form = $('[data-ledger-form]');
+    if (!form) return;
+    const rows = () => $$('.ledger-input-row', $('#movementRows'));
+    const total = $('#id_mov-TOTAL_FORMS');
+    const renumber = () => {
+      rows().forEach((row, index) => {
+        $('.line-col', row).textContent = String(index + 1).padStart(2, '0');
+        $$('[name^="mov-"]', row).forEach(input => {
+          input.name = input.name.replace(/^mov-\d+-/, `mov-${index}-`);
+          input.id = input.id.replace(/^id_mov-\d+-/, `id_mov-${index}-`);
+        });
+      });
+      total.value = rows().length;
+    };
+    $('[data-ledger-add]', form).addEventListener('click', () => {
+      const index = rows().length;
+      $('#movementRows').insertAdjacentHTML('beforeend', $('#movementRowTemplate').innerHTML.replace(/__prefix__/g, index).replace(/__numero__/g, String(index + 1).padStart(2, '0')));
+      total.value = index + 1;
+    });
+    $('#movementRows').addEventListener('click', event => {
+      if (!event.target.closest('[data-ledger-remove]')) return;
+      if (rows().length <= 1) { showToast('Debe permanecer al menos una fila.', 'warning'); return; }
+      event.target.closest('.ledger-input-row').remove();
+      renumber();
+    });
+    form.addEventListener('submit', event => {
+      if (!window.confirm(`¿Guardar ${rows().length} movimiento(s) en el Libro Mayor?`)) event.preventDefault();
+    });
+  }
+
+  wireLedgerForm();
   window.addEventListener('popstate', showScreenFromUrl);
   showScreenFromUrl();
   JSON.parse($('#serverMessages').textContent).forEach(message => showToast(message.text, message.level === 'success' ? 'success' : message.level === 'warning' ? 'warning' : 'error'));
