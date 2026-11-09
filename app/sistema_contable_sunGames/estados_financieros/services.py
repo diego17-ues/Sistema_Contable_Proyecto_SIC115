@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from bitacora.eventos import Accion, Resultado
+from libro_mayor.models import EstadoPeriodo
 from usuarios.exceptions import RolNoAutorizadoError, UsuarioInactivoError
 from usuarios.roles import Rol
 
@@ -230,6 +231,12 @@ class CierrePeriodoService:
         _verificar(actor, ROLES_CONSULTA)
         return [self._resumen(p) for p in self._repositorio.periodos()]
 
+    def estado_actual(self, actor):
+        """Estado persistido del período contable más reciente."""
+        _verificar(actor, ROLES_CONSULTA)
+        periodo = self._repositorio.periodo_mas_reciente()
+        return periodo.estado if periodo else EstadoPeriodo.ABIERTO
+
     def requisitos_rango(self, actor, desde, hasta):
         """Estado del rango para Cierre provisional y la Hoja de Trabajo."""
         _verificar(actor, ROLES_CONSULTA)
@@ -244,17 +251,37 @@ class CierrePeriodoService:
         periodo = self._repositorio.obtener_periodo(periodo_id)
         return self._cerrar(actor, periodo, confirmacion, motivo)
 
-    def cerrar_rango(self, actor, desde, hasta, *, confirmacion, motivo):
-        """Cierre provisional desde la Hoja de Trabajo: usa el período con
-        ese rango o crea «Provisional AAAA-MM» al confirmar."""
+    def cerrar_rango(self, actor, desde, hasta, *, confirmacion, motivo,
+                     tipo_cierre="provisional"):
+        """Cierra un rango provisional o el ejercicio calendario completo."""
         _verificar(actor, self.ROLES_CIERRE)
         _validar_rango(desde, hasta)
-        periodo = self._periodo_del_rango(desde, hasta)
+        tipo_cierre = (tipo_cierre or "provisional").lower()
+        if tipo_cierre not in {"provisional", "anual"}:
+            raise RangoInvalidoError("El tipo de cierre no es válido.")
+        if tipo_cierre == "anual":
+            if (desde.month != 1 or desde.day != 1 or hasta.month != 12
+                    or hasta.day != 31 or desde.year != hasta.year):
+                raise RangoInvalidoError(
+                    "El cierre anual debe abarcar del 01/01 al 31/12 "
+                    "del mismo ejercicio."
+                )
+            periodo = (self._repositorio.periodo_con_rango(desde, hasta)
+                       or self._repositorio.nuevo_periodo(
+                           nombre=f"Ejercicio {desde.year}", desde=desde,
+                           hasta=hasta))
+        else:
+            periodo = self._periodo_del_rango(desde, hasta)
         cerrado = self._repositorio.rango_con_cierre(desde, hasta)
-        if not periodo.pk and cerrado:
-            raise PeriodoNoAbiertoError(
+        if cerrado and not periodo.pk:
+            error = PeriodoNoAbiertoError(
                 "El rango incluye fechas de un período cerrado."
             )
+            self._registrar(
+                Accion.CIERRE_PERIODO, Resultado.RECHAZADO, actor, periodo,
+                f"{error} Motivo: {(motivo or '').strip() or '—'}",
+            )
+            raise error
         return self._cerrar(actor, periodo, confirmacion, motivo)
 
     def _periodo_del_rango(self, desde, hasta):
@@ -324,7 +351,7 @@ class CierrePeriodoService:
         if periodo.cerrado:
             raise PeriodoNoAbiertoError()
         self._validar_motivo(motivo)
-        if (confirmacion or "").strip() != periodo.nombre:
+        if confirmacion != "CONFIRMAR":
             raise ConfirmacionIncorrectaError(campo="confirmacion")
         resumen = self._resumen(periodo)
         if resumen.ventas_pendientes:

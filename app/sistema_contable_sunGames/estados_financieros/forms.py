@@ -16,7 +16,8 @@ def campo_motivo():
 
 class CierrePeriodoForm(forms.Form):
     confirmacion = forms.CharField(
-        label="Nombre del período", required=False, max_length=NOMBRE_MAX,
+        label="Confirmación", required=False, max_length=NOMBRE_MAX,
+        strip=False,
         widget=forms.TextInput(attrs={"autocomplete": "off"}),
     )
     motivo = campo_motivo()
@@ -36,7 +37,12 @@ class RangoForm(forms.Form):
 
 
 class CierreRangoForm(RangoForm, CierrePeriodoForm):
-    pass
+    tipo_cierre = forms.ChoiceField(
+        choices=(("provisional", "Cierre provisional"),
+                 ("anual", "Cierre anual")),
+        required=False,
+        initial="provisional",
+    )
 
 
 class AjusteForm(forms.Form):

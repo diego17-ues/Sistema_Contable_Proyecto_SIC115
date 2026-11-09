@@ -5,6 +5,8 @@ from django.shortcuts import redirect, render
 from django.templatetags.static import static
 from django.urls import reverse
 
+from estados_financieros.composition import crear_cierre_service
+from libro_mayor.models import EstadoPeriodo
 from usuarios.composition import crear_acceso_service
 from usuarios.exceptions import UsuarioError
 
@@ -36,12 +38,19 @@ def contexto_panel(request, screen):
         acceso.verificar_acceso(request.user, screen)
     except UsuarioError as error:
         raise PermissionDenied(str(error)) from error
+    estado_guardado = crear_cierre_service().estado_actual(request.user)
+    estado_periodo = (
+        "CERRADO_PROVISIONAL"
+        if estado_guardado == EstadoPeriodo.CIERRE_PROVISIONAL
+        else "ABIERTO"
+    )
 
     screen_urls = {
         "login": reverse("login"),
         "logout": reverse("logout"),
         "closing": reverse("cierre_periodos"),
         "api_ventas": reverse("api_ventas"),
+        "api_conciliar_ventas": reverse("api_conciliar_ventas"),
         "api_hoja": reverse("api_hoja_trabajo"),
         "api_ajuste": reverse("api_ajuste"),
         "api_cierre_provisional": reverse("api_cierre_provisional"),
@@ -54,6 +63,7 @@ def contexto_panel(request, screen):
     return {
         "initial_screen": screen,
         "screen_urls": screen_urls,
+        "estado_periodo": estado_periodo,
         "logo_url": static("sic_sunGames/SunGames_Logo.png"),
         "modulos": sorted(acceso.modulos(request.user)),
         "usuario_actual": {

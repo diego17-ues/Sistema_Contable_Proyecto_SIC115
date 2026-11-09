@@ -6,7 +6,11 @@ import json
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import (
+    require_GET,
+    require_http_methods,
+    require_POST,
+)
 
 from usuarios.composition import crear_acceso_service
 from usuarios.exceptions import RolNoAutorizadoError, UsuarioError
@@ -17,7 +21,11 @@ from ventas.exceptions import (
     VentaNoEncontradaError,
     VentasError,
 )
-from ventas.forms import EventoSteamForm, FiltroVentasForm
+from ventas.forms import (
+    ConciliacionVentasForm,
+    EventoSteamForm,
+    FiltroVentasForm,
+)
 
 SIN_PERMISO = (RolNoAutorizadoError, UsuarioInactivoError)
 
@@ -69,13 +77,13 @@ def steam_ventas(request):
         if not isinstance(datos, dict):
             raise ValueError
     except ValueError:
-        servicio.rechazar_evento("", "El cuerpo no es un JSON válido.")
+        servicio.registrar_error("", "El cuerpo no es un JSON válido.")
         return _error("El cuerpo no es un JSON válido.", 400)
     form = EventoSteamForm(datos)
     if not form.is_valid():
         detalle = "; ".join(f"{campo}: {' '.join(errores)}"
                             for campo, errores in form.errors.items())
-        servicio.rechazar_evento(str(datos.get("id", ""))[:64], detalle)
+        servicio.registrar_error(str(datos.get("id", ""))[:64], detalle)
         return _error("Evento inválido.", 422, campos=form.errors)
     try:
         venta = servicio.recibir(**form.datos_servicio())
@@ -123,7 +131,48 @@ def ventas_api(request):
             "estado": conexion.estado,
             "ultimoContacto": (conexion.ultimo_contacto.isoformat()
                                if conexion.ultimo_contacto else None),
+            "ultimoError": (conexion.ultimo_error.isoformat()
+                            if conexion.ultimo_error else None),
         },
+    })
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def conciliacion_api(request):
+    """Previsualiza y confirma la conciliación de eventos Steam."""
+    if (denegado := verificar_modulo(request, "operations")):
+        return denegado
+    datos = request.GET if request.method == "GET" else request.POST
+    form = ConciliacionVentasForm(datos)
+    if not form.is_valid():
+        return _error("Indica un período válido.", 400,
+                      campos=form.errors)
+    servicio = crear_ventas_service()
+    desde, hasta = (form.cleaned_data["desde"],
+                    form.cleaned_data["hasta"])
+    try:
+        if request.method == "GET":
+            resumen = servicio.previsualizar_conciliacion(
+                request.user, desde, hasta
+            )
+            return JsonResponse({
+                "eventos": resumen.eventos,
+                "total": str(resumen.total),
+                "cuentasPorCobrar": str(resumen.cuentas_por_cobrar),
+                "comision": str(resumen.comision),
+            })
+        resultado = servicio.conciliar(request.user, desde, hasta)
+    except SIN_PERMISO as error:
+        return _error(str(error), 403)
+    except VentasError as error:
+        return _error(str(error), 422)
+    return JsonResponse({
+        "conciliadas": resultado.conciliadas,
+        "total": str(resultado.total),
+        "cuentasPorCobrar": str(resultado.cuentas_por_cobrar),
+        "comision": str(resultado.comision),
+        "errores": list(resultado.errores),
     })
 
 

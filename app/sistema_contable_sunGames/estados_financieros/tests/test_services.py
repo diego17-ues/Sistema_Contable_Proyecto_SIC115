@@ -54,7 +54,7 @@ class BaseTest(SimpleTestCase):
             self.repositorio.transaccion_simulada,
         )
 
-    def cerrar(self, confirmacion="Ejercicio 2026", motivo="Fin de año"):
+    def cerrar(self, confirmacion="CONFIRMAR", motivo="Fin de año"):
         return self.cierre.cerrar(self.contador, 1, confirmacion=confirmacion,
                                   motivo=motivo)
 
@@ -153,12 +153,25 @@ class CierreTests(BaseTest):
         self.assertEqual(self.periodo.estado, EstadoPeriodo.ABIERTO)
         self.assertEqual(self.repositorio.emitidos, [])
 
-    def test_rechaza_nombre_de_confirmacion_incorrecto(self):
-        with self.assertRaises(ConfirmacionIncorrectaError):
-            self.cerrar(confirmacion="ejercicio 2026")
+    def test_estado_actual_lee_el_estado_del_periodo_mas_reciente(self):
+        self.periodo.estado = EstadoPeriodo.CIERRE_PROVISIONAL
+
+        estado = self.cierre.estado_actual(self.contador)
+
+        self.assertEqual(estado, EstadoPeriodo.CIERRE_PROVISIONAL)
+
+    def test_rechaza_confirmacion_que_no_sea_exacta(self):
+        for confirmacion in ("confirmar", " CONFIRMAR", "CONFIRMAR "):
+            with self.subTest(confirmacion=confirmacion), self.assertRaises(
+                ConfirmacionIncorrectaError
+            ):
+                self.cerrar(confirmacion=confirmacion)
         self.assertSinCambios()
-        self.assertEqual(self.acciones(),
-                         [(Accion.CIERRE_PERIODO, Resultado.RECHAZADO)])
+        self.assertEqual(self.acciones(), [
+            (Accion.CIERRE_PERIODO, Resultado.RECHAZADO),
+            (Accion.CIERRE_PERIODO, Resultado.RECHAZADO),
+            (Accion.CIERRE_PERIODO, Resultado.RECHAZADO),
+        ])
 
     def test_rechaza_sin_motivo(self):
         with self.assertRaises(MotivoObligatorioError):
@@ -180,7 +193,7 @@ class CierreTests(BaseTest):
 
     def test_solo_el_contador_general_cierra(self):
         with self.assertRaises(RolNoAutorizadoError):
-            self.cierre.cerrar(self.admin, 1, confirmacion="Ejercicio 2026",
+            self.cierre.cerrar(self.admin, 1, confirmacion="CONFIRMAR",
                                motivo="x")
 
     def test_cierre_correcto_emite_snapshot_y_audita(self):

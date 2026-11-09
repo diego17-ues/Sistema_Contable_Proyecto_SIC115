@@ -39,3 +39,15 @@ class FiltroVentasForm(forms.Form):
     q = forms.CharField(required=False, max_length=120)
     desde = forms.DateField(required=False)
     hasta = forms.DateField(required=False)
+
+
+class ConciliacionVentasForm(forms.Form):
+    desde = forms.DateField()
+    hasta = forms.DateField()
+
+    def clean(self):
+        datos = super().clean()
+        desde, hasta = datos.get("desde"), datos.get("hasta")
+        if desde and hasta and desde > hasta:
+            self.add_error("hasta", "La fecha final debe ser posterior.")
+        return datos

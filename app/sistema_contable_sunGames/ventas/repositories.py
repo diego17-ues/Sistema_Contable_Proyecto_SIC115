@@ -38,6 +38,11 @@ class VentaRepository:
             )
         return list(ventas)
 
+    def ventas_en_periodo(self, desde, hasta):
+        return list(Venta.objects.filter(
+            _rango_fecha_hora(desde, hasta)
+        ).order_by("fecha_hora", "pk"))
+
     def obtener(self, identificador):
         try:
             return Venta.objects.get(identificador=identificador)
@@ -61,9 +66,20 @@ class VentaRepository:
     def registrar_contacto(self, momento):
         conexion, _ = ConexionSteam.objects.get_or_create(pk=1)
         conexion.ultimo_contacto = momento
-        conexion.save(update_fields=["ultimo_contacto"])
+        conexion.ultimo_error = None
+        conexion.save(update_fields=["ultimo_contacto", "ultimo_error"])
+
+    def registrar_error(self, momento):
+        conexion, _ = ConexionSteam.objects.get_or_create(pk=1)
+        conexion.ultimo_error = momento
+        conexion.save(update_fields=["ultimo_error"])
 
     def ultimo_contacto(self):
         return ConexionSteam.objects.filter(pk=1).values_list(
             "ultimo_contacto", flat=True
+        ).first()
+
+    def ultimo_error(self):
+        return ConexionSteam.objects.filter(pk=1).values_list(
+            "ultimo_error", flat=True
         ).first()

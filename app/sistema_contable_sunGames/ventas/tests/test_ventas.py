@@ -1,8 +1,11 @@
 import json
 import secrets
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
+from pathlib import Path
+from types import SimpleNamespace
 
+from django.contrib.staticfiles import finders
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
@@ -10,7 +13,12 @@ from bitacora.eventos import Accion, Resultado
 from bitacora.models import RegistroBitacora
 from catalogo.tests.fakes import BitacoraEnMemoria
 from estados_financieros.models import EstadoFinancieroEmitido
-from libro_mayor.models import EstadoPeriodo, Movimiento, PeriodoContable
+from libro_mayor.models import (
+    EstadoPeriodo,
+    Movimiento,
+    PeriodoContable,
+    Transaccion,
+)
 from simulador_steam.simulador import generar_evento
 from usuarios.exceptions import RolNoAutorizadoError
 from usuarios.models import Usuario
@@ -42,7 +50,7 @@ def evento(**cambios):
 
 class RepoEnMemoria:
     def __init__(self):
-        self.ventas, self.contacto = {}, None
+        self.ventas, self.contacto, self.error = {}, None, None
 
     def existe(self, identificador):
         return identificador in self.ventas
@@ -54,9 +62,50 @@ class RepoEnMemoria:
 
     def registrar_contacto(self, momento):
         self.contacto = momento
+        self.error = None
+
+    def registrar_error(self, momento):
+        self.error = momento
 
     def ultimo_contacto(self):
         return self.contacto
+
+    def ultimo_error(self):
+        return self.error
+
+    def ventas_en_periodo(self, desde, hasta):
+        return [venta for venta in self.ventas.values()
+                if desde <= venta.fecha <= hasta]
+
+    def marcar_registrada(self, venta, transaccion):
+        venta.estado = EstadoVenta.REGISTRADA
+        venta.transaccion_id = transaccion.pk
+        return venta
+
+    def obtener(self, identificador):
+        return self.ventas[identificador]
+
+
+class MayorEnMemoria:
+    def __init__(self):
+        self.movimientos = []
+        self.transacciones = 0
+
+    def periodo_de(self, fecha):
+        return SimpleNamespace(cerrado=False)
+
+    def obtener_cuenta(self, codigo):
+        return SimpleNamespace(codigo=codigo, activa=True)
+
+    def tiene_subcuentas(self, cuenta):
+        return False
+
+    def crear_transaccion(self, usuario):
+        self.transacciones += 1
+        return SimpleNamespace(pk=self.transacciones)
+
+    def crear_movimiento(self, **datos):
+        self.movimientos.append(datos)
 
 
 class VentasServiceTests(SimpleTestCase):
@@ -76,12 +125,15 @@ class VentasServiceTests(SimpleTestCase):
             comision=Decimal(datos["comision"]),
         )
 
-    def test_recibe_evento_valido_pendiente_y_conectado(self):
+    def test_recibe_evento_no_actualiza_el_estado_del_latido(self):
         venta = self.recibir()
 
         self.assertEqual(venta.estado, EstadoVenta.PENDIENTE)
         self.assertEqual(venta.total, Decimal("39.98"))
         self.assertEqual(venta.neto, Decimal("27.98"))
+        self.assertEqual(self.servicio.estado_conexion().estado, "En espera")
+
+        self.servicio.latido()
         self.assertEqual(self.servicio.estado_conexion().estado, "Conectado")
 
     def test_rechaza_duplicado_moneda_y_comision_excesiva(self):
@@ -98,6 +150,51 @@ class VentasServiceTests(SimpleTestCase):
 
     def test_sin_contacto_queda_en_espera(self):
         self.assertEqual(self.servicio.estado_conexion().estado, "En espera")
+
+    def test_error_autenticado_se_muestra_hasta_el_siguiente_latido(self):
+        self.servicio.registrar_error()
+        self.assertEqual(self.servicio.estado_conexion().estado, "Error")
+
+        self.servicio.latido()
+
+        self.assertEqual(self.servicio.estado_conexion().estado, "Conectado")
+
+    def test_conciliacion_contabiliza_una_vez_por_evento(self):
+        venta = self.recibir()
+        mayor = MayorEnMemoria()
+        servicio = VentasService(self.repo, mayor, self.bitacora,
+                                 reloj=lambda: AHORA)
+        actor = crear_usuario("contador", Rol.CONTADOR_GENERAL)
+        desde, hasta = date(2026, 11, 1), date(2026, 11, 30)
+
+        primero = servicio.conciliar(actor, desde, hasta)
+        segundo = servicio.conciliar(actor, desde, hasta)
+
+        self.assertEqual(primero.conciliadas, 1)
+        self.assertEqual(primero.total, Decimal("39.98"))
+        self.assertEqual(primero.cuentas_por_cobrar, Decimal("27.98"))
+        self.assertEqual(primero.comision, Decimal("12.00"))
+        self.assertEqual(segundo.conciliadas, 1)
+        self.assertEqual(len(mayor.movimientos), 3)
+        self.assertEqual(mayor.transacciones, 1)
+        self.assertEqual(venta.estado, EstadoVenta.REGISTRADA)
+
+    def test_conciliacion_repite_evento_sin_duplicar_asiento(self):
+        venta = self.recibir()
+        mayor = MayorEnMemoria()
+        servicio = VentasService(self.repo, mayor, self.bitacora,
+                                 reloj=lambda: AHORA)
+        actor = crear_usuario("contador", Rol.CONTADOR_GENERAL)
+        desde, hasta = date(2026, 11, 1), date(2026, 11, 30)
+
+        primera = servicio.conciliar(actor, desde, hasta)
+        segunda = servicio.conciliar(actor, desde, hasta)
+
+        self.assertEqual(segunda.conciliadas, 1)
+        self.assertEqual(segunda.total, primera.total)
+        self.assertEqual(len(mayor.movimientos), 3)
+        self.assertEqual(mayor.transacciones, 1)
+        self.assertEqual(venta.estado, EstadoVenta.REGISTRADA)
 
     def test_solo_el_contador_general_contabiliza(self):
         with self.assertRaises(RolNoAutorizadoError):
@@ -135,6 +232,11 @@ class VentasIntegracionTests(TestCase):
             reverse("api_contabilizar_venta", args=[identificador])
         )
 
+    def conciliar(self, method="post", **datos):
+        return getattr(self.client, method)(
+            reverse("api_conciliar_ventas"), datos
+        )
+
     def test_webhook_valida_token_formato_y_duplicados(self):
         self.assertEqual(self.enviar(evento(), token="otro").status_code, 401)
         self.assertEqual(self.enviar(evento()).status_code, 201)
@@ -150,6 +252,26 @@ class VentasIntegracionTests(TestCase):
             accion=Accion.RECEPCION_VENTA, resultado=Resultado.RECHAZADO
         ).count(), 3)
 
+    def test_error_autenticado_actualiza_estado_hasta_latido(self):
+        self.assertEqual(
+            self.enviar(evento(cantidad=0)).status_code, 422
+        )
+        self.client.force_login(self.contador)
+
+        conexion = self.client.get(reverse("api_ventas")).json()["conexion"]
+        self.assertEqual(conexion["estado"], "Error")
+        self.assertIsNotNone(conexion["ultimoError"])
+
+        self.client.logout()
+        latido = self.client.post(
+            reverse("steam_latido"), HTTP_AUTHORIZATION=f"Bearer {TOKEN}"
+        )
+        self.assertEqual(latido.status_code, 200)
+        self.client.force_login(self.contador)
+        conexion = self.client.get(reverse("api_ventas")).json()["conexion"]
+        self.assertEqual(conexion["estado"], "Conectado")
+        self.assertIsNone(conexion["ultimoError"])
+
     @override_settings(STEAM_WEBHOOK_TOKEN="")
     def test_webhook_sin_token_configurado(self):
         self.assertEqual(self.enviar(evento()).status_code, 503)
@@ -157,6 +279,9 @@ class VentasIntegracionTests(TestCase):
     def test_contador_contabiliza_con_asiento_balanceado(self):
         self.enviar(evento())
         self.client.force_login(self.contador)
+        self.client.post(
+            reverse("steam_latido"), HTTP_AUTHORIZATION=f"Bearer {TOKEN}"
+        )
 
         listado = self.client.get(reverse("api_ventas")).json()
         respuesta = self.contabilizar()
@@ -185,11 +310,89 @@ class VentasIntegracionTests(TestCase):
         self.assertTrue(Movimiento.objects.filter(cuenta__codigo="5102")
                         .exists())
 
+    def test_conciliar_una_vez_por_evento_y_auditar(self):
+        self.enviar(evento())
+        self.client.force_login(self.contador)
+        rango = {"desde": "2026-11-01", "hasta": "2026-11-30"}
+
+        vista_previa = self.conciliar("get", **rango)
+        primera = self.conciliar(**rango)
+        segunda = self.conciliar(**rango)
+
+        self.assertEqual(vista_previa.status_code, 200)
+        self.assertEqual(vista_previa.json()["cuentasPorCobrar"], "27.98")
+        self.assertEqual(vista_previa.json()["comision"], "12.00")
+        self.assertEqual(primera.status_code, 200, primera.content)
+        self.assertEqual(primera.json()["conciliadas"], 1)
+        self.assertEqual(primera.json()["total"], "39.98")
+        self.assertEqual(segunda.status_code, 200, segunda.content)
+        self.assertEqual(segunda.json()["conciliadas"], 1)
+        self.assertEqual(Movimiento.objects.count(), 3)
+        self.assertEqual(Transaccion.objects.count(), 1)
+        self.assertEqual(RegistroBitacora.objects.filter(
+            accion=Accion.CONCILIACION_VENTAS
+        ).count(), 2)
+
+    def test_conciliar_permite_evento_contabilizado_en_periodo_cerrado(self):
+        self.enviar(evento())
+        self.client.force_login(self.contador)
+        self.assertEqual(self.contabilizar().status_code, 200)
+        periodo = PeriodoContable.objects.get(nombre="Ejercicio 2026")
+        periodo.estado = EstadoPeriodo.CIERRE_PROVISIONAL
+        periodo.save()
+
+        vista_previa = self.conciliar(
+            "get", desde="2026-11-01", hasta="2026-11-30"
+        )
+        movimientos_antes = Movimiento.objects.count()
+        respuesta = self.conciliar(
+            desde="2026-11-01", hasta="2026-11-30"
+        )
+        segunda = self.conciliar(
+            desde="2026-11-01", hasta="2026-11-30"
+        )
+
+        self.assertEqual(vista_previa.status_code, 200)
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+        self.assertEqual(respuesta.json()["conciliadas"], 1)
+        self.assertEqual(segunda.status_code, 200, segunda.content)
+        self.assertEqual(segunda.json()["conciliadas"], 1)
+        self.assertEqual(Movimiento.objects.count(), movimientos_antes)
+        self.assertEqual(Transaccion.objects.count(), 1)
+        self.assertEqual(Venta.objects.get().estado, EstadoVenta.REGISTRADA)
+        self.assertEqual(RegistroBitacora.objects.filter(
+            accion=Accion.CONCILIACION_VENTAS
+        ).count(), 2)
+
+    def test_conciliar_no_contabiliza_evento_pendiente_en_periodo_cerrado(self):
+        self.enviar(evento())
+        self.client.force_login(self.contador)
+        periodo = PeriodoContable.objects.get(nombre="Ejercicio 2026")
+        periodo.estado = EstadoPeriodo.CIERRE_PROVISIONAL
+        periodo.save()
+
+        vista_previa = self.conciliar(
+            "get", desde="2026-11-01", hasta="2026-11-30"
+        )
+        respuesta = self.conciliar(
+            desde="2026-11-01", hasta="2026-11-30"
+        )
+
+        self.assertEqual(vista_previa.status_code, 200)
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+        self.assertEqual(respuesta.json()["conciliadas"], 0)
+        self.assertEqual(len(respuesta.json()["errores"]), 1)
+        self.assertFalse(Movimiento.objects.exists())
+        self.assertEqual(Venta.objects.get().estado, EstadoVenta.PENDIENTE)
+        self.assertEqual(RegistroBitacora.objects.get(
+            accion=Accion.CONCILIACION_VENTAS
+        ).resultado, Resultado.RECHAZADO)
+
     def test_cierre_se_bloquea_con_ventas_pendientes(self):
         self.enviar(evento())
         self.client.force_login(self.contador)
         datos = {"desde": "2026-11-01", "hasta": "2026-11-30",
-                 "confirmacion": "Provisional 2026-11", "motivo": "Cierre"}
+                 "confirmacion": "CONFIRMAR", "motivo": "Cierre"}
 
         hoja = self.client.get(reverse("api_hoja_trabajo"), datos).json()
         bloqueado = self.client.post(reverse("api_cierre_provisional"), datos)
@@ -245,3 +448,16 @@ class VentasIntegracionTests(TestCase):
         listado = self.client.get(reverse("api_ventas")).json()
         self.assertEqual(listado["ventas"], [])
         self.assertEqual(listado["conexion"]["estado"], "En espera")
+
+
+class EstadoConexionUiTests(SimpleTestCase):
+    def test_panel_de_estado_de_conexion_no_tiene_controles_editables(self):
+        ruta = finders.find("sic_sunGames/app.js")
+        fuente = Path(ruta).read_text(encoding="utf-8")
+        panel = fuente.split("function steamPanel()", 1)[1].split(
+            "function showToast(", 1
+        )[0]
+
+        self.assertNotRegex(panel, r"<(input|select|textarea)\b")
+        self.assertNotIn("data-action=\"steam-check\"", panel)
+        self.assertIn("Solo lectura", panel)

@@ -90,6 +90,7 @@ class ConexionSteam(models.Model):
     """Último contacto del servicio Steam simulado (un único registro)."""
 
     ultimo_contacto = models.DateTimeField(null=True, blank=True)
+    ultimo_error = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = "conexión Steam"

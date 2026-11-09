@@ -34,7 +34,7 @@ class PeriodoNoAbiertoError(EstadosFinancierosError):
 
 
 class ConfirmacionIncorrectaError(EstadosFinancierosError):
-    mensaje = "Escribe el nombre exacto del período para confirmar."
+    mensaje = "Escribe CONFIRMAR exactamente y en mayúsculas."
 
 
 class MotivoObligatorioError(EstadosFinancierosError):

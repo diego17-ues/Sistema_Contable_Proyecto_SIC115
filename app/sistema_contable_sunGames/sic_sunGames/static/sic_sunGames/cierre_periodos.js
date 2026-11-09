@@ -5,8 +5,8 @@
     const motivo = form.querySelector('textarea').value.trim();
     let listo = motivo !== '';
     if ('formCierre' in form.dataset) {
-      const nombre = form.querySelector('[name$="confirmacion"]').value.trim();
-      listo = listo && form.dataset.cuadra === 'true' && nombre === form.dataset.nombre;
+      const confirmacion = form.querySelector('[name$="confirmacion"]').value;
+      listo = listo && form.dataset.cuadra === 'true' && confirmacion === 'CONFIRMAR';
     } else {
       listo = listo && form.querySelector('[type="password"]').value !== '';
     }

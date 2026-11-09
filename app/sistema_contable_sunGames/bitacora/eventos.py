@@ -20,6 +20,9 @@ class Accion(models.TextChoices):
     CONTABILIZACION_VENTA = (
         "CONTABILIZACION_VENTA", "Contabilización de venta"
     )
+    CONCILIACION_VENTAS = (
+        "CONCILIACION_VENTAS", "Conciliación de ventas Steam"
+    )
 
 
 class Resultado(models.TextChoices):

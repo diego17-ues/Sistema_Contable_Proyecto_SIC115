@@ -73,6 +73,10 @@ class EstadosRepositoryEnMemoria:
     def periodos(self):
         return list(self._periodos.values())
 
+    def periodo_mas_reciente(self):
+        return (self._periodos[max(self._periodos)]
+                if self._periodos else None)
+
     def obtener_periodo(self, pk):
         try:
             return self._periodos[pk]

@@ -193,6 +193,9 @@ class AppJsSinDatosDeDemostracionTests(SimpleTestCase):
         self.assertNotIn("addAudit", self.codigo)
         self.assertNotIn("state.audit", self.codigo)
 
+    def test_no_expone_el_tipo_tecnico_del_cierre_provisional(self):
+        self.assertNotIn("Tipo: PROVISIONAL_MENSUAL", self.codigo)
+
 
 class AdministracionIntegracionTests(TestCase):
     """CU-02 y CU-03 contra PostgreSQL."""

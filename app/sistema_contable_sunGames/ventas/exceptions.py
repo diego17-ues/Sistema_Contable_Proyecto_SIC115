@@ -21,6 +21,10 @@ class VentaNoEncontradaError(VentasError):
     mensaje = "La venta no existe."
 
 
+class RangoConciliacionInvalidoError(VentasError):
+    mensaje = "La fecha inicial debe ser igual o anterior a la final."
+
+
 class VentaYaRegistradaError(VentasError):
     mensaje = "La venta ya está registrada en el Libro Mayor."
 

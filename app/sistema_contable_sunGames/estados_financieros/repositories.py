@@ -18,6 +18,9 @@ class EstadosFinancierosRepository:
     def periodos(self):
         return list(PeriodoContable.objects.order_by("fecha_inicio", "pk"))
 
+    def periodo_mas_reciente(self):
+        return PeriodoContable.objects.order_by("-pk").first()
+
     def obtener_periodo(self, pk):
         try:
             return PeriodoContable.objects.get(pk=pk)

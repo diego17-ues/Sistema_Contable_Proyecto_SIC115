@@ -55,7 +55,7 @@ class CierreIntegracionTests(TestCase):
             concepto="Operación", tipo=tipo, importe=Decimal(importe),
         )
 
-    def cerrar(self, confirmacion=NOMBRE, motivo="Cierre de noviembre"):
+    def cerrar(self, confirmacion="CONFIRMAR", motivo="Cierre de noviembre"):
         prefijo = f"p{self.periodo.pk}"
         return self.client.post(
             reverse("periodo_cerrar", args=[self.periodo.pk]),
@@ -85,7 +85,7 @@ class CierreIntegracionTests(TestCase):
         pantalla = self.client.get(reverse("cierre_periodos"))
 
         for texto in (f'data-modal="cerrar-{self.periodo.pk}"',
-                      f"Escribe «{NOMBRE}» para confirmar", "Motivo",
+                      "Escribe CONFIRMAR exactamente", "Motivo",
                       "Partidas incluidas", "Movimientos incluidos",
                       "Cuadra", "dejará de aceptar transacciones",
                       ">Cancelar</button>", ">Cerrar período</button>"):
@@ -161,7 +161,7 @@ class CierreIntegracionTests(TestCase):
 
     def test_cierre_rechazado_no_cambia_nada(self):
         self.client.force_login(self.contador)
-        casos = [{"confirmacion": "Ejercicio"}, {"motivo": "  "}]
+        casos = [{"confirmacion": "CONFIRMAR "}, {"motivo": "  "}]
         for datos in casos:
             with self.subTest(datos=datos):
                 respuesta = self.cerrar(**datos)
@@ -175,6 +175,27 @@ class CierreIntegracionTests(TestCase):
         self.assertFalse(EstadoFinancieroEmitido.objects.exists())
         self.assertEqual(self.eventos(Accion.CIERRE_PERIODO).filter(
             resultado=Resultado.RECHAZADO).count(), 3)
+
+    def test_cierre_anual_tambien_exige_confirmar_exactamente(self):
+        self.client.force_login(self.contador)
+        datos = {
+            "desde": "2026-01-01", "hasta": "2026-12-31",
+            "tipo_cierre": "anual", "confirmacion": "Confirmar",
+            "motivo": "Cierre anual",
+        }
+
+        rechazado = self.client.post(reverse("api_cierre_provisional"), datos)
+        self.assertEqual(rechazado.status_code, 422)
+        self.assertEqual(rechazado.json()["campo"], "confirmacion")
+
+        datos["confirmacion"] = "CONFIRMAR"
+        aceptado = self.client.post(reverse("api_cierre_provisional"), datos)
+
+        self.assertEqual(aceptado.status_code, 200, aceptado.content)
+        self.assertIn("cierre anual", aceptado.json()["mensaje"])
+        self.periodo.refresh_from_db()
+        self.assertEqual(self.periodo.estado,
+                         EstadoPeriodo.CIERRE_PROVISIONAL)
 
     def test_cierre_es_atomico(self):
         self.client.force_login(self.contador)
@@ -197,6 +218,12 @@ class CierreIntegracionTests(TestCase):
     def test_reapertura_por_no_administrador_se_rechaza(self):
         self.cerrar_como_contador()
 
+        pantalla = self.client.get(reverse("cierre_periodos"))
+        self.assertEqual(pantalla.status_code, 200)
+        self.assertNotContains(
+            pantalla, f'data-modal="reabrir-{self.periodo.pk}"'
+        )
+
         respuesta = self.reabrir()
 
         self.assertEqual(respuesta.status_code, 403)
@@ -204,6 +231,26 @@ class CierreIntegracionTests(TestCase):
         self.assertTrue(self.periodo.cerrado)
         self.assertEqual(self.eventos(Accion.REAPERTURA_PERIODO).get()
                          .resultado, Resultado.RECHAZADO)
+
+    def test_estado_cerrado_se_conserva_al_cambiar_pantalla_y_usuario(self):
+        self.cerrar_como_contador()
+
+        for usuario in (self.contador, self.admin):
+            with self.subTest(usuario=usuario.username):
+                self.client.force_login(usuario)
+                for pantalla in ("dashboard", "reports"):
+                    with self.subTest(pantalla=pantalla):
+                        respuesta = self.client.get(reverse(pantalla))
+
+                        self.assertContains(
+                            respuesta,
+                            '<script id="periodStatus" '
+                            'type="application/json">'
+                            '"CERRADO_PROVISIONAL"</script>',
+                        )
+                        self.assertContains(
+                            respuesta, "Período cerrado provisionalmente"
+                        )
 
     def test_reapertura_con_contrasena_incorrecta(self):
         self.cerrar_como_contador()

@@ -252,14 +252,16 @@ def cierre_provisional_api(request):
         periodo = crear_cierre_service().cerrar_rango(
             request.user, datos["desde"], datos["hasta"],
             confirmacion=datos["confirmacion"], motivo=datos["motivo"],
+            tipo_cierre=datos.get("tipo_cierre") or "provisional",
         )
     except SIN_PERMISO as error:
         return JsonResponse({"error": str(error)}, status=403)
     except EstadosFinancierosError as error:
         return JsonResponse({"error": str(error), "campo": error.campo},
                             status=422)
+    tipo = datos.get("tipo_cierre") or "provisional"
     return JsonResponse({"mensaje": f"El período «{periodo.nombre}» quedó "
-                                    "cerrado (cierre provisional)."})
+                                    f"cerrado (cierre {tipo})."})
 
 
 @login_required

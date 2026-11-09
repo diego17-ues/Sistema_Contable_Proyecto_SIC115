@@ -25,11 +25,12 @@ from .exceptions import (
     ContabilizacionError,
     EventoInvalidoError,
     MonedaNoAdmitidaError,
+    RangoConciliacionInvalidoError,
     VentaDuplicadaError,
     VentasError,
     VentaYaRegistradaError,
 )
-from .models import CENTAVO, TipoProducto
+from .models import CENTAVO, EstadoVenta, TipoProducto
 
 CERO = Decimal("0.00")
 
@@ -48,6 +49,24 @@ class ConfiguracionVentas:
 class EstadoConexion:
     estado: str
     ultimo_contacto: datetime = None
+    ultimo_error: datetime = None
+
+
+@dataclass(frozen=True)
+class ResumenConciliacion:
+    conciliadas: int
+    total: Decimal
+    cuentas_por_cobrar: Decimal
+    comision: Decimal
+    errores: tuple = ()
+
+
+@dataclass(frozen=True)
+class VistaPreviaConciliacion:
+    eventos: int
+    total: Decimal
+    cuentas_por_cobrar: Decimal
+    comision: Decimal
 
 
 def _ahora():
@@ -97,9 +116,10 @@ class VentasService:
                 impuesto=impuesto,
             )
         except VentasError as error:
-            self.rechazar_evento(identificador, str(error))
+            with self._transaccion():
+                self._repositorio.registrar_error(self._reloj())
+                self.rechazar_evento(identificador, str(error))
             raise
-        self._repositorio.registrar_contacto(self._reloj())
         self._bitacora.registrar(
             Accion.RECEPCION_VENTA, Resultado.EXITOSO, referencia=referencia,
             detalle=f"{titulo} · {cantidad} × {precio_unitario} {moneda}",
@@ -118,12 +138,24 @@ class VentasService:
 
     def estado_conexion(self):
         ultimo = self._repositorio.ultimo_contacto()
+        ultimo_error = self._repositorio.ultimo_error()
+        if ultimo_error and (ultimo is None or ultimo_error >= ultimo):
+            return EstadoConexion("Error", ultimo, ultimo_error)
         if ultimo is None:
             return EstadoConexion("En espera")
         limite = timedelta(minutes=self._config.minutos_conectado)
         estado = ("Conectado" if self._reloj() - ultimo <= limite
                   else "Fuera de servicio")
         return EstadoConexion(estado, ultimo)
+
+    def registrar_error(self, identificador=None, motivo=None):
+        """Registra el error de una solicitud autenticada del simulador."""
+        if motivo is None:
+            self._repositorio.registrar_error(self._reloj())
+            return
+        with self._transaccion():
+            self._repositorio.registrar_error(self._reloj())
+            self.rechazar_evento(identificador or "", motivo)
 
     def listar(self, actor, *, consulta="", desde=None, hasta=None):
         self._verificar(actor, self.ROLES_CONSULTA)
@@ -133,6 +165,59 @@ class VentasService:
 
     def pendientes_en(self, desde, hasta):
         return self._repositorio.contar_pendientes(desde, hasta)
+
+    def previsualizar_conciliacion(self, actor, desde, hasta):
+        self._verificar(actor, self.ROLES_REGISTRO)
+        ventas = self._ventas_para_conciliar(desde, hasta)
+        total = sum((venta.total for venta in ventas), CERO)
+        comision = sum((venta.comision for venta in ventas), CERO)
+        return VistaPreviaConciliacion(
+            len(ventas), total, total - comision, comision
+        )
+
+    def conciliar(self, actor, desde, hasta):
+        """Conciliación repetible; eventos ya registrados no duplican asientos."""
+        self._verificar(actor, self.ROLES_REGISTRO)
+        ventas = self._ventas_para_conciliar(desde, hasta)
+        with self._transaccion():
+            conciliadas = 0
+            total = CERO
+            comision = CERO
+            errores = []
+            for venta in ventas:
+                try:
+                    if venta.estado != EstadoVenta.REGISTRADA:
+                        self.contabilizar(actor, venta.identificador)
+                except VentasError as error:
+                    errores.append({
+                        "id": venta.identificador,
+                        "mensaje": str(error),
+                    })
+                    continue
+                conciliadas += 1
+                total += venta.total
+                comision += venta.comision
+
+            resultado = (Resultado.RECHAZADO
+                         if errores and conciliadas == 0
+                         else Resultado.EXITOSO)
+            self._bitacora.registrar(
+                Accion.CONCILIACION_VENTAS, resultado, actor=actor,
+                referencia=f"Steam {desde} a {hasta}"[:60],
+                detalle=(f"Conciliadas: {conciliadas}; total: {total:.2f}; "
+                         f"cuentas por cobrar: {total - comision:.2f}; "
+                         f"comisión: {comision:.2f}; "
+                         f"errores: {len(errores)}"),
+            )
+            return ResumenConciliacion(
+                conciliadas, total, total - comision, comision,
+                tuple(errores),
+            )
+
+    def _ventas_para_conciliar(self, desde, hasta):
+        if desde > hasta:
+            raise RangoConciliacionInvalidoError()
+        return self._repositorio.ventas_en_periodo(desde, hasta)
 
     def contabilizar(self, actor, identificador):
         """CU-08.2: registra la venta en el Libro Mayor, una sola vez."""
