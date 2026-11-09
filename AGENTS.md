@@ -143,3 +143,5 @@ Los pasos completos de instalación están en `README.md`.
 **Contador General:**
 - CU-04, CU-05, CU-07, CU-08 (con sus subcasos)
 - CU-06 Catálogo de Cuentas: solo consulta.
+
+El registro contable es por movimiento: cada movimiento tiene una cuenta, un importe firmado y una fecha. El sistema no exige que una transacción cuadre al registrarla. El cuadre se verifica en el Balance de comprobación (CU-04.1), y el contador es responsable de registrar completas las transacciones. Ningún movimiento se guarda si sus datos no son válidos.
