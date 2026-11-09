@@ -1,11 +1,12 @@
 from django.db import DatabaseError
-from django.db.models import Count, Sum
+from django.db.models import Count, Q, Sum
 
 from catalogo.models import Cuenta
 from libro_mayor.models import (
     EstadoPeriodo,
     Movimiento,
     PeriodoContable,
+    TipoMovimiento,
     Transaccion,
 )
 
@@ -51,6 +52,48 @@ class EstadosFinancierosRepository:
             movimientos__in=movimientos
         ).distinct().count()
         return transacciones, movimientos.aggregate(n=Count("pk"))["n"]
+
+    def agregados_hoja(self, desde, hasta):
+        """Por cuenta: apertura y Debe/Haber del rango, sin y con ajustes."""
+        rango = Q(movimientos__fecha__gte=desde, movimientos__fecha__lte=hasta)
+        ajuste = Q(movimientos__tipo=TipoMovimiento.AJUSTE)
+        debe, haber = Q(movimientos__importe__gt=0), Q(
+            movimientos__importe__lt=0
+        )
+        importe = "movimientos__importe"
+        return list(
+            Cuenta.objects.filter(movimientos__fecha__lte=hasta).distinct()
+            .select_related("rubro", "naturaleza")
+            .annotate(
+                apertura=Sum(importe, filter=Q(movimientos__fecha__lt=desde)),
+                debe=Sum(importe, filter=rango & debe & ~ajuste),
+                haber=Sum(importe, filter=rango & haber & ~ajuste),
+                ajuste_debe=Sum(importe, filter=rango & debe & ajuste),
+                ajuste_haber=Sum(importe, filter=rango & haber & ajuste),
+            ).order_by("codigo")
+        )
+
+    def ajustes(self, desde, hasta):
+        return list(Movimiento.objects.filter(
+            tipo=TipoMovimiento.AJUSTE, fecha__gte=desde, fecha__lte=hasta
+        ).select_related("cuenta").order_by("fecha", "pk"))
+
+    def periodo_con_rango(self, desde, hasta):
+        return PeriodoContable.objects.filter(
+            fecha_inicio=desde, fecha_fin=hasta
+        ).first()
+
+    def rango_con_cierre(self, desde, hasta):
+        return PeriodoContable.objects.filter(
+            fecha_inicio__lte=hasta, fecha_fin__gte=desde
+        ).exclude(estado=EstadoPeriodo.ABIERTO).exists()
+
+    def nuevo_periodo(self, *, nombre, desde, hasta):
+        return PeriodoContable(nombre=nombre, fecha_inicio=desde,
+                               fecha_fin=hasta)
+
+    def guardar_periodo(self, periodo):
+        return self._guardar(periodo)
 
     def suma_balanza(self, *, hasta):
         return Movimiento.objects.filter(fecha__lte=hasta).aggregate(

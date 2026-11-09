@@ -55,3 +55,11 @@ class PeriodoNoReabribleError(EstadosFinancierosError):
 
 class GuardadoCierreError(EstadosFinancierosError):
     mensaje = "No se pudo guardar; el período quedó como estaba."
+
+
+class VentasPendientesError(EstadosFinancierosError):
+    mensaje = "Hay ventas pendientes de contabilizar en el período."
+
+
+class RangoInvalidoError(EstadosFinancierosError):
+    mensaje = "La fecha inicial debe ser igual o anterior a la final."

@@ -16,6 +16,10 @@ class Accion(models.TextChoices):
     DESCARGA_ESTADO_PDF = (
         "DESCARGA_ESTADO_PDF", "Descarga de estado financiero en PDF"
     )
+    RECEPCION_VENTA = "RECEPCION_VENTA", "Recepción de venta Steam"
+    CONTABILIZACION_VENTA = (
+        "CONTABILIZACION_VENTA", "Contabilización de venta"
+    )
 
 
 class Resultado(models.TextChoices):

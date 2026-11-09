@@ -5,6 +5,7 @@ from django.db import transaction
 
 from libro_mayor.composition import LOGO
 from usuarios.composition import crear_bitacora_service
+from ventas.composition import crear_ventas_service
 
 from .exportadores import ExportadorEstadoPDF
 from .repositories import EstadosFinancierosRepository
@@ -21,5 +22,5 @@ def crear_estados_financieros_service():
 def crear_cierre_service():
     return CierrePeriodoService(
         EstadosFinancierosRepository(), crear_estados_financieros_service(),
-        crear_bitacora_service(), transaction.atomic,
+        crear_bitacora_service(), transaction.atomic, crear_ventas_service(),
     )

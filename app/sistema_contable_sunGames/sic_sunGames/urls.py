@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import administracion, auth, catalogo, estados, mayor, pages
+from .views import administracion, auth, catalogo, estados, mayor, pages, ventas
 
 urlpatterns = [
     path("", pages.index, name="index"),
@@ -21,6 +21,14 @@ urlpatterns = [
     path("panel/estados-financieros/periodos/<int:periodo_id>/cerrar/", estados.cerrar_periodo, name="periodo_cerrar"),
     path("panel/estados-financieros/periodos/<int:periodo_id>/reabrir/", estados.reabrir_periodo, name="periodo_reabrir"),
     path("panel/estados-financieros/<int:periodo_id>/<str:tipo>/pdf/", estados.estado_pdf, name="estado_pdf"),
+    path("panel/estados-financieros/api/hoja-trabajo/", estados.hoja_trabajo_api, name="api_hoja_trabajo"),
+    path("panel/estados-financieros/api/ajustes/", estados.ajuste_api, name="api_ajuste"),
+    path("panel/estados-financieros/api/cierre-provisional/", estados.cierre_provisional_api, name="api_cierre_provisional"),
+    path("panel/estados-financieros/pdf/<str:tipo>/", estados.estado_pdf_rango, name="estado_pdf_rango"),
+    path("panel/ventas-costos/api/ventas/", ventas.ventas_api, name="api_ventas"),
+    path("panel/ventas-costos/api/ventas/<str:identificador>/contabilizar/", ventas.contabilizar_api, name="api_contabilizar_venta"),
+    path("api/steam/ventas/", ventas.steam_ventas, name="steam_ventas"),
+    path("api/steam/latido/", ventas.steam_latido, name="steam_latido"),
     path("panel/ventas-costos/", pages.render_screen, {"screen": "operations"}, name="operations"),
     path("panel/usuarios/", administracion.usuarios, name="users"),
     path("panel/usuarios/nuevo/", administracion.usuario_nuevo, name="usuario_nuevo"),

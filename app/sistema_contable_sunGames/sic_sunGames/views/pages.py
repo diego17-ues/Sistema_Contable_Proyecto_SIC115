@@ -41,6 +41,11 @@ def contexto_panel(request, screen):
         "login": reverse("login"),
         "logout": reverse("logout"),
         "closing": reverse("cierre_periodos"),
+        "api_ventas": reverse("api_ventas"),
+        "api_hoja": reverse("api_hoja_trabajo"),
+        "api_ajuste": reverse("api_ajuste"),
+        "api_cierre_provisional": reverse("api_cierre_provisional"),
+        "pdf_estados": reverse("estado_pdf_rango", args=["TIPO"]),
         **{
             name: reverse(route_name)
             for name, route_name in SCREEN_URL_NAMES.items()

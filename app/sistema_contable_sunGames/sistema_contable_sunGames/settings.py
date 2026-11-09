@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'catalogo',
     'libro_mayor',
     'estados_financieros',
+    'ventas',
 ]
 
 AUTH_USER_MODEL = 'usuarios.Usuario'
@@ -148,4 +149,16 @@ LIBRO_MAYOR = {
     "IMPORTE_MAXIMO": None,
     "CONCEPTO_MIN": 3,
     "CONCEPTO_MAX": 200,
+}
+
+# Ventas (CU-08). Token compartido con el simulador de Steam (.env) y
+# cuentas del asiento de cada venta, configurables.
+STEAM_WEBHOOK_TOKEN = os.getenv("STEAM_WEBHOOK_TOKEN", "")
+VENTAS = {
+    "MONEDA": "USD",
+    "CUENTA_POR_COBRAR": "1104",
+    "CUENTA_COMISION": "4302",
+    "CUENTA_INGRESO_JUEGO": "5101",
+    "CUENTA_INGRESO_DLC": "5102",
+    "MINUTOS_CONECTADO": 5,
 }

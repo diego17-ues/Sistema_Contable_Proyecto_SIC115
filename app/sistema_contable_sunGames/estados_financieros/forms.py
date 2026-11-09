@@ -28,3 +28,23 @@ class ReaperturaPeriodoForm(forms.Form):
         widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}),
     )
     motivo = campo_motivo()
+
+
+class RangoForm(forms.Form):
+    desde = forms.DateField()
+    hasta = forms.DateField()
+
+
+class CierreRangoForm(RangoForm, CierrePeriodoForm):
+    pass
+
+
+class AjusteForm(forms.Form):
+    code = forms.CharField(max_length=4)
+    date = forms.DateField()
+    concept = forms.CharField(max_length=200, required=False)
+    reference = forms.CharField(max_length=40, required=False)
+    debit = forms.DecimalField(required=False, decimal_places=2,
+                               max_digits=14)
+    credit = forms.DecimalField(required=False, decimal_places=2,
+                                max_digits=14)

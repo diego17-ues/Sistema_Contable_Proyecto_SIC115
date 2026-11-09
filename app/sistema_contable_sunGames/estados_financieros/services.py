@@ -14,7 +14,9 @@ from bitacora.eventos import Accion, Resultado
 from usuarios.exceptions import RolNoAutorizadoError, UsuarioInactivoError
 from usuarios.roles import Rol
 
-from . import calculo
+import calendar
+
+from . import calculo, hoja_trabajo
 from .exceptions import (
     BalanzaDescuadradaError,
     ConfirmacionIncorrectaError,
@@ -24,9 +26,11 @@ from .exceptions import (
     MotivoObligatorioError,
     PeriodoNoAbiertoError,
     PeriodoNoReabribleError,
+    RangoInvalidoError,
     RecalculoPeriodoCerradoError,
     SnapshotNoDisponibleError,
     TipoEstadoInvalidoError,
+    VentasPendientesError,
 )
 from .models import TipoEstado
 
@@ -41,6 +45,19 @@ def _verificar(actor, roles):
         raise UsuarioInactivoError()
     if actor.rol not in roles:
         raise RolNoAutorizadoError()
+
+
+def _validar_rango(desde, hasta):
+    if not desde or not hasta or desde > hasta:
+        raise RangoInvalidoError(campo="desde")
+
+
+def nombre_provisional(desde, hasta):
+    ultimo = calendar.monthrange(desde.year, desde.month)[1]
+    if (desde.day == 1 and hasta.year == desde.year
+            and hasta.month == desde.month and hasta.day == ultimo):
+        return f"Provisional {desde:%Y-%m}"
+    return f"Provisional {desde:%d/%m/%Y}–{hasta:%d/%m/%Y}"
 
 
 def _referencia(periodo):
@@ -117,7 +134,47 @@ class EstadosFinancierosService:
         return EstadoConsultado(periodo, emitido.datos, emitido)
 
     def exportar_pdf(self, actor, periodo_id, tipo):
-        consulta = self.obtener(actor, periodo_id, tipo)
+        return self._exportar(actor, self.obtener(actor, periodo_id, tipo),
+                              tipo)
+
+    def exportar_pdf_rango(self, actor, desde, hasta, tipo):
+        """PDF de un rango libre (p. ej. la Hoja de Trabajo). Si coincide
+        con un período registrado se usa ese período (y su snapshot)."""
+        _verificar(actor, ROLES_CONSULTA)
+        _validar_rango(desde, hasta)
+        periodo = self._repositorio.periodo_con_rango(desde, hasta)
+        if periodo is not None:
+            return self.exportar_pdf(actor, periodo.pk, tipo)
+        if self._repositorio.rango_con_cierre(desde, hasta):
+            raise RecalculoPeriodoCerradoError(
+                "El rango incluye fechas de un período cerrado; descarga el "
+                "estado emitido al cerrar ese período."
+            )
+        periodo = self._repositorio.nuevo_periodo(
+            nombre=f"{desde:%d/%m/%Y}–{hasta:%d/%m/%Y}", desde=desde,
+            hasta=hasta,
+        )
+        return self._exportar(
+            actor, EstadoConsultado(periodo, self.calcular(periodo, tipo)),
+            tipo,
+        )
+
+    def hoja_trabajo(self, actor, desde, hasta):
+        _verificar(actor, ROLES_CONSULTA)
+        _validar_rango(desde, hasta)
+        hoja = hoja_trabajo.construir(
+            desde, hasta, self._repositorio.agregados_hoja(desde, hasta)
+        )
+        hoja["adjustments"] = [{
+            "code": m.cuenta.codigo, "account": m.cuenta.denominacion,
+            "correlativo": f"Ajuste · transacción {m.transaccion_id}",
+            "date": m.fecha.isoformat(), "concept": m.concepto,
+            "side": "Cargo" if m.importe > 0 else "Abono",
+            "amount": str(abs(m.importe)),
+        } for m in self._repositorio.ajustes(desde, hasta)]
+        return hoja
+
+    def _exportar(self, actor, consulta, tipo):
         periodo = consulta.periodo
         archivo = self._exportador.exportar(
             consulta.datos, estado_periodo=periodo.get_estado_display(),
@@ -140,6 +197,7 @@ class ResumenCierre:
     transacciones: int
     movimientos: int
     diferencia: Decimal
+    ventas_pendientes: int = 0
 
     @property
     def cuadra(self):
@@ -155,11 +213,12 @@ class CierrePeriodoService:
     ROLES_REAPERTURA = frozenset({Rol.ADMINISTRADOR})
 
     def __init__(self, repositorio, estados, bitacora,
-                 transaccion=nullcontext):
+                 transaccion=nullcontext, ventas=None):
         self._repositorio = repositorio
         self._estados = estados
         self._bitacora = bitacora
         self._transaccion = transaccion
+        self._ventas = ventas
 
     def puede_cerrar(self, actor):
         return actor.activo and actor.rol in self.ROLES_CIERRE
@@ -171,9 +230,40 @@ class CierrePeriodoService:
         _verificar(actor, ROLES_CONSULTA)
         return [self._resumen(p) for p in self._repositorio.periodos()]
 
+    def requisitos_rango(self, actor, desde, hasta):
+        """Estado del rango para Cierre provisional y la Hoja de Trabajo."""
+        _verificar(actor, ROLES_CONSULTA)
+        _validar_rango(desde, hasta)
+        periodo = self._periodo_del_rango(desde, hasta)
+        cerrado = (periodo.cerrado if periodo.pk
+                   else self._repositorio.rango_con_cierre(desde, hasta))
+        return self._resumen(periodo), cerrado
+
     def cerrar(self, actor, periodo_id, *, confirmacion, motivo):
         _verificar(actor, self.ROLES_CIERRE)
         periodo = self._repositorio.obtener_periodo(periodo_id)
+        return self._cerrar(actor, periodo, confirmacion, motivo)
+
+    def cerrar_rango(self, actor, desde, hasta, *, confirmacion, motivo):
+        """Cierre provisional desde la Hoja de Trabajo: usa el período con
+        ese rango o crea «Provisional AAAA-MM» al confirmar."""
+        _verificar(actor, self.ROLES_CIERRE)
+        _validar_rango(desde, hasta)
+        periodo = self._periodo_del_rango(desde, hasta)
+        cerrado = self._repositorio.rango_con_cierre(desde, hasta)
+        if not periodo.pk and cerrado:
+            raise PeriodoNoAbiertoError(
+                "El rango incluye fechas de un período cerrado."
+            )
+        return self._cerrar(actor, periodo, confirmacion, motivo)
+
+    def _periodo_del_rango(self, desde, hasta):
+        return (self._repositorio.periodo_con_rango(desde, hasta)
+                or self._repositorio.nuevo_periodo(
+                    nombre=nombre_provisional(desde, hasta), desde=desde,
+                    hasta=hasta))
+
+    def _cerrar(self, actor, periodo, confirmacion, motivo):
         motivo = (motivo or "").strip()
         try:
             self._validar_cierre(periodo, confirmacion, motivo)
@@ -224,8 +314,11 @@ class CierrePeriodoService:
     def _resumen(self, periodo):
         transacciones, movimientos = self._repositorio.conteo(periodo)
         suma = self._repositorio.suma_balanza(hasta=periodo.fecha_fin)
+        pendientes = (self._ventas.pendientes_en(periodo.fecha_inicio,
+                                                 periodo.fecha_fin)
+                      if self._ventas else 0)
         return ResumenCierre(periodo, transacciones, movimientos,
-                             suma or CERO)
+                             suma or CERO, pendientes)
 
     def _validar_cierre(self, periodo, confirmacion, motivo):
         if periodo.cerrado:
@@ -234,6 +327,11 @@ class CierrePeriodoService:
         if (confirmacion or "").strip() != periodo.nombre:
             raise ConfirmacionIncorrectaError(campo="confirmacion")
         resumen = self._resumen(periodo)
+        if resumen.ventas_pendientes:
+            raise VentasPendientesError(
+                f"Hay {resumen.ventas_pendientes} venta(s) pendientes de "
+                "contabilizar en el período; regístralas antes de cerrar."
+            )
         if not resumen.cuadra:
             raise BalanzaDescuadradaError(
                 "La balanza de comprobación no cuadra (diferencia "
@@ -251,6 +349,8 @@ class CierrePeriodoService:
             )
 
     def _emitir_y_cerrar(self, actor, periodo, motivo):
+        if periodo.pk is None:
+            self._repositorio.guardar_periodo(periodo)
         for tipo, datos in self._estados.calcular_todos(periodo).items():
             self._repositorio.guardar_emitido(
                 periodo=periodo, tipo=tipo, datos=datos, usuario=actor
