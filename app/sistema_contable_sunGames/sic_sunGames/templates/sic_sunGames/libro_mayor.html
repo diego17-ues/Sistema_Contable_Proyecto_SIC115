@@ -4,7 +4,7 @@
 
 {% block page_content %}
 {% if modo_balance %}
-<div class="page-heading"><div><h1>Balance de Comprobación</h1><p>Al {{ balance.fecha_corte|date:"d/m/Y" }} · expresado en USD</p></div><div class="heading-actions"><button class="button button-secondary" type="button" data-action="export" data-source="trial-balance" data-format="pdf">↓ PDF</button><button class="button button-secondary" type="button" data-action="export" data-source="trial-balance" data-format="xlsx">↓ Excel</button></div></div>
+<div class="page-heading"><div><h1>Balance de Comprobación</h1><p>Al {{ balance.fecha_corte|date:"d/m/Y" }} · expresado en USD</p></div><div class="heading-actions"><a class="button button-secondary" href="{% url 'balance_pdf' %}?corte={{ balance.fecha_corte|date:'Y-m-d' }}">↓ PDF</a><button class="button button-secondary" type="button" data-action="export" data-source="trial-balance" data-format="xlsx">↓ Excel</button></div></div>
 <form class="filter-bar" method="get" action="{% url 'ledger' %}" novalidate>
   <input type="hidden" name="mode" value="trial-balance"/>
   <div class="field"><label for="{{ balance_form.corte.id_for_label }}">{{ balance_form.corte.label }}</label>{{ balance_form.corte }}{% for error in balance_form.corte.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>

@@ -3,12 +3,16 @@
 from decimal import Decimal
 
 from django.conf import settings
+from django.contrib.staticfiles import finders
 from django.db import transaction
 
 from usuarios.composition import crear_bitacora_service
 
+from .exportadores import ExportadorBalancePDF
 from .repositories import TransaccionRepository
 from .services import ConfiguracionLibroMayor, LibroMayorService
+
+LOGO = "sic_sunGames/SunGames_Logo.png"
 
 
 def configuracion():
@@ -24,4 +28,5 @@ def crear_libro_mayor_service():
     return LibroMayorService(
         TransaccionRepository(), crear_bitacora_service(), configuracion(),
         transaction.atomic,
+        ExportadorBalancePDF(finders.find(LOGO)),
     )

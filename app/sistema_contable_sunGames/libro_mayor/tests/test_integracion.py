@@ -159,3 +159,22 @@ class LibroMayorIntegracionTests(TestCase):
         self.assertFalse(Movimiento.objects.exists())
         self.assertNotContains(pantalla, reverse("transaccion_registrar"))
         self.assertEqual(balance.status_code, 200)
+
+    def test_descarga_del_balance_en_pdf(self):
+        self.client.force_login(self.contador)
+        self.registrar("1101", [("2026-11-03", "Venta", INGRESO, "100", "")])
+
+        respuesta = self.client.get(
+            reverse("balance_pdf"), {"corte": "2026-11-30"}
+        )
+        pantalla = self.client.get(reverse("ledger"), {
+            "mode": "trial-balance", "corte": "2026-11-30",
+        })
+
+        self.assertEqual(respuesta["Content-Type"], "application/pdf")
+        self.assertIn('filename="balance_comprobacion_20261130.pdf"',
+                      respuesta["Content-Disposition"])
+        self.assertTrue(respuesta.content.startswith(b"%PDF"))
+        self.assertContains(
+            pantalla, f'{reverse("balance_pdf")}?corte=2026-11-30'
+        )

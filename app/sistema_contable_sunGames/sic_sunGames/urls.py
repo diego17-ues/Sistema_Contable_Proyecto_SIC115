@@ -9,6 +9,7 @@ urlpatterns = [
     path("logout/", auth.logout_view, name="logout"),
     path("panel/dashboard/", pages.render_screen, {"screen": "dashboard"}, name="dashboard"),
     path("panel/libro-mayor/", mayor.libro_mayor, name="ledger"),
+    path("panel/libro-mayor/balance/pdf/", mayor.balance_pdf, name="balance_pdf"),
     path("panel/libro-mayor/registrar/", mayor.registrar_transaccion, name="transaccion_registrar"),
     path("panel/catalogo-cuentas/", catalogo.cuentas, name="accounts"),
     path("panel/catalogo-cuentas/nueva/", catalogo.cuenta_nueva, name="cuenta_nueva"),

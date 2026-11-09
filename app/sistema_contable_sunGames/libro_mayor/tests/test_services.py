@@ -13,6 +13,7 @@ from libro_mayor.exceptions import (
     MovimientoInvalidoError,
     PeriodoCerradoError,
 )
+from libro_mayor.exportadores import ExportadorBalancePDF
 from libro_mayor.services import ConfiguracionLibroMayor, LibroMayorService
 from usuarios.exceptions import RolNoAutorizadoError
 from usuarios.roles import Rol
@@ -323,3 +324,23 @@ class BalanceComprobacionTest(LibroMayorTestCase):
         balance = self.servicio.balance_comprobacion(self.contador, FECHA)
         self.assertEqual(balance.filas, ())
         self.assertTrue(balance.balanceado)
+
+
+class ExportarBalanceTest(LibroMayorTestCase):
+    def test_pdf_con_las_cuentas_con_movimientos_y_totales(self):
+        self.servicio = LibroMayorService(
+            self.repositorio, self.bitacora, ConfiguracionLibroMayor(),
+            exportador_balance=ExportadorBalancePDF(comprimir=False),
+        )
+        self.registrar("1101", [linea(debe="1250.00")])
+        self.registrar("5101", [linea(haber="1000.00")])
+
+        archivo = self.servicio.exportar_balance(self.contador, FECHA)
+
+        self.assertTrue(archivo.contenido.startswith(b"%PDF"))
+        self.assertEqual(archivo.nombre, "balance_comprobacion_20261103.pdf")
+        for texto in (b"Balance de Comprobaci", b"Al 03/11/2026",
+                      b"1101", b"5101", b"$1,250.00", b"$1,000.00",
+                      b"Totales", b"$250.00"):
+            self.assertIn(texto, archivo.contenido)
+        self.assertNotIn(b"2103", archivo.contenido)

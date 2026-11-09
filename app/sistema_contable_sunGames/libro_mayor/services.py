@@ -171,11 +171,12 @@ class LibroMayorService:
     ROLES_CONSULTA = frozenset({Rol.CONTADOR_GENERAL, Rol.ADMINISTRADOR})
 
     def __init__(self, repositorio, bitacora, configuracion=None,
-                 transaccion=nullcontext):
+                 transaccion=nullcontext, exportador_balance=None):
         self._repositorio = repositorio
         self._bitacora = bitacora
         self._config = configuracion or ConfiguracionLibroMayor()
         self._transaccion = transaccion
+        self._exportador_balance = exportador_balance
 
     def puede_registrar(self, actor):
         return actor.activo and actor.rol in self.ROLES_REGISTRO
@@ -255,6 +256,10 @@ class LibroMayorService:
             )
         )
         return BalanceComprobacion(fecha_corte, filas)
+
+    def exportar_balance(self, actor, fecha_corte):
+        balance = self.balance_comprobacion(actor, fecha_corte)
+        return self._exportador_balance.exportar(balance, actor)
 
     def _validar_movimientos(self, movimientos):
         movimientos = list(movimientos)

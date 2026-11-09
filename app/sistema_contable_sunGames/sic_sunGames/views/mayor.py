@@ -3,6 +3,7 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -93,13 +94,18 @@ def _render(request, servicio, filtros, registro=None, formset=None):
     return render(request, LIBRO_MAYOR_TEMPLATE, contexto)
 
 
-def _balance(request, servicio):
-    contexto = contexto_panel(request, "ledger")
+def _corte(request):
     form = BalanceComprobacionForm(request.GET if "corte" in request.GET
                                    else None)
     corte = timezone.localdate()
     if form.is_bound and form.is_valid() and form.cleaned_data["corte"]:
         corte = form.cleaned_data["corte"]
+    return form, corte
+
+
+def _balance(request, servicio):
+    contexto = contexto_panel(request, "ledger")
+    form, corte = _corte(request)
     try:
         balance = servicio.balance_comprobacion(request.user, corte)
     except SIN_PERMISO as error:
@@ -114,6 +120,23 @@ def libro_mayor(request):
     if request.GET.get("mode") == MODO_BALANCE:
         return _balance(request, servicio)
     return _render(request, servicio, request.GET)
+
+
+@login_required
+def balance_pdf(request):
+    servicio = crear_libro_mayor_service()
+    _, corte = _corte(request)
+    try:
+        archivo = servicio.exportar_balance(request.user, corte)
+    except SIN_PERMISO as error:
+        raise _sin_permiso(error) from error
+    respuesta = HttpResponse(
+        archivo.contenido, content_type=archivo.tipo_contenido
+    )
+    respuesta["Content-Disposition"] = (
+        f'attachment; filename="{archivo.nombre}"'
+    )
+    return respuesta
 
 
 @login_required
