@@ -10,6 +10,12 @@ class Accion(models.TextChoices):
     ALTA_CUENTA = "ALTA_CUENTA", "Alta de cuenta"
     MODIFICACION_CUENTA = "MODIFICACION_CUENTA", "Modificación de cuenta"
     REGISTRO_TRANSACCION = "REGISTRO_TRANSACCION", "Registro de transacción"
+    CIERRE_PERIODO = "CIERRE_PERIODO", "Cierre de período"
+    REAPERTURA_PERIODO = "REAPERTURA_PERIODO", "Reapertura de período"
+    EMISION_ESTADOS = "EMISION_ESTADOS", "Emisión de estados financieros"
+    DESCARGA_ESTADO_PDF = (
+        "DESCARGA_ESTADO_PDF", "Descarga de estado financiero en PDF"
+    )
 
 
 class Resultado(models.TextChoices):
@@ -24,3 +30,4 @@ class Resultado(models.TextChoices):
     CUENTA_NO_HABILITADA = (
         "CUENTA_NO_HABILITADA", "Rechazado: cuenta no habilitada"
     )
+    RECHAZADO = "RECHAZADO", "Rechazado: validación no superada"

@@ -6,7 +6,12 @@ from libro_mayor.exceptions import (
     FechaInvalidaError,
     GuardadoTransaccionError,
 )
-from libro_mayor.models import Movimiento, PeriodoContable, Transaccion
+from libro_mayor.models import (
+    EstadoPeriodo,
+    Movimiento,
+    PeriodoContable,
+    Transaccion,
+)
 
 DEUDORA = Naturaleza(codigo="D", nombre="Deudora")
 ACREEDORA = Naturaleza(codigo="A", nombre="Acreedora")
@@ -115,5 +120,7 @@ class TransaccionRepositoryEnMemoria:
 
 def periodo(inicio, fin, cerrado=False):
     return PeriodoContable(
-        nombre="P", fecha_inicio=inicio, fecha_fin=fin, cerrado=cerrado
+        nombre="P", fecha_inicio=inicio, fecha_fin=fin,
+        estado=(EstadoPeriodo.CIERRE_PROVISIONAL if cerrado
+                else EstadoPeriodo.ABIERTO),
     )

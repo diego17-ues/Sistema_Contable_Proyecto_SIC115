@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import administracion, auth, catalogo, mayor, pages
+from .views import administracion, auth, catalogo, estados, mayor, pages
 
 urlpatterns = [
     path("", pages.index, name="index"),
@@ -17,6 +17,10 @@ urlpatterns = [
     path("panel/catalogo-cuentas/<str:codigo>/", catalogo.cuenta_detalle, name="cuenta_detalle"),
     path("panel/catalogo-cuentas/<str:codigo>/modificar/", catalogo.cuenta_modificar, name="cuenta_modificar"),
     path("panel/estados-financieros/", pages.render_screen, {"screen": "reports"}, name="reports"),
+    path("panel/estados-financieros/periodos/", estados.cierre_periodos, name="cierre_periodos"),
+    path("panel/estados-financieros/periodos/<int:periodo_id>/cerrar/", estados.cerrar_periodo, name="periodo_cerrar"),
+    path("panel/estados-financieros/periodos/<int:periodo_id>/reabrir/", estados.reabrir_periodo, name="periodo_reabrir"),
+    path("panel/estados-financieros/<int:periodo_id>/<str:tipo>/pdf/", estados.estado_pdf, name="estado_pdf"),
     path("panel/ventas-costos/", pages.render_screen, {"screen": "operations"}, name="operations"),
     path("panel/usuarios/", administracion.usuarios, name="users"),
     path("panel/usuarios/nuevo/", administracion.usuario_nuevo, name="usuario_nuevo"),

@@ -40,6 +40,7 @@ def contexto_panel(request, screen):
     screen_urls = {
         "login": reverse("login"),
         "logout": reverse("logout"),
+        "closing": reverse("cierre_periodos"),
         **{
             name: reverse(route_name)
             for name, route_name in SCREEN_URL_NAMES.items()

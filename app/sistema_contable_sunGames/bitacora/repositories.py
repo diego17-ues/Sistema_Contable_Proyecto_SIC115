@@ -3,10 +3,10 @@ from .models import RegistroBitacora
 
 class BitacoraRepository:
     def crear(self, *, accion, resultado, actor=None, afectado=None,
-              referencia=""):
+              referencia="", detalle=""):
         return RegistroBitacora.objects.create(
             accion=accion, resultado=resultado, actor=actor,
-            afectado=afectado, referencia=referencia,
+            afectado=afectado, referencia=referencia, detalle=detalle,
         )
 
     def listar(self):

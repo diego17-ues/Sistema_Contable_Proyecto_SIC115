@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'bitacora',
     'catalogo',
     'libro_mayor',
+    'estados_financieros',
 ]
 
 AUTH_USER_MODEL = 'usuarios.Usuario'

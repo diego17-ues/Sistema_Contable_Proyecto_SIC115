@@ -378,3 +378,8 @@ td small { display: block; margin-top: 3px; color: #8a969e; font-size: 9px; }
   .modal-fields .full { grid-column: auto; }
   .demo-banner { align-items: flex-start; flex-direction: column; }
 }
+.modal-backdrop[hidden] { display: none; }
+.close-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; margin: 0 0 14px; }
+.close-summary .full { grid-column: 1/-1; }
+.close-summary dt { color: var(--muted); font-size: 10px; }
+.close-summary dd { margin: 3px 0 0; color: var(--navy); font-weight: 700; font-size: 12px; }

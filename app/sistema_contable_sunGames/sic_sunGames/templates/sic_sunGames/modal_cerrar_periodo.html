@@ -1,0 +1,22 @@
+<div class="modal-backdrop" data-modal="cerrar-{{ p.pk }}"{% if abierto != "cerrar" %} hidden{% endif %}>
+  <section class="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-cerrar-{{ p.pk }}">
+    <div class="modal-header"><div><h2 id="titulo-cerrar-{{ p.pk }}">Cerrar período</h2><p>Cierre provisional · revisa el resumen antes de confirmar</p></div><button class="modal-close" type="button" data-cerrar-modal aria-label="Cerrar">×</button></div>
+    <form class="modal-form" method="post" action="{% url 'periodo_cerrar' p.pk %}" data-form-cierre data-nombre="{{ p.nombre }}" data-cuadra="{{ r.cuadra|yesno:'true,false' }}" novalidate>
+      {% csrf_token %}
+      {% for error in form.non_field_errors %}<p class="form-error">{{ error }}</p>{% endfor %}
+      <dl class="close-summary">
+        <div><dt>Período</dt><dd>{{ p.nombre }}</dd></div>
+        <div><dt>Rango</dt><dd>{{ p.fecha_inicio|date:"d/m/Y" }} – {{ p.fecha_fin|date:"d/m/Y" }}</dd></div>
+        <div><dt>Partidas incluidas</dt><dd>{{ r.transacciones }}</dd></div>
+        <div><dt>Movimientos incluidos</dt><dd>{{ r.movimientos }}</dd></div>
+        <div class="full"><dt>Balanza de comprobación</dt><dd>{% if r.cuadra %}<span class="tag tag-open">Cuadra</span>{% else %}<span class="tag tag-warn">No cuadra · diferencia ${{ r.diferencia_absoluta|floatformat:"2g" }}</span>{% endif %}</dd></div>
+      </dl>
+      <div class="notice"><span class="notice-icon">!</span><span>El período quedará cerrado y dejará de aceptar transacciones (registros, cambios y ajustes). Sus estados financieros se guardarán tal como están y solo un administrador podrá reabrirlo.{% if not r.cuadra %} <strong>No se puede cerrar mientras la balanza no cuadre.</strong>{% endif %}</span></div>
+      <div class="modal-fields section-gap">
+        <div class="field full"><label for="{{ form.confirmacion.id_for_label }}">Escribe «{{ p.nombre }}» para confirmar *</label>{{ form.confirmacion }}{% for error in form.confirmacion.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+        <div class="field full"><label for="{{ form.motivo.id_for_label }}">Motivo *</label>{{ form.motivo }}{% for error in form.motivo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+      </div>
+      <div class="modal-actions"><button class="button button-secondary" type="button" data-cerrar-modal>Cancelar</button><button class="button button-primary" type="submit" data-confirmar disabled>Cerrar período</button></div>
+    </form>
+  </section>
+</div>

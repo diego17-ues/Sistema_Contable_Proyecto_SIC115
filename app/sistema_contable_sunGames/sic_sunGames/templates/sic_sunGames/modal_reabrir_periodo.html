@@ -1,0 +1,15 @@
+<div class="modal-backdrop" data-modal="reabrir-{{ p.pk }}"{% if abierto != "reabrir" %} hidden{% endif %}>
+  <section class="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-reabrir-{{ p.pk }}">
+    <div class="modal-header"><div><h2 id="titulo-reabrir-{{ p.pk }}">Reabrir período</h2><p>{{ p.nombre }} · {{ p.fecha_inicio|date:"d/m/Y" }} – {{ p.fecha_fin|date:"d/m/Y" }}</p></div><button class="modal-close" type="button" data-cerrar-modal aria-label="Cerrar">×</button></div>
+    <form class="modal-form" method="post" action="{% url 'periodo_reabrir' p.pk %}" data-form-reapertura novalidate>
+      {% csrf_token %}
+      {% for error in form.non_field_errors %}<p class="form-error">{{ error }}</p>{% endfor %}
+      <div class="notice"><span class="notice-icon">!</span><span>El período volverá a aceptar transacciones. Los estados emitidos al cerrar se conservan y la reapertura queda en la bitácora.</span></div>
+      <div class="modal-fields section-gap">
+        <div class="field full"><label for="{{ form.contrasena.id_for_label }}">Contraseña del administrador *</label>{{ form.contrasena }}{% for error in form.contrasena.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+        <div class="field full"><label for="{{ form.motivo.id_for_label }}">Motivo *</label>{{ form.motivo }}{% for error in form.motivo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+      </div>
+      <div class="modal-actions"><button class="button button-secondary" type="button" data-cerrar-modal>Cancelar</button><button class="button button-primary" type="submit" data-confirmar disabled>Reabrir período</button></div>
+    </form>
+  </section>
+</div>

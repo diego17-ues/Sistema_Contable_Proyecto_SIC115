@@ -9,14 +9,16 @@ from .exceptions import (
     FechaInvalidaError,
     GuardadoTransaccionError,
 )
-from .models import Movimiento, PeriodoContable, Transaccion
+from .models import EstadoPeriodo, Movimiento, PeriodoContable, Transaccion
 
 
 class TransaccionRepository:
     def periodo_de(self, fecha):
-        periodo = PeriodoContable.objects.filter(
-            fecha_inicio__lte=fecha, fecha_fin__gte=fecha
-        ).first()
+        periodos = PeriodoContable.objects.que_contienen(fecha)
+        periodo = (
+            periodos.exclude(estado=EstadoPeriodo.ABIERTO).first()
+            or periodos.first()
+        )
         if periodo is None:
             raise FechaInvalidaError(campo="fecha")
         return periodo

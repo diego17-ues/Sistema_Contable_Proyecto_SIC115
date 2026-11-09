@@ -116,8 +116,9 @@ class BitacoraEnMemoria:
         self.registros = []
 
     def registrar(self, accion, resultado, *, actor=None, afectado=None,
-                  referencia=""):
+                  referencia="", detalle=""):
         self.registros.append({
             "accion": accion, "resultado": resultado, "actor": actor,
             "referencia": referencia,
+            **({"detalle": detalle} if detalle else {}),
         })
