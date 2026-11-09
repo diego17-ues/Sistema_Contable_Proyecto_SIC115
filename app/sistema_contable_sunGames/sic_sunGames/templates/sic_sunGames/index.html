@@ -16,7 +16,7 @@
         </div>
         <nav id="navigation" class="navigation" aria-label="Navegación principal"></nav>
         <div class="sidebar-bottom">
-          <div class="sidebar-period"><span class="status-dot"></span><span>Período abierto</span></div>
+          <div class="sidebar-period"><span class="status-dot{% if estado_periodo != 'ABIERTO' %} is-closed{% endif %}"></span><span>{% if estado_periodo == 'ABIERTO' %}Período abierto{% else %}Período cerrado provisionalmente{% endif %}</span></div>
           <form id="logoutForm" class="logout-form" method="post" action="{% url 'logout' %}">
             {% csrf_token %}
             <button id="logoutButton" class="logout-button" type="submit">Cerrar sesión <span aria-hidden="true">↗</span></button>
@@ -29,7 +29,7 @@
           <button id="menuToggle" class="icon-button mobile-menu" type="button" aria-label="Abrir menú">☰</button>
           <div class="breadcrumbs"><span>SunGames</span><span class="crumb-separator">/</span><strong id="breadcrumb">Panel</strong></div>
           <div class="topbar-actions">
-            <span class="topbar-period"><span class="status-dot"></span>Período abierto</span>
+            <span class="topbar-period"><span class="status-dot{% if estado_periodo != 'ABIERTO' %} is-closed{% endif %}"></span>{% if estado_periodo == 'ABIERTO' %}Período abierto{% else %}Período cerrado provisionalmente{% endif %}</span>
             <button id="userMenu" class="user-menu" type="button" aria-label="Usuario activo">
               <span class="avatar"></span>
               <span class="user-meta"><strong id="activeUser">{{ usuario_actual.name }}</strong><small>{{ usuario_actual.role }}</small></span>
@@ -50,6 +50,7 @@
   {{ logo_url|json_script:"logoUrl" }}
   {{ usuario_actual|json_script:"currentUser" }}
   {{ modulos|json_script:"modulos" }}
+  {{ estado_periodo|json_script:"periodStatus" }}
   <script id="serverMessages" type="application/json">[{% for message in messages %}{"text": "{{ message|escapejs }}", "level": "{{ message.tags|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]</script>
-  <script src="{% static 'sic_sunGames/app.js' %}?v=20261111-1"></script>
+  <script src="{% static 'sic_sunGames/app.js' %}?v=20261112-6"></script>
 {% endblock %}

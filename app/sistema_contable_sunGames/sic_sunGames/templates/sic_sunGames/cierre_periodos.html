@@ -1,0 +1,40 @@
+{% extends "sic_sunGames/index.html" %}
+{% load static %}
+
+{% block server_rendered %} data-server-rendered="true"{% endblock %}
+
+{% block page_content %}
+<div class="page-heading"><div><h1>Cierre de períodos</h1><p>Cierre provisional, reapertura y estados financieros en PDF (NIC 1).</p></div><div class="heading-actions"><a class="button button-secondary" href="{% url 'reports' %}">Volver a Estados financieros</a></div></div>
+<section class="card">
+  <div class="card-header"><div><h2>Períodos contables</h2><p>Un período cerrado no acepta movimientos y sus estados se exportan desde el emitido al cerrar.</p></div></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Período</th><th>Rango</th><th>Estado</th><th class="num">Partidas</th><th class="num">Movimientos</th><th>Balanza</th><th>Estados financieros (PDF)</th><th>Acciones</th></tr></thead>
+      <tbody>
+        {% for fila in filas %}{% with r=fila.resumen p=fila.resumen.periodo %}
+        <tr>
+          <td><strong>{{ p.nombre }}</strong></td>
+          <td>{{ p.fecha_inicio|date:"d/m/Y" }} – {{ p.fecha_fin|date:"d/m/Y" }}</td>
+          <td><span class="tag {% if p.cerrado %}tag-warn{% else %}tag-open{% endif %}">{{ p.get_estado_display }}</span></td>
+          <td class="num">{{ r.transacciones }}</td>
+          <td class="num">{{ r.movimientos }}</td>
+          <td>{% if r.cuadra %}<span class="tag tag-open">Cuadra</span>{% else %}<span class="tag tag-warn">No cuadra · ${{ r.diferencia_absoluta|floatformat:"2g" }}</span>{% endif %}</td>
+          <td><a class="text-button" href="{% url 'estado_pdf' p.pk 'balance-general' %}">↓ Balance General</a><br/><a class="text-button" href="{% url 'estado_pdf' p.pk 'estado-resultados' %}">↓ Estado de Resultados</a></td>
+          <td>{% if not p.cerrado and puede_cerrar %}<button class="button button-primary" type="button" data-abrir-modal="cerrar-{{ p.pk }}">Cerrar período</button>{% elif p.cerrado and puede_reabrir %}<button class="button button-secondary" type="button" data-abrir-modal="reabrir-{{ p.pk }}">Reabrir período</button>{% else %}—{% endif %}</td>
+        </tr>
+        {% endwith %}{% empty %}
+        <tr><td class="empty-cell" colspan="8">No hay períodos contables registrados.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% for fila in filas %}{% with r=fila.resumen p=fila.resumen.periodo %}
+  {% if not p.cerrado and puede_cerrar %}{% include "sic_sunGames/modal_cerrar_periodo.html" with form=fila.form_cierre abierto=fila.abrir %}{% endif %}
+  {% if p.cerrado and puede_reabrir %}{% include "sic_sunGames/modal_reabrir_periodo.html" with form=fila.form_reapertura abierto=fila.abrir %}{% endif %}
+{% endwith %}{% endfor %}
+{% endblock %}
+
+{% block scripts %}{{ block.super }}
+  <script src="{% static 'sic_sunGames/cierre_periodos.js' %}?v=20261109-2"></script>
+{% endblock %}

@@ -8,18 +8,26 @@
   const today = () => new Date().toISOString().slice(0, 10);
   const safe = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   const screenUrls = JSON.parse($('#screenUrls').textContent);
+  const csrfToken = () => $('#logoutForm [name=csrfmiddlewaretoken]')?.value || '';
+  async function api(url, options = {}) {
+    const response = await fetch(url, { credentials: 'same-origin', ...options, headers: { Accept: 'application/json', 'X-CSRFToken': csrfToken(), ...(options.headers || {}) } });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'No se pudo completar la operación.');
+    return data;
+  }
   const logoUrl = JSON.parse($('#logoUrl').textContent);
   const initialScreen = $('#appShell').dataset.screen || 'dashboard';
   const initialParams = new URLSearchParams(window.location.search);
   const savedUser = JSON.parse($('#currentUser').textContent);
   const modulos = JSON.parse($('#modulos').textContent);
+  const initialPeriodStatus = JSON.parse($('#periodStatus').textContent);
   const serverRendered = $('#appContent').dataset.serverRendered === 'true';
   const serverScreens = ['users', 'audit', 'accounts', 'ledger'];
 
   const navGroups = [
     { label: 'Inicio', items: [{ id: 'dashboard', title: 'Dashboard', icon: '⌂' }] },
     { label: 'Contabilidad', items: [{ id: 'ledger', title: 'Libro Mayor', icon: '▤' }, { id: 'accounts', title: 'Catálogo de cuentas', icon: '☷' }, { id: 'reports', title: 'Estados financieros', icon: '▥' }] },
-    { label: 'Operación', items: [{ id: 'operations', title: 'Ventas y costos', icon: '◫' }] },
+    { label: 'Operación', items: [{ id: 'operations', title: 'Ventas', icon: '◫' }] },
     { label: 'Administración', items: [{ id: 'users', title: 'Usuarios', icon: '♙' }, { id: 'audit', title: 'Auditoría', icon: '◷' }] },
   ];
 
@@ -52,33 +60,23 @@
   ];
 
   const transactionTypes = ['Diario', 'Comprobante de Ingreso', 'Comprobante de Egreso', 'Ajuste'];
-  const ledgerRows = [
-    { id: 1, date: '2026-10-31', code: '5101', account: 'Ingresos por licencias de videojuegos', concept: 'Ventas · corte de octubre', reference: 'V-1048', type: 'Comprobante de Ingreso', correlativo: 'Comprobante de Ingreso-2026-00001', side: 'Abono', amount: 6240 },
-    { id: 2, date: '2026-10-31', code: '4104', account: 'Costo de ventas', concept: 'Costo · corte de octubre', reference: 'CST-1031', type: 'Comprobante de Egreso', correlativo: 'Comprobante de Egreso-2026-00001', side: 'Cargo', amount: 2380 },
-    { id: 3, date: '2026-10-30', code: '4201', account: 'Sueldos y salarios administrativos', concept: 'Gastos · corte de octubre', reference: 'GAS-1030', type: 'Comprobante de Egreso', correlativo: 'Comprobante de Egreso-2026-00002', side: 'Cargo', amount: 940 },
-    { id: 4, date: '2026-10-29', code: '5101', account: 'Ingresos por licencias de videojuegos', concept: 'Venta · Título A', reference: 'V-1046', type: 'Comprobante de Ingreso', correlativo: 'Comprobante de Ingreso-2026-00002', side: 'Abono', amount: 1280 },
-    { id: 5, date: '2026-10-27', code: '4104', account: 'Costo de ventas', concept: 'Costo · Título A', reference: 'CST-1027', type: 'Comprobante de Egreso', correlativo: 'Comprobante de Egreso-2026-00003', side: 'Cargo', amount: 520 },
-    { id: 6, date: '2026-10-01', code: '1101', account: 'Caja general', concept: 'Saldo de apertura', reference: 'AP-2026', type: 'Diario', correlativo: 'Diario-2026-00001', side: 'Cargo', amount: 3000 },
-    { id: 7, date: '2026-10-01', code: '3101', account: 'Capital social', concept: 'Saldo de capital', reference: 'AP-2026', type: 'Diario', correlativo: 'Diario-2026-00002', side: 'Abono', amount: 3000 },
-    { id: 8, date: '2026-10-28', code: '5101', account: 'Ingresos por licencias de videojuegos', concept: 'Venta · Título C', reference: 'V-1045', type: 'Comprobante de Ingreso', correlativo: 'Comprobante de Ingreso-2026-00003', side: 'Abono', amount: 615 },
-  ];
+  // Los movimientos y las ventas vienen del servidor (Libro Mayor y Steam simulado).
+  const ledgerRows = [];
 
-  const sales = [
-    { id: 'V-1048', date: '2026-10-31', title: 'Título A', channel: 'Tienda digital', amount: 1280, status: 'Pendiente' },
-    { id: 'V-1047', date: '2026-10-30', title: 'Título B', channel: 'Tienda digital', amount: 940, status: 'Pendiente' },
-    { id: 'V-1046', date: '2026-10-29', title: 'Título A', channel: 'Steam', amount: 760, status: 'Registrada', correlativo: 'Comprobante de Ingreso-2026-00002' },
-    { id: 'V-1045', date: '2026-10-28', title: 'Título C', channel: 'Tienda digital', amount: 615, status: 'Registrada', correlativo: 'Comprobante de Ingreso-2026-00003' },
-    { id: 'V-1044', date: '2026-10-27', title: 'Título B', channel: 'Steam', amount: 480, status: 'Pendiente' },
-  ];
+  let sales = [];
 
   const state = {
     current: initialScreen, report: initialParams.get('report') || 'results', operation: initialParams.get('operation') || 'verify', period: 'month',
     currentUser: savedUser, ledgerMode: initialParams.get('mode') || 'ledger', trialBalanceTo: today(),
-    ledgerFilter: { account: '5101', from: '', to: '' }, salesQuery: '',
-    periodStatus: 'ABIERTO', closedRange: null, worksheet: null, provisionalFrom: '2026-10-01', provisionalTo: '2026-10-31',
-    steamStatus: 'En espera',
+    ledgerFilter: { account: '5101', from: '', to: '' }, salesQuery: '', salesFrom: '', salesTo: '', salesLoaded: false, canPostSales: false, provisional: null, cuentas: [],
+    periodStatus: initialPeriodStatus || 'ABIERTO',
+    indicatorPeriodStatus: initialPeriodStatus || 'ABIERTO',
+    closedRange: null, worksheet: null, provisionalFrom: '2026-10-01', provisionalTo: '2026-10-31',
+    provisionalRequestId: 0,
+    steamStatus: 'En espera', steamContact: null, steamError: null,
+    reconciliationPreview: null, reconciliationResult: null,
     nextLedgerId: 9,
-    salesTotal: 78240,
+    salesTotal: 0,
   };
 
   function renderNavigation() {
@@ -88,6 +86,10 @@
 
   function canView(view) {
     return modulos.includes(view);
+  }
+
+  function canReopenPeriod() {
+    return state.currentUser?.role === 'Administrador';
   }
 
   function setScreen(view, params = {}, replace = false) {
@@ -131,14 +133,15 @@
       return;
     }
     renderNavigation();
-    const titles = { dashboard: 'Dashboard', ledger: 'Libro Mayor', accounts: 'Catálogo de cuentas', reports: 'Estados financieros', operations: 'Ventas y costos', users: 'Usuarios', audit: 'Auditoría' };
+    const titles = { dashboard: 'Dashboard', ledger: 'Libro Mayor', accounts: 'Catálogo de cuentas', reports: 'Estados financieros', operations: 'Ventas', users: 'Usuarios', audit: 'Auditoría' };
     $('#breadcrumb').textContent = titles[state.current] || 'Panel';
-    const periodClosed = state.periodStatus === 'CERRADO_PROVISIONAL';
+    const periodClosed = state.indicatorPeriodStatus === 'CERRADO_PROVISIONAL';
     const periodLabel = periodClosed ? 'Período cerrado provisionalmente' : 'Período abierto';
     $('.sidebar-period span:last-child').textContent = periodLabel;
     $('.sidebar-period .status-dot').classList.toggle('is-closed', periodClosed);
     $('.topbar-period').innerHTML = `<span class="status-dot ${periodClosed ? 'is-closed' : ''}"></span>${periodLabel}`;
     if (serverRendered) return;
+    if (['dashboard', 'operations'].includes(state.current) && !state.salesLoaded) loadSales();
     const renderers = { dashboard: dashboardPage, reports: reportsPage, operations: operationsPage };
     $('#appContent').innerHTML = (renderers[state.current] || dashboardPage)();
     if ($('#provisionalFrom') && state.provisionalFrom) $('#provisionalFrom').value = state.provisionalFrom;
@@ -148,7 +151,7 @@
   function dashboardPage() {
     const periodLabel = state.period === 'year' ? 'Año actual' : state.period === 'quarter' ? 'Últimos 90 días' : 'Últimos 30 días';
     const salesValue = state.salesTotal + (state.period === 'year' ? 34420 : state.period === 'quarter' ? 12860 : 0);
-    const lastSale = sales[0];
+    const lastSale = sales[0] || { amount: 0, date: '—', title: 'Sin ventas recibidas' };
     return `${heading('Dashboard', 'Resumen de ventas y rendimiento de costos.', `<button class="button button-gold" type="button" data-action="simulate-sale">＋ Nueva venta</button>`)}
       <div class="demo-banner"><div class="dashboard-filter"><label for="dashboardPeriod">Período</label><select id="dashboardPeriod"><option value="month" ${state.period === 'month' ? 'selected' : ''}>Últimos 30 días</option><option value="quarter" ${state.period === 'quarter' ? 'selected' : ''}>Últimos 90 días</option><option value="year" ${state.period === 'year' ? 'selected' : ''}>Año actual</option></select></div></div>
       <div class="kpi-grid">
@@ -166,7 +169,7 @@
   }
 
   function accountOptions(selected = '') {
-    return accounts.filter(account => account.status === 'Activa').map(account => `<option value="${safe(account.code)}" ${selected === account.code ? 'selected' : ''}>${safe(account.code)} · ${safe(account.name)}</option>`).join('');
+    return state.cuentas.filter(account => account.status === 'Activa').map(account => `<option value="${safe(account.code)}" ${selected === account.code ? 'selected' : ''}>${safe(account.code)} · ${safe(account.name)}</option>`).join('');
   }
 
   function trialBalanceRows(asOf) {
@@ -215,18 +218,33 @@
   function provisionalPage(tabs) {
     const from = state.provisionalFrom || '2026-10-01';
     const to = state.provisionalTo || '2026-10-31';
-    const pending = sales.filter(sale => sale.status === 'Pendiente' && sale.date >= from && sale.date <= to);
-    const periodRows = ledgerRows.filter(row => row.date >= from && row.date <= to);
-    const open = state.periodStatus !== 'CERRADO_PROVISIONAL';
+    const info = provisionalInfo(from, to);
+    const loading = state.provisionalLoading && !info;
+    const pending = { length: info ? info.ventasPendientes : 0 };
+    const periodRows = { length: info ? info.movimientos : 0 };
+    const open = !info || info.estado !== 'CERRADO_PROVISIONAL';
+    const estadoTexto = loading ? 'Consultando…' : open ? 'Abierto' : 'Cerrado provisionalmente';
+    const estadoDetalle = loading ? 'Consultando el estado del período.' : open ? 'Admite revisión' : 'No admite nuevos movimientos';
+    const pendientesTexto = loading ? 'Consultando…' : pending.length ? `${pending.length} pendientes` : 'Completado';
+    const pendientesDetalle = loading ? 'Consultando las ventas del rango.' : pending.length ? 'Deben registrarse en el Libro Mayor antes de generar la hoja.' : 'No hay ventas pendientes en el rango.';
+    const movimientosTexto = loading ? 'Consultando…' : `${periodRows.length} transacciones`;
+    const movimientosDetalle = loading ? 'Consultando los movimientos del rango.' : periodRows.length ? 'Disponibles para incorporar a la hoja.' : 'No hay movimientos en las fechas seleccionadas.';
+    const errorMarkup = info?.error ? `<div class="notice section-gap"><span class="notice-icon">!</span><span>${safe(info.error)}</span></div>` : '';
     const sameWorksheet = state.worksheet && state.worksheet.from === from && state.worksheet.to === to;
+    const periodAction = open
+      ? `<button class="button button-primary" type="button" data-action="generate-worksheet" ${state.provisionalLoading || pending.length || !periodRows.length ? 'disabled' : ''}>Generar Hoja de Trabajo</button>`
+      : canReopenPeriod()
+        ? '<button class="button button-secondary" type="button" data-action="reopen-period">Reabrir período</button>'
+        : '';
     return `${heading('Cierre provisional', 'Valida las operaciones del período y genera la Hoja de Trabajo.', '')}${tabs}
-      <section class="card"><div class="card-header"><div><h2>Período a revisar</h2><p>Selecciona el rango que se utilizará en la hoja.</p></div><span class="tag ${open ? 'tag-open' : 'tag-warn'}">${open ? 'Abierto' : 'Cerrado provisionalmente'}</span></div><div class="card-body"><div class="filter-bar" style="margin:0"><div class="field"><label for="provisionalFrom">Fecha inicial</label><input id="provisionalFrom" type="date" value="${safe(from)}" ${open ? '' : 'disabled'}/></div><div class="field"><label for="provisionalTo">Fecha final</label><input id="provisionalTo" type="date" value="${safe(to)}" ${open ? '' : 'disabled'}/></div><span class="tag tag-muted">Tipo: PROVISIONAL_MENSUAL</span><button class="button button-secondary" type="button" data-action="check-provisional" ${open ? '' : 'disabled'}>Consultar requisitos</button></div></div></section>
-      <section class="card section-gap"><div class="card-header"><div><h2>Requisitos previos</h2><p>Las ventas del rango deben estar registradas antes de preparar la hoja.</p></div></div><div class="table-wrap"><table><thead><tr><th>Validación</th><th>Resultado</th><th>Detalle</th></tr></thead><tbody><tr><td><strong>Estado del período</strong></td><td><span class="tag ${open ? 'tag-open' : 'tag-warn'}">${open ? 'Abierto' : 'Cerrado provisionalmente'}</span></td><td>${open ? 'Admite revisión' : 'No admite nuevos movimientos'}</td></tr><tr><td><strong>Ventas pendientes</strong></td><td><span class="tag ${pending.length ? 'tag-warn' : 'tag-open'}">${pending.length ? `${pending.length} pendientes` : 'Completado'}</span></td><td>${pending.length ? 'Deben registrarse en el Libro Mayor antes de generar la hoja.' : 'No hay ventas pendientes en el rango.'}</td></tr><tr><td><strong>Movimientos en Libro Mayor</strong></td><td><span class="tag ${periodRows.length ? 'tag-open' : 'tag-muted'}">${periodRows.length} transacciones</span></td><td>${periodRows.length ? 'Disponibles para incorporar a la hoja.' : 'No hay movimientos en las fechas seleccionadas.'}</td></tr></tbody></table></div>${pending.length ? `<div class="card-body"><button class="button button-secondary" type="button" data-view="operations" data-operation="post">Ir a contabilizar ventas</button></div>` : ''}<div class="table-footer"><span>Las validaciones se consultan al generar la hoja.</span>${sameWorksheet ? '<button class="text-button" type="button" data-report="worksheet">Abrir Hoja de Trabajo →</button>' : ''}</div></section>
-      <div class="heading-actions section-gap">${open ? `<button class="button button-primary" type="button" data-action="generate-worksheet" ${pending.length || !periodRows.length ? 'disabled' : ''}>Generar Hoja de Trabajo</button>` : '<button class="button button-secondary" type="button" data-action="reopen-period">Reabrir período</button>'}${sameWorksheet ? '<button class="button button-secondary" type="button" data-report="worksheet">Revisar hoja generada</button>' : ''}</div>`;
+      <section class="card"><div class="card-header"><div><h2>Período a revisar</h2><p>Selecciona el rango que se utilizará en la hoja.</p></div><span class="tag ${loading ? 'tag-muted' : open ? 'tag-open' : 'tag-warn'}">${estadoTexto}</span></div><div class="card-body"><div class="filter-bar" style="margin:0"><div class="field"><label for="provisionalFrom">Fecha inicial</label><input id="provisionalFrom" type="date" value="${safe(from)}" ${state.provisionalLoading ? 'disabled' : ''}/></div><div class="field"><label for="provisionalTo">Fecha final</label><input id="provisionalTo" type="date" value="${safe(to)}" ${state.provisionalLoading ? 'disabled' : ''}/></div><button class="button button-secondary" type="button" data-action="check-provisional" ${state.provisionalLoading ? 'disabled' : ''}>${state.provisionalLoading ? 'Consultando…' : 'Consultar requisitos'}</button></div>${errorMarkup}</div></section>
+      <section class="card section-gap"><div class="card-header"><div><h2>Requisitos previos</h2><p>Las ventas del rango deben estar registradas antes de preparar la hoja.</p></div></div><div class="table-wrap"><table><thead><tr><th>Validación</th><th>Resultado</th><th>Detalle</th></tr></thead><tbody><tr><td><strong>Estado del período</strong></td><td><span class="tag ${loading ? 'tag-muted' : open ? 'tag-open' : 'tag-warn'}">${estadoTexto}</span></td><td>${estadoDetalle}</td></tr><tr><td><strong>Ventas pendientes</strong></td><td><span class="tag ${loading ? 'tag-muted' : pending.length ? 'tag-warn' : 'tag-open'}">${pendientesTexto}</span></td><td>${pendientesDetalle}</td></tr><tr><td><strong>Movimientos en Libro Mayor</strong></td><td><span class="tag ${loading ? 'tag-muted' : periodRows.length ? 'tag-open' : 'tag-muted'}">${movimientosTexto}</span></td><td>${movimientosDetalle}</td></tr></tbody></table></div>${pending.length ? `<div class="card-body"><button class="button button-secondary" type="button" data-view="operations" data-operation="post">Ir a contabilizar ventas</button></div>` : ''}<div class="table-footer"><span>Se volverán a validar al generar la hoja.</span>${sameWorksheet ? '<button class="text-button" type="button" data-report="worksheet">Abrir Hoja de Trabajo →</button>' : ''}</div></section>
+      <div class="heading-actions section-gap">${periodAction}${sameWorksheet ? '<button class="button button-secondary" type="button" data-report="worksheet">Revisar hoja generada</button>' : ''}</div>`;
   }
 
   function closingPage(tabs) {
-    return `${heading('Cierre contable', 'El cierre provisional se prepara con la Hoja de Trabajo del período.', '')}${tabs}<section class="card"><div class="card-header"><div><h2>Estado del período</h2><p>Flujo de revisión contable</p></div><span class="tag ${state.periodStatus === 'ABIERTO' ? 'tag-open' : 'tag-warn'}">${state.periodStatus === 'ABIERTO' ? 'Abierto' : 'Cerrado provisionalmente'}</span></div><div class="card-body"><div class="notice"><span class="notice-icon">i</span><span>El cierre provisional requiere generar y revisar la Hoja de Trabajo. Los estados financieros del período se habilitan a partir de esa hoja.</span></div><div class="section-gap"><button class="button button-primary" type="button" data-report="provisional">${state.periodStatus === 'ABIERTO' ? 'Preparar cierre provisional' : 'Consultar período cerrado'}</button>${hasCurrentWorksheet() ? '<button class="button button-secondary" type="button" data-report="worksheet">Abrir Hoja de Trabajo</button>' : ''}</div></div></section>`;
+    const label = canReopenPeriod() ? 'Cerrar o reabrir períodos' : 'Cerrar períodos';
+    return `${heading('Cierre contable', 'El cierre provisional se prepara con la Hoja de Trabajo del período.', '')}${tabs}<section class="card"><div class="card-header"><div><h2>Estado del período</h2><p>Flujo de revisión contable</p></div><span class="tag ${state.periodStatus === 'ABIERTO' ? 'tag-open' : 'tag-warn'}">${state.periodStatus === 'ABIERTO' ? 'Abierto' : 'Cerrado provisionalmente'}</span></div><div class="card-body"><div class="notice"><span class="notice-icon">i</span><span>El cierre provisional requiere generar y revisar la Hoja de Trabajo. Los estados financieros del período se habilitan a partir de esa hoja.</span></div><div class="section-gap"><a class="button button-primary" href="${safe(screenUrls.closing)}">${label}</a><button class="button button-secondary" type="button" data-report="provisional">${state.periodStatus === 'ABIERTO' ? 'Preparar cierre provisional' : 'Consultar período cerrado'}</button>${hasCurrentWorksheet() ? '<button class="button button-secondary" type="button" data-report="worksheet">Abrir Hoja de Trabajo</button>' : ''}</div></div></section>`;
   }
 
   function worksheetPage(tabs) {
@@ -237,16 +255,21 @@
     const tableRows = sheet.rows.map(row => `<tr><td><strong>${safe(row.code || '—')}</strong><small>${safe(row.name)}</small></td>${pair(row.trialDebit,row.trialCredit)}${pair(row.adjustDebit,row.adjustCredit)}${pair(row.adjustedDebit,row.adjustedCredit)}${pair(row.resultsDebit,row.resultsCredit)}${pair(row.equityDebit,row.equityCredit)}${pair(row.balanceDebit,row.balanceCredit)}</tr>`).join('');
     const checks = worksheetChecks(sheet);
     const checkMarkup = checks.map(item => `<div class="balance-check ${item.ok ? 'is-balanced' : 'is-unbalanced'}"><span>${item.ok ? '✓' : '⚠'}</span><div><strong>${item.title}</strong><small>${item.ok ? 'Cuadra' : `Diferencia ${money(item.debit - item.credit)}`}</small></div></div>`).join('');
-    const adjustments = ledgerRows.filter(row => row.type === 'Ajuste' && row.date >= sheet.from && row.date <= sheet.to);
+    const adjustments = sheet.adjustments || [];
     const adjustmentRows = adjustments.map(row => `<tr><td><strong>${safe(row.code)} · ${safe(row.account)}</strong></td><td>${safe(row.correlativo)}</td><td>${safe(row.date)}</td><td>${safe(row.concept)}</td><td class="num">${row.side === 'Cargo' ? money(row.amount) : '—'}</td><td class="num">${row.side === 'Abono' ? money(row.amount) : '—'}</td></tr>`).join('') || '<tr><td colspan="6" class="empty-cell">Sin ajustes para este período</td></tr>';
     const adjustmentForm = state.periodStatus === 'ABIERTO' ? `<section class="card section-gap"><div class="card-header"><div><h2>Registrar transacción de ajuste</h2></div></div><form id="adjustmentForm" class="adjustment-form"><div class="field"><label for="adjustmentAccount">Cuenta</label><select id="adjustmentAccount" name="code" required>${accountOptions()}</select></div><div class="field"><label for="adjustmentDate">Fecha</label><input id="adjustmentDate" name="date" type="date" value="${safe(sheet.to)}" min="${safe(sheet.from)}" max="${safe(sheet.to)}" required/></div><div class="field adjustment-description"><label for="adjustmentConcept">Descripción</label><input id="adjustmentConcept" name="concept" required/></div><div class="field"><label for="adjustmentReference">Referencia</label><input id="adjustmentReference" name="reference"/></div><div class="field"><label for="adjustmentDebit">Debe</label><input id="adjustmentDebit" name="debit" class="money-input" type="number" min="0" step="0.01"/></div><div class="field"><label for="adjustmentCredit">Haber</label><input id="adjustmentCredit" name="credit" class="money-input" type="number" min="0" step="0.01"/></div><button class="button button-primary" type="submit">Guardar ajuste</button></form></section>` : '';
+    const periodAction = state.periodStatus === 'ABIERTO'
+      ? `<button class="button button-primary" type="button" data-action="confirm-provisional-close" ${checks.every(item => item.ok) ? '' : 'disabled'}>Confirmar cierre provisional</button>`
+      : canReopenPeriod()
+        ? '<button class="button button-secondary" type="button" data-action="reopen-period">Reabrir período</button>'
+        : '';
     return `${heading('Hoja de Trabajo', 'Revisa los saldos del Libro Mayor.', `<button class="button button-secondary" type="button" data-action="export" data-source="worksheet" data-format="pdf">↓ PDF</button><button class="button button-secondary" type="button" data-action="export" data-source="worksheet" data-format="xlsx">↓ Excel</button>`)}${tabs}
       <div class="demo-banner"><span><strong>Hoja generada</strong> · ${safe(sheet.from)} a ${safe(sheet.to)} · ${sheet.rows.filter(row => row.code).length} cuentas</span><span class="tag ${state.periodStatus === 'ABIERTO' ? 'tag-open' : 'tag-warn'}">${state.periodStatus === 'ABIERTO' ? 'En revisión' : 'Cierre provisional'}</span></div>
       <div class="balance-checks">${checkMarkup}</div>
       <section class="card worksheet-card"><div class="table-wrap worksheet-wrap"><table class="worksheet-table" id="worksheetMatrix"><thead><tr><th rowspan="2">Cuenta</th><th colspan="2">Balance de comprobación</th><th colspan="2">Ajustes</th><th colspan="2">Balance ajustado</th><th colspan="2">Estado de resultados</th><th colspan="2">Cambios en patrimonio</th><th colspan="2">Balance general</th></tr><tr><th>Debe</th><th>Haber</th><th>Debe</th><th>Haber</th><th>Debe</th><th>Haber</th><th>Debe</th><th>Haber</th><th>Debe</th><th>Haber</th><th>Debe</th><th>Haber</th></tr></thead><tbody>${tableRows}<tr class="worksheet-total"><td><strong>Totales</strong></td>${pair(totals.trialDebit,totals.trialCredit)}${pair(totals.adjustDebit,totals.adjustCredit)}${pair(totals.adjustedDebit,totals.adjustedCredit)}${pair(totals.resultsDebit,totals.resultsCredit)}${pair(totals.equityDebit,totals.equityCredit)}${pair(totals.balanceDebit,totals.balanceCredit)}</tr></tbody></table></div></section>
       <section class="card section-gap"><div class="card-header"><div><h2>Detalle de ajustes</h2></div><span class="tag">${adjustments.length}</span></div><div class="table-wrap"><table class="adjustment-detail-table"><thead><tr><th>Cuenta</th><th>Correlativo</th><th>Fecha</th><th>Descripción</th><th class="num">Debe</th><th class="num">Haber</th></tr></thead><tbody>${adjustmentRows}</tbody></table></div></section>${adjustmentForm}
       <section class="card section-gap"><div class="card-header"><div><h2>Estados financieros</h2></div></div><div class="card-body"><div class="quick-links"><button class="quick-link" type="button" data-report="results">Estado de Resultados <span>↗</span></button><button class="quick-link" type="button" data-report="changes">Estado de Cambios en el Patrimonio <span>↗</span></button><button class="quick-link" type="button" data-report="balance">Estado de situación financiera <span>↗</span></button></div></div></section>
-      <div class="entry-actions section-gap">${state.periodStatus === 'ABIERTO' ? `<button class="button button-primary" type="button" data-action="confirm-provisional-close" ${checks.every(item => item.ok) ? '' : 'disabled'}>Confirmar cierre provisional</button>` : '<button class="button button-secondary" type="button" data-action="reopen-period">Reabrir período</button>'}</div>`;
+      <div class="entry-actions section-gap">${periodAction}</div>`;
   }
 
   function worksheetChecks(sheet) {
@@ -257,68 +280,166 @@
     });
   }
 
-  function generateWorksheet() {
-    const from = $('#provisionalFrom')?.value || state.provisionalFrom || '2026-10-01';
-    const to = $('#provisionalTo')?.value || state.provisionalTo || '2026-10-31';
+  function provisionalInfo(from, to) {
+    const info = state.provisional;
+    if (info && info.from === from && info.to === to) return info;
+    if (!state.provisionalLoading) loadProvisional(from, to);
+    return null;
+  }
+
+  async function loadProvisional(from, to) {
+    const requestId = state.provisionalRequestId + 1;
+    state.provisionalRequestId = requestId;
+    state.provisionalLoading = true;
+    try {
+      const data = await api(`${screenUrls.api_hoja}?${new URLSearchParams({ desde: from, hasta: to })}`);
+      if (requestId !== state.provisionalRequestId) return null;
+      state.provisional = { ...data, from, to };
+      state.periodStatus = data.estado;
+      state.cuentas = data.cuentas;
+      if (state.worksheet && state.worksheet.from === from && state.worksheet.to === to) state.worksheet = normalizeWorksheet(data);
+    } catch (error) {
+      if (requestId !== state.provisionalRequestId) return null;
+      state.provisional = { from, to, ventasPendientes: 0, movimientos: 0, error: error.message };
+      showToast(error.message, 'error');
+    } finally {
+      if (requestId === state.provisionalRequestId) {
+        state.provisionalLoading = false;
+      }
+    }
+    if (requestId !== state.provisionalRequestId) return null;
+    if (state.current === 'reports') page();
+    return state.provisional;
+  }
+
+  async function consultProvisionalRequirements() {
+    const from = $('#provisionalFrom')?.value || '';
+    const to = $('#provisionalTo')?.value || '';
+    if (!from || !to || from > to) {
+      showToast('La fecha inicial debe ser igual o anterior a la final.', 'error');
+      return;
+    }
+    state.provisionalFrom = from;
+    state.provisionalTo = to;
+    state.provisional = null;
+    const request = loadProvisional(from, to);
+    page();
+    await request;
+  }
+
+  function normalizeWorksheet(data) {
+    const sheet = data.worksheet;
+    const toNumber = row => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, typeof value === 'string' && /^-?\d+(\.\d+)?$/.test(value) && key !== 'code' ? Number(value) : value]));
+    return { ...sheet, rows: sheet.rows.map(toNumber), totals: toNumber(sheet.totals), adjustments: sheet.adjustments.map(toNumber), periodo: data.periodo };
+  }
+
+  async function generateWorksheet() {
+    const from = $('#provisionalFrom')?.value || state.provisionalFrom;
+    const to = $('#provisionalTo')?.value || state.provisionalTo;
     state.provisionalFrom = from;
     state.provisionalTo = to;
     if (!from || !to || from > to) { showToast('La fecha inicial debe ser igual o anterior a la fecha final.', 'error'); return; }
+    const info = await loadProvisional(from, to);
+    if (!info || info.error) return;
     if (state.periodStatus !== 'ABIERTO') { showToast('El período ya está cerrado provisionalmente.', 'warning'); return; }
-    const pending = sales.filter(sale => sale.status === 'Pendiente' && sale.date >= from && sale.date <= to);
-    if (pending.length) { page(); showToast('Registra las ventas pendientes antes de generar la Hoja de Trabajo.', 'warning'); return; }
-    const periodRows = ledgerRows.filter(row => row.date >= from && row.date <= to);
-    if (!periodRows.length) { page(); showToast('No hay movimientos en el rango seleccionado.', 'warning'); return; }
-    state.worksheet = buildWorksheet(from, to);
+    if (info.ventasPendientes) { showToast('Registra las ventas pendientes antes de generar la Hoja de Trabajo.', 'warning'); return; }
+    if (!info.movimientos) { showToast('No hay movimientos en el rango seleccionado.', 'warning'); return; }
+    state.worksheet = normalizeWorksheet(info);
     state.report = 'worksheet';
     page();
   }
 
-  function buildWorksheet(from, to) {
-    const codes = [...new Set(ledgerRows.filter(row => row.date <= to).map(row => row.code))];
-    const rows = codes.map(code => {
-      const account = accounts.find(item => item.code === code);
-      if (!account) return null;
-      const openingRows = ledgerRows.filter(row => row.code === code && row.date < from);
-      const periodRows = ledgerRows.filter(row => row.code === code && row.date >= from && row.date <= to);
-      const normalRows = periodRows.filter(row => row.type !== 'Ajuste');
-      const adjustmentRows = periodRows.filter(row => row.type === 'Ajuste');
-      const net = list => list.reduce((sum, row) => sum + (row.side === 'Cargo' ? row.amount : -row.amount), 0);
-      const sideTotals = list => ({ debit: list.filter(row => row.side === 'Cargo').reduce((sum,row) => sum + row.amount,0), credit: list.filter(row => row.side === 'Abono').reduce((sum,row) => sum + row.amount,0) });
-      const openingNet = net(openingRows);
-      const normalTotals = sideTotals(normalRows);
-      const adjustTotals = sideTotals(adjustmentRows);
-      const trialNet = openingNet + normalTotals.debit - normalTotals.credit;
-      const adjustedNet = trialNet + adjustTotals.debit - adjustTotals.credit;
-      const periodNet = net(periodRows);
-      const trialDebit = Math.max(trialNet,0), trialCredit = Math.max(-trialNet,0);
-      const adjustedDebit = Math.max(adjustedNet,0), adjustedCredit = Math.max(-adjustedNet,0);
-      const resultsIncluded = account.group === 'Ingreso' || account.group === 'Egreso';
-      const equityIncluded = account.group === 'Patrimonio';
-      const balanceIncluded = ['Activo','Pasivo','Patrimonio'].includes(account.group);
-      return {
-        code, name: account.name, group: account.group, nature: account.nature,
-        openingNet, periodDebit: sideTotals(periodRows).debit, periodCredit: sideTotals(periodRows).credit, periodNet,
-        trialDebit, trialCredit, adjustDebit: adjustTotals.debit, adjustCredit: adjustTotals.credit, adjustedDebit, adjustedCredit,
-        resultsDebit: resultsIncluded ? Math.max(periodNet,0) : 0, resultsCredit: resultsIncluded ? Math.max(-periodNet,0) : 0,
-        equityDebit: equityIncluded ? adjustedDebit : 0, equityCredit: equityIncluded ? adjustedCredit : 0,
-        balanceDebit: balanceIncluded ? adjustedDebit : 0, balanceCredit: balanceIncluded ? adjustedCredit : 0,
-      };
-    }).filter(Boolean);
-    const resultNet = rows.filter(row => row.group === 'Ingreso' || row.group === 'Egreso').reduce((sum,row) => sum + row.periodNet,0);
-    if (resultNet !== 0) rows.push({ code: '', name: 'Resultado del período', group: 'Resultado', trialDebit: 0, trialCredit: 0, adjustDebit: 0, adjustCredit: 0, adjustedDebit: 0, adjustedCredit: 0, resultsDebit: Math.max(-resultNet,0), resultsCredit: Math.max(resultNet,0), equityDebit: Math.max(resultNet,0), equityCredit: Math.max(-resultNet,0), balanceDebit: Math.max(resultNet,0), balanceCredit: Math.max(-resultNet,0), periodNet: -resultNet, openingNet: 0, periodDebit: 0, periodCredit: 0 });
-    const keys = ['trialDebit','trialCredit','adjustDebit','adjustCredit','adjustedDebit','adjustedCredit','resultsDebit','resultsCredit','equityDebit','equityCredit','balanceDebit','balanceCredit'];
-    const totals = Object.fromEntries(keys.map(key => [key, rows.reduce((sum,row) => sum + (row[key] || 0),0)]));
-    return { from, to, generatedAt: today(), rows, totals };
+  function requestProvisionalClose() {
+    const info = state.provisional;
+    const sheet = state.worksheet;
+    if (!info || !sheet) return;
+    const name = info.periodo.nombre;
+    const summary = `<div class="field full"><strong>${safe(name)}</strong><small class="help">${safe(sheet.from)} a ${safe(sheet.to)} · ${info.transacciones} partidas · ${info.movimientos} movimientos · Balanza: ${info.balanzaCuadra ? 'cuadra' : `no cuadra (diferencia ${money(info.diferencia)})`} · Ventas pendientes: ${info.ventasPendientes}</small></div><div class="field full"><div class="notice"><span class="notice-icon">!</span><span>El período quedará cerrado y dejará de aceptar transacciones hasta que un administrador lo reabra.</span></div></div>`;
+    const fields = `${summary}<div class="field full"><label for="closeConfirm">Escribe CONFIRMAR exactamente *</label><input id="closeConfirm" name="confirmacion" autocomplete="off"/></div><div class="field full"><label for="closeReason">Motivo *</label><textarea id="closeReason" name="motivo" rows="3"></textarea></div>`;
+    openModal('Cerrar período', 'Cierre provisional desde la Hoja de Trabajo', fields, 'Cerrar período', data => {
+      const body = new FormData();
+      Object.entries({ desde: sheet.from, hasta: sheet.to, confirmacion: data.confirmacion, motivo: data.motivo }).forEach(([key, value]) => body.append(key, value));
+      api(screenUrls.api_cierre_provisional, { method: 'POST', body }).then(result => {
+        $('#modalRoot').innerHTML = '';
+        state.indicatorPeriodStatus = 'CERRADO_PROVISIONAL';
+        showToast(result.mensaje, 'success');
+        loadProvisional(sheet.from, sheet.to);
+      }).catch(error => showToast(error.message, 'error'));
+      return false;
+    });
+    const submit = $('#genericModalForm [type="submit"]');
+    const update = () => { submit.disabled = !(info.balanzaCuadra && !info.ventasPendientes && $('#closeConfirm').value === 'CONFIRMAR' && $('#closeReason').value.trim()); };
+    $('#genericModalForm').addEventListener('input', update);
+    update();
   }
 
-  function requestProvisionalClose() {
-    // TODO(CU-07.2): las acciones que cambian el estado del período están pendientes de definir.
-    showToast('El cierre provisional está pendiente de definición (CU-07).', 'warning');
+  function requestAnnualClose() {
+    if (!state.worksheet) return;
+    const year = state.worksheet.from.slice(0, 4);
+    const desde = `${year}-01-01`;
+    const hasta = `${year}-12-31`;
+    const fields = `<div class="field full"><strong>Ejercicio ${safe(year)}</strong><small class="help">${desde} a ${hasta} · El servidor validará la balanza, el estado del período y las ventas pendientes.</small></div><div class="field full"><label for="annualConfirm">Escribe CONFIRMAR exactamente *</label><input id="annualConfirm" name="confirmacion" autocomplete="off"/></div><div class="field full"><label for="annualReason">Motivo *</label><textarea id="annualReason" name="motivo" rows="3"></textarea></div>`;
+    openModal('Cierre anual', 'El servidor validará el ejercicio antes de cerrarlo.', fields, 'Confirmar cierre anual', data => {
+      const body = new FormData();
+      Object.entries({ desde, hasta, tipo_cierre: 'anual', confirmacion: data.confirmacion, motivo: data.motivo }).forEach(([key, value]) => body.append(key, value));
+      api(screenUrls.api_cierre_provisional, { method: 'POST', body }).then(async result => {
+        $('#modalRoot').innerHTML = '';
+        state.indicatorPeriodStatus = 'CERRADO_PROVISIONAL';
+        showToast(result.mensaje, 'success');
+        await loadProvisional(desde, hasta);
+        state.report = 'annual';
+        page();
+      }).catch(error => showToast(error.message, 'error'));
+      return false;
+    });
+    const submit = $('#genericModalForm [type="submit"]');
+    const update = () => { submit.disabled = !($('#annualConfirm').value === 'CONFIRMAR' && $('#annualReason').value.trim()); };
+    $('#genericModalForm').addEventListener('input', update);
+    update();
+  }
+
+  async function previewReconciliation() {
+    const desde = $('#reconcileFrom').value;
+    const hasta = $('#reconcileTo').value;
+    state.reconcileFrom = desde;
+    state.reconcileTo = hasta;
+    state.reconciliationResult = null;
+    try {
+      const params = new URLSearchParams({ desde, hasta });
+      state.reconciliationPreview = await api(`${screenUrls.api_conciliar_ventas}?${params}`);
+    } catch (error) {
+      state.reconciliationPreview = null;
+      showToast(error.message, 'error');
+    }
+    if (state.current === 'operations') page();
+  }
+
+  async function confirmReconciliation() {
+    if (!state.reconciliationPreview) return;
+    const body = new FormData();
+    body.append('desde', state.reconcileFrom);
+    body.append('hasta', state.reconcileTo);
+    try {
+      state.reconciliationResult = await api(screenUrls.api_conciliar_ventas, { method: 'POST', body });
+      state.reconciliationPreview = null;
+      const errores = state.reconciliationResult.errores || [];
+      const mensaje = errores.length
+        ? `${state.reconciliationResult.conciliadas} conciliadas; ${errores.length} no se contabilizaron. Revisa el detalle.`
+        : 'Conciliación procesada y auditada.';
+      showToast(mensaje, errores.length ? 'warning' : 'success');
+      await loadSales();
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+    if (state.current === 'operations') page();
   }
 
   function requestPeriodReopen() {
-    // TODO(CU-07): la reapertura de un período está pendiente de definir.
-    showToast('La reapertura del período está pendiente de definición (CU-07).', 'warning');
+    if (!canReopenPeriod()) {
+      showToast('Solo un administrador puede reabrir un período.', 'error');
+      return;
+    }
+    window.location.assign(screenUrls.closing);
   }
 
   function statementHeading(title, period) {
@@ -495,7 +616,11 @@
   }
 
   function annualReport() {
-    return `<section class="card"><div class="card-header"><div><h2>Informes relacionados con el cierre anual</h2><p>Ejercicio con Hoja de Trabajo disponible</p></div><span class="tag tag-demo">${safe(state.worksheet.from.slice(0,4))}</span></div><div class="card-body"><div class="quick-links"><button class="quick-link" type="button" data-report="results">Estado de Resultados <span>↗</span></button><button class="quick-link" type="button" data-report="changes">Estado de Cambios en el Patrimonio <span>↗</span></button><button class="quick-link" type="button" data-report="balance">Balance General <span>↗</span></button><button class="quick-link" type="button" data-report="worksheet">Hoja de Trabajo <span>↗</span></button></div></div></section>`;
+    const year = state.worksheet.from.slice(0, 4);
+    const closeAction = state.currentUser.role === 'Contador General' && state.periodStatus === 'ABIERTO'
+      ? `<div class="heading-actions section-gap"><button class="button button-primary" type="button" data-action="confirm-annual-close">Solicitar cierre anual</button></div>`
+      : '';
+    return `<section class="card"><div class="card-header"><div><h2>Informes relacionados con el cierre anual</h2><p>Ejercicio con Hoja de Trabajo disponible</p></div><span class="tag tag-demo">${safe(year)}</span></div><div class="card-body"><div class="quick-links"><button class="quick-link" type="button" data-report="results">Estado de Resultados <span>↗</span></button><button class="quick-link" type="button" data-report="changes">Estado de Cambios en el Patrimonio <span>↗</span></button><button class="quick-link" type="button" data-report="balance">Balance General <span>↗</span></button><button class="quick-link" type="button" data-report="worksheet">Hoja de Trabajo <span>↗</span></button></div>${closeAction}</div></section>`;
   }
 
   const operationTabs = [['verify', 'Verificar ventas'], ['post', 'Contabilizar ventas'], ['reconcile', 'Conciliar ventas'], ['steam', 'Conexión Steam']];
@@ -503,27 +628,36 @@
     const activeTitle = operationTabs.find(([id]) => id === state.operation)?.[1] || operationTabs[0][1];
     const tabs = `<div class="tabs">${operationTabs.map(([id, title]) => `<button class="tab-button ${state.operation === id ? 'active' : ''}" type="button" data-operation="${id}">${title}</button>`).join('')}</div>`;
     const content = state.operation === 'post' ? postSalesPanel() : state.operation === 'reconcile' ? reconcilePanel() : state.operation === 'steam' ? steamPanel() : verifySalesPanel();
-    return `${heading('Ventas y costos', 'Consulta y registra ventas.', '')}${tabs}${content}`;
+    return `${heading('Ventas', 'Consulta y registra ventas.', '')}${tabs}${content}`;
   }
 
   function verifySalesPanel() {
     const filtered = sales.filter(item => !state.salesQuery || `${item.id} ${item.title} ${item.channel}`.toLowerCase().includes(state.salesQuery.toLowerCase()));
-    return `<div class="demo-banner"><span><strong>Resumen del período</strong> · Consulta de ventas.</span></div><div class="filter-bar"><div class="field grow"><label for="salesQuery">Buscar venta</label><input id="salesQuery" value="${safe(state.salesQuery)}" placeholder="Código, título o canal"/></div><div class="field"><label for="salesFrom">Desde</label><input id="salesFrom" type="date" value="2026-10-01"/></div><div class="field"><label for="salesTo">Hasta</label><input id="salesTo" type="date" value="2026-10-31"/></div><button class="button button-secondary" type="button" data-action="filter-sales">Consultar</button></div><section class="card"><div class="card-header"><div><h2>Ventas</h2><p>Listado de ventas identificadas para consulta</p></div><span class="tag">${filtered.length} ventas</span></div><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Identificador</th><th>Producto</th><th>Canal</th><th>Estado</th><th class="num">Monto</th></tr></thead><tbody>${filtered.map(sale => `<tr><td>${safe(sale.date)}</td><td><strong>${safe(sale.id)}</strong><small>${safe(sale.correlativo || (sale.status === 'Pendiente' ? 'Sin correlativo hasta registrar' : ''))}</small></td><td>${safe(sale.title)}</td><td>${safe(sale.channel)}</td><td><span class="tag ${sale.status === 'Registrada' ? 'tag-open' : 'tag-muted'}">${safe(sale.status)}</span></td><td class="num">${money(sale.amount)}</td></tr>`).join('')}</tbody></table></div></section>`;
+    return `<div class="demo-banner"><span><strong>Resumen del período</strong> · Consulta de ventas.</span></div><div class="filter-bar"><div class="field grow"><label for="salesQuery">Buscar venta</label><input id="salesQuery" value="${safe(state.salesQuery)}" placeholder="Código, título o canal"/></div><div class="field"><label for="salesFrom">Desde</label><input id="salesFrom" type="date" value="${safe(state.salesFrom)}"/></div><div class="field"><label for="salesTo">Hasta</label><input id="salesTo" type="date" value="${safe(state.salesTo)}"/></div><button class="button button-secondary" type="button" data-action="filter-sales">Consultar</button></div><section class="card"><div class="card-header"><div><h2>Ventas</h2><p>Listado de ventas identificadas para consulta</p></div><span class="tag">${filtered.length} ventas</span></div><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Identificador</th><th>Producto</th><th>Canal</th><th>Estado</th><th class="num">Monto</th></tr></thead><tbody>${filtered.map(sale => `<tr><td>${safe(sale.date)}</td><td><strong>${safe(sale.id)}</strong><small>${safe(sale.correlativo || (sale.status === 'Pendiente' ? 'Sin correlativo hasta registrar' : ''))}</small></td><td>${safe(sale.title)}</td><td>${safe(sale.channel)}</td><td><span class="tag ${sale.status === 'Registrada' ? 'tag-open' : 'tag-muted'}">${safe(sale.status)}</span></td><td class="num">${money(sale.amount)}</td></tr>`).join('')}</tbody></table></div></section>`;
   }
 
   function postSalesPanel() {
     const pending = sales.filter(sale => sale.status === 'Pendiente');
-    return `<div class="notice"><span class="notice-icon">i</span><span>Al registrar una venta, el ingreso se aplica directamente a la cuenta correspondiente del Libro Mayor.</span></div><section class="card section-gap"><div class="card-header"><div><h2>Ventas pendientes de registro</h2><p>Selecciona una venta para registrarla directamente en el Libro Mayor.</p></div><span class="tag tag-muted">${pending.length} pendientes</span></div><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Venta</th><th>Producto</th><th>Canal</th><th class="num">Monto</th><th></th></tr></thead><tbody>${pending.length ? pending.map(sale => `<tr><td>${safe(sale.date)}</td><td><strong>${safe(sale.id)}</strong></td><td>${safe(sale.title)}</td><td>${safe(sale.channel)}</td><td class="num">${money(sale.amount)}</td><td class="num"><button class="button button-primary button-small" type="button" data-action="post-sale" data-sale="${safe(sale.id)}">Registrar</button></td></tr>`).join('') : `<tr><td colspan="6"><div class="empty-state"><strong>No hay ventas pendientes</strong></div></td></tr>`}</tbody></table></div></section>`;
+    return `<div class="notice"><span class="notice-icon">i</span><span>Al registrar una venta, el ingreso se aplica directamente a la cuenta correspondiente del Libro Mayor.</span></div><section class="card section-gap"><div class="card-header"><div><h2>Ventas pendientes de registro</h2><p>Selecciona una venta para registrarla directamente en el Libro Mayor.</p></div><span class="tag tag-muted">${pending.length} pendientes</span></div><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Venta</th><th>Producto</th><th>Canal</th><th class="num">Monto</th><th></th></tr></thead><tbody>${pending.length ? pending.map(sale => `<tr><td>${safe(sale.date)}</td><td><strong>${safe(sale.id)}</strong></td><td>${safe(sale.title)}</td><td>${safe(sale.channel)}</td><td class="num">${money(sale.amount)}</td><td class="num">${state.canPostSales ? `<button class="button button-primary button-small" type="button" data-action="post-sale" data-sale="${safe(sale.id)}">Registrar</button>` : '—'}</td></tr>`).join('') : `<tr><td colspan="6"><div class="empty-state"><strong>No hay ventas pendientes</strong></div></td></tr>`}</tbody></table></div></section>`;
   }
 
+  // TODO(CU-08.3): cotejar liquidaciones y depósitos bancarios requiere
+  // definir el formato de liquidación de Steam.
   function reconcilePanel() {
-    return `<div class="demo-banner"><span><strong>Conciliación</strong> · Pantalla de consulta para identificar diferencias entre fuentes de venta.</span></div><section class="card"><div class="card-header"><div><h2>Conciliar ventas</h2><p>Selecciona un período y consulta los registros disponibles.</p></div></div><div class="card-body"><div class="filter-bar" style="margin:0"><div class="field"><label for="reconcileFrom">Desde</label><input id="reconcileFrom" type="date" value="2026-10-01"/></div><div class="field"><label for="reconcileTo">Hasta</label><input id="reconcileTo" type="date" value="2026-10-31"/></div><div class="field"><label for="reconcileSource">Origen</label><select id="reconcileSource"><option>Todos</option><option>Tienda digital</option><option>Steam</option></select></div><button class="button button-primary" type="button" data-action="reconcile">Consultar conciliación</button></div></div><div class="empty-state"><strong>Selecciona filtros para mostrar coincidencias</strong>La conciliación compara los registros del período seleccionado.</div></section>`;
+    const preview = state.reconciliationPreview;
+    const result = state.reconciliationResult;
+    const previewMarkup = preview ? `<div class="notice section-gap"><span class="notice-icon">i</span><span>${preview.eventos} eventos Steam · Total ${money(preview.total)} · Cuentas por cobrar (1104) ${money(preview.cuentasPorCobrar)} · Comisión (4302) ${money(preview.comision)}</span></div><div class="heading-actions section-gap"><button class="button button-primary" type="button" data-action="confirm-reconciliation">Confirmar y contabilizar</button></div>` : '';
+    const errors = result?.errores?.length ? `<ul class="form-errors">${result.errores.map(error => `<li>${safe(error.id)}: ${safe(error.mensaje)}</li>`).join('')}</ul>` : '<p class="help">Sin errores.</p>';
+    const resultMarkup = result ? `<section class="card section-gap"><div class="card-header"><div><h2>Resultado de la conciliación</h2><p>${result.conciliadas} eventos conciliados</p></div></div><div class="card-body"><dl class="close-summary"><div><dt>Total</dt><dd>${money(result.total)}</dd></div><div><dt>Cuentas por cobrar (1104)</dt><dd>${money(result.cuentasPorCobrar)}</dd></div><div><dt>Comisión (4302)</dt><dd>${money(result.comision)}</dd></div></dl>${errors}</div></section>` : '';
+    return `<div class="demo-banner"><span><strong>Conciliación Steam</strong> · Se contabilizan los eventos recibidos en el período seleccionado.</span></div><section class="card"><div class="card-header"><div><h2>Conciliar ventas</h2><p>Calcula importes por período antes de confirmar el registro en el Libro Mayor.</p></div></div><div class="card-body"><div class="filter-bar" style="margin:0"><div class="field"><label for="reconcileFrom">Desde</label><input id="reconcileFrom" type="date" value="${safe(state.reconcileFrom || '2026-10-01')}"/></div><div class="field"><label for="reconcileTo">Hasta</label><input id="reconcileTo" type="date" value="${safe(state.reconcileTo || '2026-10-31')}"/></div><button class="button button-secondary" type="button" data-action="preview-reconciliation">Calcular período</button></div>${previewMarkup}${resultMarkup}</div></section>`;
   }
 
   function steamPanel() {
-    const statusStyle = state.steamStatus === 'Conectado' ? 'steam-connected' : state.steamStatus === 'Fuera de servicio' ? 'steam-offline' : 'steam-waiting';
-    const statusIcon = state.steamStatus === 'Conectado' ? '✓' : state.steamStatus === 'Fuera de servicio' ? '×' : '…';
-    return `<section class="card steam-card"><div class="card-header"><div><h2>Estado de Steam API</h2></div><span class="tag tag-demo">Estado de conexión</span></div><div class="card-body"><div class="steam-status-panel ${statusStyle}"><span class="steam-status-icon">${statusIcon}</span><div><strong>${safe(state.steamStatus)}</strong><small>Estado de conexión</small></div></div><div class="filter-bar steam-status-controls"><div class="field"><label for="steamStatusSelect">Estado de conexión</label><select id="steamStatusSelect"><option ${state.steamStatus === 'Conectado' ? 'selected' : ''}>Conectado</option><option ${state.steamStatus === 'En espera' ? 'selected' : ''}>En espera</option><option ${state.steamStatus === 'Fuera de servicio' ? 'selected' : ''}>Fuera de servicio</option></select></div><button class="button button-primary" type="button" data-action="steam-check">Mostrar estado</button></div></div></section>`;
+    const statusStyle = state.steamStatus === 'Conectado' ? 'steam-connected' : state.steamStatus === 'Error' ? 'steam-error' : state.steamStatus === 'Fuera de servicio' ? 'steam-offline' : 'steam-waiting';
+    const statusIcon = state.steamStatus === 'Conectado' ? '✓' : state.steamStatus === 'Error' ? '!' : state.steamStatus === 'Fuera de servicio' ? '×' : '…';
+    const contacto = state.steamContact ? new Date(state.steamContact).toLocaleString('es-SV') : 'Sin latidos registrados';
+    const error = state.steamError ? new Date(state.steamError).toLocaleString('es-SV') : 'Sin errores recientes';
+    return `<section class="card steam-card"><div class="card-header"><div><h2>Estado de Steam API</h2></div><span class="tag tag-demo">Solo lectura</span></div><div class="card-body"><div class="steam-status-panel ${statusStyle}"><span class="steam-status-icon">${statusIcon}</span><div><strong>${safe(state.steamStatus)}</strong><small>Estado de conexión</small></div></div><p class="steam-note">Último latido: ${safe(contacto)} · Último error autenticado: ${safe(error)}</p></div></section>`;
   }
 
   function showToast(message, type = 'success') {
@@ -547,71 +681,74 @@
   }
 
   function onAction(action, target) {
-    if (action === 'simulate-sale') {
-      const id = `V-${1049 + Math.max(0, sales.length - 5)}`;
-      const amount = 320 + Math.round(Math.random() * 480);
-      sales.unshift({ id, date: today(), title: 'Título nuevo', channel: 'Tienda digital', amount, status: 'Pendiente' });
-      state.salesTotal += amount;
-      page(); showToast('Venta agregada.', 'success');
-    }
+    if (action === 'simulate-sale') loadSales().then(() => showToast('Las ventas llegan desde el simulador de Steam; lista actualizada.', 'success'));
     if (action === 'show-trial-balance') { state.ledgerMode = 'trial-balance'; page(); }
     if (action === 'back-ledger') { state.ledgerMode = 'ledger'; page(); }
     if (action === 'refresh-trial-balance') { state.trialBalanceTo = $('#trialBalanceTo').value || today(); page(); }
-    if (action === 'export') exportDocument(target.dataset.source || 'report', target.dataset.format || 'pdf');
+    if (action === 'export') { if (!exportNiif(target.dataset.source, target.dataset.format)) exportDocument(target.dataset.source || 'report', target.dataset.format || 'pdf'); }
     if (action === 'generate-report') showToast('Reporte actualizado con los movimientos del período.', 'success');
     if (action === 'close-period') { state.report = 'provisional'; page(); }
     if (action === 'generate-worksheet') generateWorksheet();
-    if (action === 'check-provisional') { state.provisionalFrom = $('#provisionalFrom').value; state.provisionalTo = $('#provisionalTo').value; page(); }
+    if (action === 'check-provisional') consultProvisionalRequirements();
     if (action === 'confirm-provisional-close') requestProvisionalClose();
     if (action === 'reopen-period') requestPeriodReopen();
     if (action === 'go-provisional') { state.report = 'provisional'; page(); }
-    if (action === 'filter-sales') { state.salesQuery = $('#salesQuery').value; page(); }
+    if (action === 'filter-sales') { state.salesQuery = $('#salesQuery').value; state.salesFrom = $('#salesFrom').value; state.salesTo = $('#salesTo').value; loadSales(); }
     if (action === 'post-sale') postSale(target.dataset.sale);
-    if (action === 'reconcile') showToast('Consulta de conciliación realizada.', 'success');
-    if (action === 'steam-check') { state.steamStatus = $('#steamStatusSelect').value; page(); showToast('Estado de conexión actualizado.', 'success'); }
+    if (action === 'preview-reconciliation') previewReconciliation();
+    if (action === 'confirm-reconciliation') confirmReconciliation();
+    if (action === 'confirm-annual-close') requestAnnualClose();
     if (action === 'close-modal') $('#modalRoot').innerHTML = '';
   }
 
-  function nextCorrelative(type, date) {
-    const year = date.slice(0, 4);
-    const highest = ledgerRows.reduce((current, row) => {
-      if (row.type !== type || !row.date.startsWith(year)) return current;
-      const numberPart = Number((row.correlativo || '').match(/-(\d{5})$/)?.[1]) || 0;
-      return Math.max(current, numberPart);
-    }, 0);
-    return `${type}-${year}-${String(highest + 1).padStart(5, '0')}`;
+  function exportNiif(source, format) {
+    const tipos = { results: 'estado-resultados', balance: 'balance-general' };
+    if (source !== 'report' || format !== 'pdf' || !tipos[state.report] || !state.worksheet) return false;
+    window.location.assign(`${screenUrls.pdf_estados.replace('TIPO', tipos[state.report])}?${new URLSearchParams({ desde: state.worksheet.from, hasta: state.worksheet.to })}`);
+    return true;
   }
 
-  function postSale(id) {
-    const sale = sales.find(item => item.id === id);
-    if (!sale || sale.status !== 'Pendiente') return;
-    if (state.periodStatus === 'CERRADO_PROVISIONAL' && state.closedRange && sale.date >= state.closedRange.from && sale.date <= state.closedRange.to) {
-      showToast('El período de la venta está cerrado provisionalmente.', 'warning'); return;
+  async function loadSales() {
+    state.salesLoaded = true;
+    try {
+      const params = new URLSearchParams({ q: state.salesQuery, desde: state.salesFrom, hasta: state.salesTo });
+      const data = await api(`${screenUrls.api_ventas}?${params}`);
+      sales = data.ventas.map(sale => ({ ...sale, amount: Number(sale.amount) }));
+      state.salesTotal = sales.reduce((sum, sale) => sum + sale.amount, 0);
+      state.steamStatus = data.conexion.estado;
+      state.steamContact = data.conexion.ultimoContacto;
+      state.steamError = data.conexion.ultimoError;
+      state.canPostSales = data.puedeContabilizar;
+    } catch (error) {
+      showToast(error.message, 'error');
     }
-    sale.status = 'Registrada';
-    sale.correlativo = nextCorrelative('Comprobante de Ingreso', sale.date);
-    ledgerRows.push({ id: state.nextLedgerId++, date: sale.date, code: '5101', account: 'Ingresos por licencias de videojuegos', concept: `Venta ${sale.id} · ${sale.title}`, reference: sale.id, type: 'Comprobante de Ingreso', correlativo: sale.correlativo, side: 'Abono', amount: sale.amount });
-    state.worksheet = null;
-    page(); showToast('Venta registrada directamente en Libro Mayor.', 'success');
+    if (['dashboard', 'operations'].includes(state.current)) page();
+  }
+
+  async function postSale(id) {
+    try {
+      const result = await api(`${screenUrls.api_ventas}${encodeURIComponent(id)}/contabilizar/`, { method: 'POST' });
+      state.worksheet = null;
+      state.provisional = null;
+      showToast(result.mensaje, 'success');
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+    loadSales();
   }
 
   function handleForm(event) {
     if (event.target.id === 'adjustmentForm') {
       event.preventDefault();
-      const data = Object.fromEntries(new FormData(event.target).entries());
-      const debit = Number(data.debit) || 0, credit = Number(data.credit) || 0;
       const sheet = state.worksheet;
       if (state.periodStatus !== 'ABIERTO' || !sheet) { showToast('No se pueden agregar ajustes a un período cerrado.', 'warning'); return; }
-      if (!data.code || !data.date || data.date < sheet.from || data.date > sheet.to || !data.concept.trim() || (debit > 0) === (credit > 0)) { showToast('Completa cuenta, fecha y descripción; registra un importe en Debe o Haber.', 'error'); return; }
-      const account = accounts.find(item => item.code === data.code);
-      if (!account) { showToast('Selecciona una cuenta activa.', 'error'); return; }
-      const adjustment = { id: state.nextLedgerId++, date: data.date, code: account.code, account: account.name, concept: data.concept.trim(), reference: data.reference.trim(), type: 'Ajuste', correlativo: nextCorrelative('Ajuste', data.date), side: debit > 0 ? 'Cargo' : 'Abono', amount: debit > 0 ? debit : credit };
-      ledgerRows.push(adjustment);
-      state.worksheet = buildWorksheet(sheet.from, sheet.to);
-      state.report = 'worksheet';
-      const balanced = worksheetChecks(state.worksheet).every(item => item.ok);
-      page();
-      showToast(balanced ? `Ajuste ${adjustment.correlativo} guardado.` : `Ajuste ${adjustment.correlativo} guardado; la hoja aún no cuadra.`, balanced ? 'success' : 'warning');
+      api(screenUrls.api_ajuste, { method: 'POST', body: new FormData(event.target) }).then(async result => {
+        await loadProvisional(sheet.from, sheet.to);
+        state.report = 'worksheet';
+        const balanced = worksheetChecks(state.worksheet).every(item => item.ok);
+        page();
+        showToast(balanced ? result.mensaje : `${result.mensaje} La hoja aún no cuadra.`, balanced ? 'success' : 'warning');
+      }).catch(error => showToast(error.message, 'error'));
       return;
     }
   }

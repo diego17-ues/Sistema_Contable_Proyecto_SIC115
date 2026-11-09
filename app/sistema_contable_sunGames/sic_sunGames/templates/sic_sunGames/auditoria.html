@@ -5,10 +5,10 @@
 {% block page_content %}
 <div class="page-heading"><div><h1>Auditoría</h1><p>Consulta las acciones registradas en el sistema.</p></div><div class="heading-actions"><a class="button button-secondary" href="{% url 'auditoria_descargar' 'pdf' %}">↓ PDF</a><a class="button button-secondary" href="{% url 'auditoria_descargar' 'excel' %}">↓ Excel</a></div></div>
 <section class="card">
-  <div class="card-header"><div><h2>Registro de actividad</h2><p>Fecha y hora, usuarios, acción y resultado</p></div><span class="tag">{{ pagina.paginator.count }} evento{{ pagina.paginator.count|pluralize }}</span></div>
+  <div class="card-header"><div><h2>Registro de actividad</h2><p>Fecha y hora, usuarios, acción, resultado y detalle</p></div><span class="tag">{{ pagina.paginator.count }} evento{{ pagina.paginator.count|pluralize }}</span></div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Fecha y hora</th><th>Usuario actor</th><th>Usuario afectado</th><th>Acción</th><th>Resultado</th></tr></thead>
+      <thead><tr><th>Fecha y hora</th><th>Usuario actor</th><th>Usuario afectado</th><th>Acción</th><th>Resultado</th><th>Detalle</th></tr></thead>
       <tbody>
         {% for evento in pagina %}
         <tr>
@@ -17,9 +17,10 @@
           <td>{{ evento.afectado.username|default:"—" }}</td>
           <td>{{ evento.get_accion_display }}{% if evento.referencia %} · {{ evento.referencia }}{% endif %}</td>
           <td>{{ evento.get_resultado_display }}</td>
+          <td>{{ evento.detalle|default:"—" }}</td>
         </tr>
         {% empty %}
-        <tr><td class="empty-cell" colspan="5">La bitácora no contiene eventos.</td></tr>
+        <tr><td class="empty-cell" colspan="6">La bitácora no contiene eventos.</td></tr>
         {% endfor %}
       </tbody>
     </table>
