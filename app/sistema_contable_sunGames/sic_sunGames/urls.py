@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import administracion, auth, catalogo, pages
+from .views import administracion, auth, catalogo, estados, mayor, pages, ventas
 
 urlpatterns = [
     path("", pages.index, name="index"),
@@ -8,13 +8,31 @@ urlpatterns = [
     path("panel/", pages.panel, name="panel"),
     path("logout/", auth.logout_view, name="logout"),
     path("panel/dashboard/", pages.render_screen, {"screen": "dashboard"}, name="dashboard"),
-    path("panel/libro-mayor/", pages.render_screen, {"screen": "ledger"}, name="ledger"),
+    path("panel/libro-mayor/", mayor.libro_mayor, name="ledger"),
+    path("panel/libro-mayor/balance/pdf/", mayor.balance_pdf, name="balance_pdf"),
+    path("panel/libro-mayor/registrar/", mayor.registrar_transaccion, name="transaccion_registrar"),
     path("panel/catalogo-cuentas/", catalogo.cuentas, name="accounts"),
     path("panel/catalogo-cuentas/nueva/", catalogo.cuenta_nueva, name="cuenta_nueva"),
     path("panel/catalogo-cuentas/siguiente-codigo/", catalogo.cuenta_siguiente_codigo, name="cuenta_siguiente_codigo"),
     path("panel/catalogo-cuentas/<str:codigo>/", catalogo.cuenta_detalle, name="cuenta_detalle"),
     path("panel/catalogo-cuentas/<str:codigo>/modificar/", catalogo.cuenta_modificar, name="cuenta_modificar"),
     path("panel/estados-financieros/", pages.render_screen, {"screen": "reports"}, name="reports"),
+    path("panel/estados-financieros/periodos/", estados.cierre_periodos, name="cierre_periodos"),
+    path("panel/estados-financieros/periodos/<int:periodo_id>/cerrar/", estados.cerrar_periodo, name="periodo_cerrar"),
+    path("panel/estados-financieros/periodos/<int:periodo_id>/reabrir/", estados.reabrir_periodo, name="periodo_reabrir"),
+    path("panel/estados-financieros/<int:periodo_id>/<str:tipo>/pdf/", estados.estado_pdf, name="estado_pdf"),
+    path("panel/estados-financieros/api/hoja-trabajo/", estados.hoja_trabajo_api, name="api_hoja_trabajo"),
+    path("panel/estados-financieros/api/ajustes/", estados.ajuste_api, name="api_ajuste"),
+    path("panel/estados-financieros/api/cierre-provisional/", estados.cierre_provisional_api, name="api_cierre_provisional"),
+    path("panel/estados-financieros/pdf/<str:tipo>/", estados.estado_pdf_rango, name="estado_pdf_rango"),
+    path("panel/ventas-costos/api/ventas/", ventas.ventas_api, name="api_ventas"),
+    path(
+        "panel/ventas-costos/api/conciliar/", ventas.conciliacion_api,
+        name="api_conciliar_ventas",
+    ),
+    path("panel/ventas-costos/api/ventas/<str:identificador>/contabilizar/", ventas.contabilizar_api, name="api_contabilizar_venta"),
+    path("api/steam/ventas/", ventas.steam_ventas, name="steam_ventas"),
+    path("api/steam/latido/", ventas.steam_latido, name="steam_latido"),
     path("panel/ventas-costos/", pages.render_screen, {"screen": "operations"}, name="operations"),
     path("panel/usuarios/", administracion.usuarios, name="users"),
     path("panel/usuarios/nuevo/", administracion.usuario_nuevo, name="usuario_nuevo"),

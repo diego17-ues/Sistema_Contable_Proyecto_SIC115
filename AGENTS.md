@@ -76,6 +76,7 @@ Implementar únicamente los casos indicados aquí. Todo lo demás queda fuera.
 - Mobiliario y equipo se capitaliza a partir de USD 500.
 - El Balance de Comprobación no se bloquea por desigualdad entre columnas debe y haber.
 - Código de cuenta de 4 dígitos: posición 1 rubro, posición 2 naturaleza, posiciones 3 y 4 número de cuenta dentro del grupo (01 a 99). El código lo asigna el servicio, nunca el usuario. Un código dado de baja no se reutiliza.
+El registro contable es por movimiento: cada movimiento tiene una cuenta, un importe firmado y una fecha. El sistema no exige que una transacción cuadre al registrarla. El cuadre se verifica en el Balance de comprobación (CU-04.1), y el contador es responsable de registrar completas las transacciones. Ningún movimiento se guarda si sus datos no son válidos.
 
 ## Eliminaciones
 

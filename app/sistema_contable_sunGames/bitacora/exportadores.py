@@ -13,7 +13,8 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Table, TableStyle
 from .exceptions import FormatoNoSoportadoError
 
 ENCABEZADOS = (
-    "Fecha y hora", "Usuario actor", "Usuario afectado", "Acción", "Resultado"
+    "Fecha y hora", "Usuario actor", "Usuario afectado", "Acción",
+    "Resultado", "Detalle",
 )
 # TODO(CU-03.2): el nombre de archivo y la plantilla de los reportes no
 # están definidos en la especificación; se usa un nombre provisional.
@@ -41,6 +42,7 @@ def filas(eventos):
             evento.afectado.username if evento.afectado_id else "",
             accion_con_referencia(evento),
             evento.get_resultado_display(),
+            evento.detalle,
         )
 
 
