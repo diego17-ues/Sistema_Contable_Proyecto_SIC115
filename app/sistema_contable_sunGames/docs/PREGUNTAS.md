@@ -1,70 +1,72 @@
 # Preguntas pendientes — Subsistema de Costos
 
-## Resueltas en la implementación actual
+## Reestructura R0 (vigente)
 
-- **Cuentas de la serie 41 e intangible**: se usan las cuentas del
-  catálogo real vía `MapeoCuenta` (semilla: mano_obra→4101,
-  servicio_directo→4102, indirecto→4103, intangible→1107
-  "Videojuegos terminados"). Si una cuenta falta o está inactiva, el
-  tipo de cargo queda bloqueado con error de dominio.
-- **Cuentas de origen de sueldos/prestaciones/depreciación y "intangible
-  en desarrollo/uso"**: pendientes solo para la fase de ASIENTOS
-  (haber de cada movimiento). Los cargos ya guardan su cuenta destino;
-  el origen del gasto se definirá con `docs/PROPUESTA_INTERFAZ.md` o
-  respuesta explícita antes de generar movimientos.
-- **Asientos contables**: pospuestos por decisión del usuario ("por
-  ahora no hay registros contables"). El módulo no escribe en el Libro
-  Mayor; `CargoOrden.referencia_asiento` y `clave_idempotencia` quedan
-  listos para la integración.
+Resueltas por el nuevo encargo o por el código:
 
-## Abiertas
+- **Cuentas destino**: confirmadas en el catálogo — 4101 mano de obra,
+  4102 costos directos, 4103 indirectos, 4104 costo de ventas,
+  1106 Videojuegos en desarrollo, 1107 Videojuegos terminados y
+  1108 Amortización acumulada de videojuegos (Haber del asiento 6).
+- **Mecanismo de asientos**: `TransaccionRepository` (patrón
+  `ventas.services.contabilizar`); el módulo valida el cuadre antes de
+  enviar. No se modifica la contabilidad general.
+- **Servicios profesionales**: fuera de la orden (gasto del período);
+  se elimina `afecta_mayor` y el "costo de gestión".
+- **Fondos, equipos, cortes y ajustes de tasa**: eliminados del módulo.
+- **Rol**: `CONTADOR_COSTOS` ya existe en `Rol.choices`.
 
-1. **Mecanismo de asientos**: ¿se acepta el patrón de `ventas`
-   (`Transaccion` + `Movimiento` por repositorio, cuadre validado por
-   el módulo de costos) o se requiere una API formal en `libro_mayor`
-   (modificación que necesita aprobación)?
+Abiertas:
 
-2. **Auxiliar por orden de trabajo**: `Movimiento` no tiene campo
-   auxiliar; la trazabilidad por orden iría en concepto/referencia +
-   tablas de costos. ¿Suficiente o se modifica el mayor?
+1. **Cuenta origen del Haber de mano de obra por proceso** (asiento 1):
+   candidatas en catálogo: `2106` Sueldos y prestaciones por pagar
+   (pasivo) o las de gasto `4201`/`4202`. ¿Cuál corresponde al pago que
+   alimenta la tarifa de cada proceso? `MapeoCuenta` lo permite por
+   proceso; falta el mapeo inicial.
 
-3. **Rol de usuario**: hoy el módulo lo ven Contador General y
-   Administrador. ¿Se crea el rol `CONTADOR_COSTOS` en esta rama o se
-   mantiene así?
+2. **Cuentas origen de costos indirectos** (asiento 3): candidatas
+   `4203`–`4208` (honorarios no; depreciación 4207, amortización de
+   licencias 4208, alquileres 4204, servicios básicos 4205, papelería
+   4206) y las no circulantes si procede. ¿Cuáles alimentan el pool y a
+   qué proceso se asigna cada una (o reparto por horas totales)?
 
-4. **Cuenta de origen del Haber** (para asientos futuros): sueldos y
-   prestaciones (`2106` pasivo vs `4201`/`4202` gasto), cargas
-   patronales (`2105` vs `4202`), depreciación (`1203` acumulada vs
-   `4207` gasto), intangible en desarrollo (`1106`?) e intangible en
-   uso (`1107` "Videojuegos terminados" ya mapeado para el traslado).
+3. **Anti doble conteo**: la regla compara lo aplicado contra "el saldo
+   de la cuenta origen en el período". ¿Saldo = suma neta de
+   movimientos del mayor en el período (debe − haber) o solo el debe?
+   Asumo **neto del período**; confirmar. ¿El `porcentaje` del mapeo
+   reduce la base comparada o solo lo aplicado?
 
-5. **Alcance de 4102**: qué servicios/licencias directos se capitalizan
-   como "servicio_directo". Semilla mapeada; la política de qué cargos
-   usan ese concepto sigue por definir.
+4. **Reapertura del período**: el mayor permite reabrir (Admin +
+   contraseña) pero no revierte movimientos. ¿El módulo genera los
+   contra-asientos (traslado inverso 1106→41x, amortización inversa)
+   con una acción propia en la pantalla de costos, o se añade un punto
+   de llamada en `estados_financieros` (eso modifica la contabilidad
+   general y requiere tu aprobación)?
 
-6. **Tasa de cargas real al cierre**: "saldo de la cuenta de
-   prestaciones y cargas patronales / salarios brutos del período" —
-   depende del punto 4 (qué cuenta es cada cosa) y de cómo se registren
-   los salarios brutos en el mayor.
+5. **Tarifa por hora**: no hay planilla ni costo por hora real por
+   empleado/departamento en la contabilidad general, así que se
+   conserva `TarifaProceso` propia con vigencia (editable solo por
+   Contador de Costos). Si más adelante existe fuente real, se migra.
 
-7. **Base del prorrateo de fondos**: se usaron las horas de desarrollo
-   registradas en órdenes abiertas (`RegistroHora`). Confirmar que es
-   la base correcta (¿incluir horas de órdenes cerradas? ¿hasta la
-   fecha del fondo? hoy se usa `hasta=fondo.fecha`).
+6. **Procesos iniciales**: semilla Diseño, Programación, Arte, Audio y
+   QA (el encargo los marca "a confirmar").
 
-8. **Costo de proceso en el período**: hoy se captura manual
-   (`CostoProceso` por período). ¿Debe calcularse desde cuentas de
-   gasto del mayor en el futuro?
+7. **Parámetros de amortización**: `vida_util_anios`=4 (25 % anual) y
+   `base_dias_anio`=365, `valor_residual`=0 — **VERIFICAR** la vida
+   útil y la política de amortización de videojuegos.
 
-9. **Horas máquina de equipos compartidos**: el uso se captura en
-   `UsoEquipo` por fecha; la tasa es cuota_mensual/horas_mes. Confirmar
-   que `horas_mes` del equipo es la capacidad correcta y no una jornada
-   distinta a la de `ParametroVigente`.
+8. **Auxiliar por orden**: `Movimiento` no tiene auxiliar; la orden va
+   en `referencia`/`concepto` + `AsientoCosto`. ¿Suficiente o se
+   modifica el mayor (requiere aprobación)?
 
-10. **Cierre provisional de costos vs cierre de estados financieros**:
-    son independientes (el nuestro no cierra el período). Confirmar que
-    el "cierre provisional" del encargo es el de costos y no el CU-07
-    existente.
+9. **Períodos**: `periodo_de` exige un `PeriodoContable` que cubra la
+   fecha del cargo; el módulo no crea períodos. Si falta, el cargo se
+   rechaza con aviso de crear el período en Estados financieros.
+
+10. **`estimacion_ref`**: se implementará como FK opcional de solo
+    lectura a la versión de presupuesto aprobada de `estimacion`
+    (muestra el total estimado, sin variaciones). Es la única lectura
+    cruzada permitida entre módulos.
 
 # Preguntas abiertas — Subsistema de Costos / Estimación
 
