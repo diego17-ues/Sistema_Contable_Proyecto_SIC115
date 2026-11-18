@@ -53,11 +53,11 @@ Rama: `costos/estimacion`. Fecha: 2026-11-18.
 
 `python manage.py test estimacion usuarios` → **105 pruebas OK**
 (32 del módulo de estimación, resto de usuarios).
-
-Estado base de `main` (documentado en el diagnóstico): 52 errores
-preexistentes por incompatibilidad Django 4.2 / Python 3.14 en el
-instrumentado de plantillas del cliente de pruebas; no se introdujeron
-errores nuevos y las pruebas nuevas no dependen de ese camino.
+Suite completa: **281 pruebas, 52 errores**, idénticos a los 52 errores
+preexistentes de `main` (incompatibilidad Django 4.2 / Python 3.14 en el
+instrumentado de plantillas del cliente de pruebas). No se introdujeron
+errores nuevos ni se modificó código existente fuera del módulo y del
+punto de acceso por rol.
 
 ## Decisiones tomadas (pendientes de confirmación en PREGUNTAS.md)
 
