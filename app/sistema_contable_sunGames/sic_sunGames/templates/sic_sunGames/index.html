@@ -52,5 +52,5 @@
   {{ modulos|json_script:"modulos" }}
   {{ estado_periodo|json_script:"periodStatus" }}
   <script id="serverMessages" type="application/json">[{% for message in messages %}{"text": "{{ message|escapejs }}", "level": "{{ message.tags|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]</script>
-  <script src="{% static 'sic_sunGames/app.js' %}?v=20261112-6"></script>
+  <script src="{% static 'sic_sunGames/app.js' %}?v=20261118-1"></script>
 {% endblock %}

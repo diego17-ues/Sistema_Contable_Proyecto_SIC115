@@ -134,7 +134,7 @@
       return;
     }
     renderNavigation();
-    const titles = { dashboard: 'Dashboard', ledger: 'Libro Mayor', accounts: 'Catálogo de cuentas', reports: 'Estados financieros', operations: 'Ventas', users: 'Usuarios', audit: 'Auditoría', estimacion: 'Estimación' };
+    const titles = { dashboard: 'Dashboard', ledger: 'Libro Mayor', accounts: 'Catálogo de cuentas', reports: 'Estados financieros', operations: 'Ventas', users: 'Usuarios', audit: 'Auditoría', estimacion: 'Estimación', costos: 'Órdenes de trabajo' };
     $('#breadcrumb').textContent = titles[state.current] || 'Panel';
     const periodClosed = state.indicatorPeriodStatus === 'CERRADO_PROVISIONAL';
     const periodLabel = periodClosed ? 'Período cerrado provisionalmente' : 'Período abierto';
