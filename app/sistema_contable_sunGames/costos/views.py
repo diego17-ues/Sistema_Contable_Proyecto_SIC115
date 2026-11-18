@@ -167,9 +167,14 @@ def orden_estimacion(request, orden_id):
         versiones = servicio.versiones_aprobadas(request.user)
     except SIN_PERMISO as error:
         _sin_permiso(error)
+    try:
+        actual = servicio.detalle(request.user, orden_id).estimacion_ref_id
+    except CostosError as error:
+        messages.error(request, str(error))
+        return redirect("costos_ordenes")
     form = EstimacionRefForm(
         request.POST if request.method == "POST" else None,
-        versiones=versiones,
+        initial={"version": actual or ""}, versiones=versiones,
     )
     if request.method == "POST" and form.is_valid():
         try:
