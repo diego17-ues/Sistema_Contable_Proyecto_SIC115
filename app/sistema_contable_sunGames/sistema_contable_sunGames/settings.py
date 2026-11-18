@@ -28,9 +28,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-rcwx3$l*xlg2z(va$*_8n(&9fvs^q(@^!l4zi!59486#&+5vxb'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
+CSRF_TRUSTED_ORIGINS= ['https://murmuring-masculine-untimely.ngrok-free.dev']
 
 
 # Application definition
@@ -49,6 +50,7 @@ INSTALLED_APPS = [
     'libro_mayor',
     'estados_financieros',
     'ventas',
+    'costos',
 ]
 
 AUTH_USER_MODEL = 'usuarios.Usuario'
@@ -63,6 +65,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
 ]
 
 ROOT_URLCONF = 'sistema_contable_sunGames.urls'
@@ -136,6 +140,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR /'staticfiles'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
