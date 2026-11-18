@@ -3,6 +3,22 @@ from decimal import Decimal, InvalidOperation
 from django import forms
 
 CAMPO_OBLIGATORIO = "Este campo es obligatorio."
+FECHA_INVALIDA = "Ingrese una fecha válida."
+FORMATOS_FECHA = ["%Y-%m-%d", "%d/%m/%Y"]
+
+
+def _fecha(label, required=True):
+    return forms.DateField(
+        label=label,
+        required=required,
+        input_formats=FORMATOS_FECHA,
+        widget=forms.DateInput(
+            attrs={"type": "date"}, format="%Y-%m-%d"
+        ),
+        error_messages={
+            "required": CAMPO_OBLIGATORIO, "invalid": FECHA_INVALIDA,
+        },
+    )
 
 
 class JuegoForm(forms.Form):
@@ -106,13 +122,8 @@ class ParametroForm(forms.Form):
         label="Valor", max_digits=14, decimal_places=6,
         error_messages={"required": CAMPO_OBLIGATORIO},
     )
-    vigente_desde = forms.DateField(
-        label="Vigente desde",
-        error_messages={"required": CAMPO_OBLIGATORIO},
-    )
-    vigente_hasta = forms.DateField(
-        label="Vigente hasta", required=False,
-    )
+    vigente_desde = _fecha("Vigente desde")
+    vigente_hasta = _fecha("Vigente hasta", required=False)
     verificado = forms.BooleanField(
         label="Verificado", required=False,
     )
@@ -136,13 +147,8 @@ class SalarioForm(forms.Form):
         decimal_places=2, min_value=0,
         error_messages={"required": CAMPO_OBLIGATORIO},
     )
-    vigente_desde = forms.DateField(
-        label="Vigente desde",
-        error_messages={"required": CAMPO_OBLIGATORIO},
-    )
-    vigente_hasta = forms.DateField(
-        label="Vigente hasta", required=False,
-    )
+    vigente_desde = _fecha("Vigente desde")
+    vigente_hasta = _fecha("Vigente hasta", required=False)
 
     def clean(self):
         datos = super().clean()
