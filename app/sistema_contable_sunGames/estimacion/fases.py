@@ -16,6 +16,4 @@ FASES_SUN_GAMES = (
     ("Audio", CLASIFICACION_OPEX),
     ("QA y accesibilidad", CLASIFICACION_OPEX),
     ("Localización", CLASIFICACION_OPEX),
-    ("Publicación y marketing", CLASIFICACION_OPEX),
-    ("Finanzas, legal y administración", CLASIFICACION_OPEX),
 )

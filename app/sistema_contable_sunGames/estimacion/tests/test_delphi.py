@@ -49,16 +49,16 @@ class DelphiTests(TestCase):
 
     def test_juego_crea_fases_fijas(self):
         fases = list(self.juego.fases.all())
-        self.assertEqual(len(fases), 9)
+        self.assertEqual(len(fases), 7)
         self.assertEqual(
-            [f.orden for f in fases], list(range(1, 10))
+            [f.orden for f in fases], list(range(1, 8))
         )
         self.assertEqual(fases[0].nombre, "Dirección de producto / productor")
         self.assertEqual(fases[0].clasificacion, "MIXTO")
         self.assertEqual(fases[1].clasificacion, "CAPEX")
         self.assertEqual(fases[2].clasificacion, "CAPEX")
         self.assertEqual(fases[3].clasificacion, "OPEX")
-        self.assertEqual(fases[8].nombre, "Finanzas, legal y administración")
+        self.assertEqual(fases[6].nombre, "Localización")
 
     def estimacion(self, experto, o, m, p, ronda=1):
         return self.servicio.registrar_estimacion(
@@ -145,9 +145,9 @@ class DelphiTests(TestCase):
 
     def test_matriz_registra_todas_las_fases(self):
         creadas = self.matriz(self.experto1)
-        self.assertEqual(len(creadas), 9)
+        self.assertEqual(len(creadas), 7)
         self.assertEqual(
-            EstimacionExperto.objects.filter(juego=self.juego).count(), 9
+            EstimacionExperto.objects.filter(juego=self.juego).count(), 7
         )
         self.assertTrue(
             all(e.ronda == 1 for e in creadas)

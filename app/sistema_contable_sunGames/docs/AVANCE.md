@@ -67,8 +67,10 @@ punto de acceso por rol.
   `horas_E` y `sigma` resultantes; `costo = horas_E × tarifa_efectiva`.
 - "Alerta" por falta de salario = registro `RECHAZADO` en bitácora.
 - Fases del juego: fijas de SunGames (`estimacion/fases.py`, matriz de
-  funciones entregada por el usuario). Al alta del juego se crean las 9
-  fases en orden con su clasificación contable (CAPEX/OPEX/MIXTO,
+  funciones entregada por el usuario, ajustada: se excluyen «Publicación
+  y marketing» y «Finanzas, legal y administración» por ser gasto del
+  período). Al alta del juego se crean las 7 fases en orden con su
+  clasificación contable (CAPEX/OPEX/MIXTO,
   `FaseEstimacion.clasificacion`, migración 0003). Ya no se capturan a
   mano; la clasificación se muestra en la consolidación y en el detalle
   de cada versión. Los juegos creados antes conservan sus fases
@@ -80,7 +82,7 @@ punto de acceso por rol.
 - Eficiencia se aplica como parámetro global `eficiencia` (la edición
   por departamento queda pendiente, ver PREGUNTAS.md).
 - Captura Delphi: una sola ronda (ronda 1). El formulario registra una
-  matriz PERT por experto y rol que cubre las 9 fases a la vez
+  matriz PERT por experto y rol que cubre las 7 fases a la vez
   (`registrar_estimacion_matriz`); no se selecciona fase ni ronda.
   Duplicado experto+rol+ronda → `EstimacionDuplicadaError`.
 - Costos de fabricación: `CostoFabricacion` por juego (directo e
