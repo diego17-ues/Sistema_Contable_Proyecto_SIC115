@@ -15,6 +15,9 @@ from .exceptions import (
     ParametroInvalidoError,
     RondaCerradaError,
     RondaSinAprobarError,
+    SalarioNoEncontradoError,
+    SinRondaAprobadaError,
+    VersionInmutableError,
 )
 
 ROLES_MODULO = frozenset(
@@ -241,11 +244,14 @@ class EstimacionService:
     def _umbral(self, actor, fecha):
         return self._parametro(actor, CLAVE_UMBRAL_DISPERSION, fecha).valor
 
-    def _parametro(self, actor, clave, fecha):
+    def parametro(self, actor, clave, fecha=None):
         self._verificar(actor)
         return self._repositorio.parametro_vigente(
             clave, fecha or date.today()
         )
+
+    def _parametro(self, actor, clave, fecha):
+        return self.parametro(actor, clave, fecha)
 
     @staticmethod
     def _consolidar_grupo(grupo, umbral):
@@ -293,9 +299,242 @@ class EstimacionService:
         ):
             raise EstimacionInvalidaError()
 
-    def _registrar(self, accion, actor, referencia):
+    def _registrar(self, accion, actor, referencia,
+                   resultado=Resultado.EXITOSO, detalle=""):
         self._bitacora.registrar(
-            accion, Resultado.EXITOSO, actor=actor, referencia=referencia
+            accion, resultado, actor=actor, referencia=referencia,
+            detalle=detalle,
+        )
+
+    @staticmethod
+    def _verificar(actor):
+        if not actor.activo:
+            raise UsuarioInactivoError()
+        if actor.rol not in ROLES_MODULO:
+            raise RolNoAutorizadoError()
+
+
+class PresupuestoService:
+    """Versiones de presupuesto estimado a partir de la ronda aprobada."""
+
+    def __init__(self, repositorio, bitacora, estimacion_service,
+                 transaccion=nullcontext):
+        self._repositorio = repositorio
+        self._bitacora = bitacora
+        self._estimaciones = estimacion_service
+        self._transaccion = transaccion
+
+    def versiones(self, actor, juego_id):
+        self._verificar(actor)
+        juego = self._repositorio.obtener_juego(juego_id)
+        return self._repositorio.versiones_de(juego)
+
+    def obtener_version(self, actor, version_id):
+        self._verificar(actor)
+        return self._repositorio.obtener_version(version_id)
+
+    def generar_version(self, actor, juego_id, *, fecha=None,
+                        costos_directos=(), costos_indirectos=()):
+        """Genera la siguiente versión en borrador desde la ronda aprobada.
+
+        Si algún rol no tiene salario vigente en la fecha, no se genera
+        la versión y se registra una alerta en la bitácora.
+        """
+        self._verificar(actor)
+        fecha = fecha or date.today()
+        juego = self._repositorio.obtener_juego(juego_id)
+        ronda = self._ultima_ronda_aprobada(juego)
+        consolidado = self._estimaciones.consolidar(
+            actor, juego_id, ronda.numero, fecha=fecha
+        )
+        parametros = self._parametros_calculo(actor, fecha)
+        try:
+            lineas, salarios = self._preparar_lineas(
+                actor, consolidado, parametros, fecha
+            )
+        except SalarioNoEncontradoError:
+            self._registrar(
+                Accion.GENERACION_PRESUPUESTO, actor,
+                f"Juego «{juego.nombre}»", Resultado.RECHAZADO,
+                detalle="Rol sin salario de referencia vigente.",
+            )
+            raise
+        with self._transaccion():
+            existentes = self._repositorio.versiones_de(juego)
+            numero = (existentes[0].numero + 1) if existentes else 1
+            version = self._repositorio.guardar_version(
+                self._repositorio.nueva_version(
+                    juego, numero, actor,
+                    self._snapshot(parametros, salarios, fecha),
+                )
+            )
+            for datos in lineas:
+                self._repositorio.guardar_linea(
+                    self._repositorio.nueva_linea(
+                        version,
+                        self._repositorio.obtener_fase(
+                            datos["fase_id"], juego
+                        ),
+                        self._repositorio.obtener_rol(datos["rol_id"]),
+                        horas_E=datos["horas_E"], sigma=datos["sigma"],
+                        tarifa=datos["tarifa"],
+                        costo_mano_obra=datos["costo"],
+                    )
+                )
+            for concepto, monto in costos_directos:
+                self._repositorio.guardar_costo_directo(
+                    self._repositorio.nueva_linea_directa(
+                        version, concepto, monto
+                    )
+                )
+            for departamento, monto in costos_indirectos:
+                self._repositorio.guardar_costo_indirecto(
+                    self._repositorio.nueva_linea_indirecta(
+                        version, departamento, monto
+                    )
+                )
+            self._registrar(
+                Accion.GENERACION_PRESUPUESTO, actor,
+                f"{version} total {self.total(version)}",
+            )
+        return version
+
+    def agregar_costo_directo(self, actor, version_id, concepto, monto):
+        version = self._version_borrador(actor, version_id)
+        with self._transaccion():
+            costo = self._repositorio.guardar_costo_directo(
+                self._repositorio.nueva_linea_directa(
+                    version, concepto, monto
+                )
+            )
+        return costo
+
+    def agregar_costo_indirecto(self, actor, version_id, departamento,
+                                monto):
+        version = self._version_borrador(actor, version_id)
+        with self._transaccion():
+            costo = self._repositorio.guardar_costo_indirecto(
+                self._repositorio.nueva_linea_indirecta(
+                    version, departamento, monto
+                )
+            )
+        return costo
+
+    def aprobar(self, actor, version_id):
+        version = self._version_borrador(actor, version_id)
+        with self._transaccion():
+            version.estado = version.Estado.APROBADO
+            self._repositorio.guardar_version(version)
+            self._registrar(
+                Accion.APROBACION_PRESUPUESTO, actor,
+                f"{version} por {actor.username}",
+            )
+        return version
+
+    def marcar_vigente(self, actor, juego_id, version_id):
+        """La vigente pasa a aprobado; solo una versión vigente por juego."""
+        self._verificar(actor)
+        with self._transaccion():
+            version = self._repositorio.obtener_version(version_id)
+            if version.estado != version.Estado.APROBADO:
+                raise VersionInmutableError(
+                    "Solo una versión aprobada puede marcarse vigente."
+                )
+            for otra in self._repositorio.versiones_de(version.juego):
+                if otra.estado == otra.Estado.VIGENTE and otra.pk != version.pk:
+                    otra.estado = otra.Estado.APROBADO
+                    self._repositorio.guardar_version(otra)
+            version.estado = version.Estado.VIGENTE
+            self._repositorio.guardar_version(version)
+        return version
+
+    def total(self, version):
+        """Mano de obra + costos directos + costos indirectos."""
+        total = sum(
+            (linea.costo_mano_obra for linea in version.lineas.all()),
+            Decimal("0"),
+        )
+        total += sum(
+            (c.monto for c in version.costos_directos.all()), Decimal("0")
+        )
+        total += sum(
+            (c.monto for c in version.costos_indirectos.all()), Decimal("0")
+        )
+        return total
+
+    # --- Internos ---
+
+    def _ultima_ronda_aprobada(self, juego):
+        rondas = [
+            r for r in self._repositorio.rondas_de(juego) if r.cerrada
+        ]
+        if not rondas:
+            raise SinRondaAprobadaError()
+        return rondas[-1]
+
+    def _parametros_calculo(self, actor, fecha):
+        return {
+            clave: self._estimaciones.parametro(actor, clave, fecha).valor
+            for clave in PARAMETROS_CALCULO
+        }
+
+    def _preparar_lineas(self, actor, consolidado, parametros, fecha):
+        lineas = []
+        salarios = {}
+        for grupo in consolidado:
+            if grupo["requiere_nueva_ronda"]:
+                continue
+            rol = self._repositorio.obtener_rol(grupo["rol_id"])
+            salario = self._repositorio.salario_vigente(rol, fecha)
+            salarios[str(rol.pk)] = {
+                "salario_bruto": str(salario.salario_bruto),
+                "vigente_desde": salario.vigente_desde.isoformat(),
+                "vigente_hasta": (
+                    salario.vigente_hasta.isoformat()
+                    if salario.vigente_hasta else None
+                ),
+            }
+            tarifa = calculos.tarifa_rol(
+                salario.salario_bruto,
+                parametros[CLAVE_TASA_CARGAS],
+                parametros[CLAVE_HORAS_SEMANA],
+                parametros[CLAVE_SEMANAS_ANIO],
+                parametros[CLAVE_EFICIENCIA],
+            )
+            horas_E = Decimal(grupo["horas_E"])
+            sigma = Decimal(grupo["sigma"])
+            lineas.append({
+                "fase_id": grupo["fase_id"],
+                "rol_id": grupo["rol_id"],
+                "horas_E": horas_E,
+                "sigma": sigma,
+                "tarifa": tarifa,
+                "costo": calculos.costo_mano_obra(horas_E, tarifa),
+            })
+        return lineas, salarios
+
+    @staticmethod
+    def _snapshot(parametros, salarios, fecha):
+        return {
+            "fecha": fecha.isoformat(),
+            "parametros": {
+                clave: str(valor) for clave, valor in parametros.items()
+            },
+            "salarios": salarios,
+        }
+
+    def _version_borrador(self, actor, version_id):
+        self._verificar(actor)
+        version = self._repositorio.obtener_version(version_id)
+        if version.inmutable:
+            raise VersionInmutableError()
+        return version
+
+    def _registrar(self, accion, actor, referencia,
+                   resultado=Resultado.EXITOSO, detalle=""):
+        self._bitacora.registrar(
+            accion, resultado, actor=actor, referencia=referencia,
+            detalle=detalle,
         )
 
     @staticmethod
