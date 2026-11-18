@@ -82,7 +82,7 @@
     }
     proceso.addEventListener('change', () => {
       const propuesto = tarifas[proceso.value];
-      if (propuesto) costo.value = Number(propuesto).toFixed(2);
+      if (propuesto) costo.value = propuesto;
       recalcular();
     });
     [horas, costo].forEach((campo) => campo.addEventListener('input', recalcular));

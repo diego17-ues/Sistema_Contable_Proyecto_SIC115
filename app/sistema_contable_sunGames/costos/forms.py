@@ -21,7 +21,8 @@ def _decimal(max_digits, decimal_places, minimo="0.01", **kwargs):
         max_digits=max_digits, decimal_places=decimal_places,
         min_value=Decimal(minimo),
         widget=forms.NumberInput(attrs={
-            "step": "0.01", "min": minimo, "inputmode": "decimal",
+            "step": str(Decimal(1).scaleb(-decimal_places)), "min": minimo,
+            "inputmode": "decimal",
             "class": "money-input",
         }),
         **kwargs,

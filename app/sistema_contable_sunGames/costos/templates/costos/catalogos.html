@@ -43,7 +43,7 @@
           <td>
             <form class="filter-bar" method="post" action="{% url 'costos_proceso_editar' proceso.pk %}" novalidate>
               {% csrf_token %}
-              <input class="money-input" type="number" name="costo_hora" step="0.01" min="0" value="{{ proceso.costo_hora|default_if_none:''|stringformat:'s' }}" aria-label="Costo por hora de {{ proceso.nombre }}" placeholder="Sin definir">
+              <input class="money-input" type="number" name="costo_hora" step="0.0001" min="0" value="{{ proceso.costo_hora|default_if_none:''|stringformat:'s' }}" aria-label="Costo por hora de {{ proceso.nombre }}" placeholder="Sin definir">
               <label><input type="checkbox" name="activo"{% if proceso.activo %} checked{% endif %}> Activo</label>
               <button class="button button-secondary" type="submit">Guardar</button>
             </form>
