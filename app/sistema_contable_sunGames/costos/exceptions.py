@@ -14,7 +14,7 @@ class OrdenNoEncontradaError(CostosError):
     pass
 
 
-class JuegoNoEncontradoError(CostosError):
+class OrdenDuplicadaError(CostosError):
     pass
 
 
@@ -26,41 +26,33 @@ class PeriodoNoAbiertoError(CostosError):
     pass
 
 
-class SinFechaCapitalizableError(CostosError):
-    pass
-
-
-class ParametroNoVigenteError(CostosError):
-    pass
-
-
-class SalarioNoVigenteError(CostosError):
-    pass
-
-
-class MapeoNoEncontradoError(CostosError):
-    pass
+class ConfiguracionNoEncontradaError(CostosError):
+    """El elemento no tiene cuentas configuradas: queda bloqueado."""
 
 
 class CuentaNoValidaError(CostosError):
     pass
 
 
-class FondoYaDistribuidoError(CostosError):
-    pass
-
-
-class SinHorasBaseError(CostosError):
-    pass
-
-
-class CorteNoEncontradoError(CostosError):
-    pass
-
-
-class ConfirmacionError(CostosError):
+class ProcesoNoValidoError(CostosError):
     pass
 
 
 class DatosInsuficientesError(CostosError):
     pass
+
+
+class RegistroNoEncontradoError(CostosError):
+    pass
+
+
+class RegistroYaAnuladoError(CostosError):
+    pass
+
+
+class AsientoDescuadradoError(CostosError):
+    pass
+
+
+class ClaveIdempotenciaError(CostosError):
+    """La clave ya se usó para otra operación distinta."""

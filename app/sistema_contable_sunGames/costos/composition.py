@@ -2,13 +2,14 @@
 
 from django.db import transaction
 
+from libro_mayor.repositories import TransaccionRepository
 from usuarios.composition import crear_bitacora_service
 
 from .repositories import CostosRepository
 from .services import (
-    CalculoService,
     CatalogoCostosService,
     OrdenService,
+    RegistroCostoService,
 )
 
 
@@ -21,8 +22,11 @@ def crear_orden_service():
     return _servicio(OrdenService)
 
 
-def crear_calculo_service():
-    return _servicio(CalculoService)
+def crear_registro_service():
+    return RegistroCostoService(
+        CostosRepository(), TransaccionRepository(),
+        crear_bitacora_service(), transaction.atomic,
+    )
 
 
 def crear_catalogo_costos_service():

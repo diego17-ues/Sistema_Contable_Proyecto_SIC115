@@ -6,170 +6,84 @@
 {% block page_content %}
 <div class="page-heading">
   <div><h1>OT-{{ orden.pk }} · {{ orden.juego.nombre }}</h1>
-    <p>{% if orden.abierta %}Orden abierta{% else %}Orden cerrada el {{ orden.fecha_cierre|date:"d/m/Y" }}{% endif %} · Capitalizable desde: {{ orden.capitalizable_desde|date:"d/m/Y"|default:"sin definir" }}</p></div>
+    <p>{{ orden.get_estado_display }} · Inicio: {{ orden.fecha_inicio|date:"d/m/Y" }}</p></div>
   <div class="heading-actions">
     {% if orden.abierta %}
-    <a class="button button-secondary" href="{% url 'costos_hora_nueva' orden.pk %}?vista={{ vista }}">＋ Registrar horas</a>
-    <a class="button button-secondary" href="{% url 'costos_cargo_nuevo' orden.pk %}?vista={{ vista }}">＋ Cargo directo</a>
-    <a class="button button-primary" href="{% url 'costos_orden_cerrar' orden.pk %}?vista={{ vista }}">Cerrar orden</a>
+    <a class="button button-primary" href="{% url 'costos_registro_nuevo' orden.pk 'mano-obra' %}">＋ Mano de obra directa</a>
+    <a class="button button-secondary" href="{% url 'costos_registro_nuevo' orden.pk 'directo' %}">＋ Costo directo</a>
+    <a class="button button-secondary" href="{% url 'costos_registro_nuevo' orden.pk 'indirecto' %}">＋ Costo indirecto</a>
     {% endif %}
     <a class="button button-secondary" href="{% url 'costos_ordenes' %}">← Órdenes</a>
   </div>
 </div>
 
-{% if orden.sin_fecha_capitalizacion %}
-<div class="notice"><span class="notice-icon">!</span><span><strong>Sin fecha de capitalización:</strong> ningún cargo de esta orden se capitaliza al intangible; todo queda como gasto del período. Define «capitalizable desde» para corregirlo en órdenes futuras.</span></div>
+{% if bloqueados %}
+<div class="notice" role="status"><span class="notice-icon">!</span><span><strong>Registro bloqueado:</strong> sin cuentas configuradas para {{ bloqueados|join:", " }}. Configúralas en <a href="{% url 'costos_catalogos' %}">Catálogos</a>.</span></div>
 {% endif %}
 
 <section class="card">
-  <div class="card-header"><div><h2>Resumen de costos</h2><p>Contable = lo que afecta la serie 41 y el intangible. Gestión = contable + servicios de terceros asignados (no capitalizables).</p></div></div>
+  <div class="card-header"><div><h2>Registros de costo</h2><p>Cada registro genera su asiento en el Libro Mayor. No se editan: se anulan con contra-asiento.</p></div></div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Concepto</th><th class="num">USD</th></tr></thead>
+      <thead><tr><th>Fecha</th><th>Elemento</th><th>Proceso</th><th>Descripción</th><th class="num">Horas</th><th class="num">Costo/hora</th><th class="num">Monto</th><th>Asiento</th><th>Estado</th><th></th></tr></thead>
       <tbody>
-        <tr><td>En cuentas de desarrollo (41xx)</td><td class="num">${{ saldos.en_41|floatformat:"2" }}</td></tr>
-        <tr><td>En corte provisional vigente</td><td class="num">${{ saldos.en_corte|floatformat:"2" }}</td></tr>
-        <tr><td>Trasladado a intangible</td><td class="num">${{ saldos.intangible|floatformat:"2" }}</td></tr>
-        <tr><td>Gasto del período (no capitalizable)</td><td class="num">${{ saldos.gasto_periodo|floatformat:"2" }}</td></tr>
-        <tr class="statement-total"><td><strong>Costo contable</strong></td><td class="num"><strong>${{ saldos.costo_contable|floatformat:"2" }}</strong></td></tr>
-        <tr class="statement-total"><td><strong>Costo de gestión</strong></td><td class="num"><strong>${{ saldos.costo_gestion|floatformat:"2" }}</strong></td></tr>
-      </tbody>
-    </table>
-  </div>
-</section>
-
-<nav class="tabs" aria-label="Secciones de la orden">
-  <a class="tab-button {% if vista == 'cargos' %}active{% endif %}" href="?vista=cargos">Cargos</a>
-  <a class="tab-button {% if vista == 'horas' %}active{% endif %}" href="?vista=horas">Horas</a>
-  <a class="tab-button {% if vista == 'cortes' %}active{% endif %}" href="?vista=cortes">Cortes</a>
-</nav>
-
-{% if vista == 'cargos' %}
-<section class="card">
-  <div class="card-header"><div><h2>Cargos</h2><p>Costos aplicados a la orden.</p></div></div>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Fecha</th><th>Origen</th><th>Descripción</th><th>Cuenta</th><th class="num">Monto</th><th>Estado</th></tr></thead>
-      <tbody>
-        {% for cargo in cargos %}
+        {% for registro in registros %}
         <tr>
-          <td>{{ cargo.fecha|date:"d/m/Y" }}</td>
-          <td>{{ cargo.get_origen_display }}</td>
-          <td><strong>{{ cargo.descripcion }}</strong></td>
-          <td>{{ cargo.cuenta.codigo|default:"—" }}</td>
-          <td class="num">${{ cargo.monto|floatformat:"2" }}</td>
-          <td>
-            {% if cargo.traslado_intangible %}<span class="tag tag-muted">Intangible</span>
-            {% elif cargo.corte and cargo.corte.estado == 'VIGENTE' %}<span class="tag tag-warn">En corte</span>
-            {% elif not cargo.afecta_mayor %}<span class="tag tag-muted">Gestión</span>
-            {% else %}<span class="tag tag-open">En 41</span>{% endif %}
-          </td>
+          <td>{{ registro.fecha|date:"d/m/Y" }}</td>
+          <td>{{ registro.get_elemento_display }}</td>
+          <td>{{ registro.proceso.nombre|default:"—" }}</td>
+          <td><strong>{{ registro.descripcion }}</strong>{% if not registro.vigente %}<small>Anulado: {{ registro.motivo_anulacion }}</small>{% endif %}</td>
+          <td class="num">{% if registro.horas %}{{ registro.horas|floatformat:"2" }}{% else %}—{% endif %}</td>
+          <td class="num">{% if registro.costo_hora %}${{ registro.costo_hora|floatformat:"2" }}{% else %}—{% endif %}</td>
+          <td class="num">${{ registro.importe|floatformat:"2" }}</td>
+          <td>{% for asiento in registro.asientos.all %}<span class="tag tag-muted">{% if asiento.tipo == 'ANULACION' %}Contra {% endif %}#{{ asiento.transaccion_id }}</span> {% endfor %}</td>
+          <td><span class="tag {% if registro.vigente %}tag-open{% else %}tag-warn{% endif %}">{{ registro.get_estado_display }}</span></td>
+          <td class="num">{% if registro.vigente %}<a class="text-button" href="{% url 'costos_registro_anular' orden.pk registro.pk %}">Anular</a>{% endif %}</td>
         </tr>
         {% empty %}
-        <tr><td colspan="6"><div class="empty-state"><strong>Sin cargos todavía.</strong><br>Registra horas o un cargo directo.</div></td></tr>
+        <tr><td colspan="10"><div class="empty-state"><strong>Sin registros todavía.</strong><br>Registra mano de obra directa, costos directos o costos indirectos.</div></td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </section>
-{% elif vista == 'horas' %}
-<section class="card">
-  <div class="card-header"><div><h2>Horas registradas</h2><p>Horas pagadas completas; no se dividen por eficiencia.</p></div></div>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Fecha</th><th>Rol</th><th>Proceso</th><th class="num">Horas</th></tr></thead>
-      <tbody>
-        {% for hora in horas %}
-        <tr>
-          <td>{{ hora.fecha|date:"d/m/Y" }}</td>
-          <td><strong>{{ hora.rol }}</strong></td>
-          <td>{{ hora.proceso.nombre|default:"—" }}</td>
-          <td class="num">{{ hora.horas|floatformat:"2" }}</td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="4"><div class="empty-state"><strong>Sin horas registradas.</strong><br>Usa «＋ Registrar horas».</div></td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</section>
-{% else %}
-<section class="card">
-  <div class="card-header"><div><h2>Cortes de costos</h2><p>Cortes del período que incluyen cargos de esta orden. Se generan desde «Catálogos y cálculos».</p></div></div>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Fecha</th><th>Período</th><th>Tipo</th><th>Estado</th><th>Motivo</th></tr></thead>
-      <tbody>
-        {% for corte in cortes %}
-        <tr>
-          <td>{{ corte.fecha|date:"d/m/Y" }}</td>
-          <td>{{ corte.periodo }}</td>
-          <td>{{ corte.get_tipo_display }}</td>
-          <td><span class="tag {% if corte.estado == 'VIGENTE' %}tag-warn{% else %}tag-muted{% endif %}">{{ corte.get_estado_display }}</span></td>
-          <td>{{ corte.motivo }}</td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="5"><div class="empty-state"><strong>Sin cortes que incluyan esta orden.</strong></div></td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</section>
-{% endif %}
 {% endblock %}
 
 {% block modal %}
-{% if form_hora %}
-<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Registrar horas">
-  <div class="modal-header"><div><h2>Registrar horas</h2><p>Horas pagadas completas en OT-{{ orden.pk }}. Genera el cargo de mano de obra con el salario vigente del rol.</p></div><a class="modal-close" href="{% url 'costos_orden' orden.pk %}?vista={{ vista }}" aria-label="Cerrar">×</a></div>
-  <form class="modal-form" method="post" action="{% url 'costos_hora_nueva' orden.pk %}?vista={{ vista }}" novalidate>
+{% if form_registro %}
+<div class="modal-backdrop" data-costos-modal><section class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloRegistro">
+  <div class="modal-header"><div><h2 id="tituloRegistro">{{ elemento_registro }}</h2><p>OT-{{ orden.pk }} · Debe {{ configuracion.cuenta_costo.codigo }} {{ configuracion.cuenta_costo.denominacion }} · haber la contrapartida elegida.</p></div><a class="modal-close" href="{% url 'costos_orden' orden.pk %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'costos_registro_nuevo' orden.pk tipo_registro %}" novalidate data-costos-form{% if tipo_registro == 'mano-obra' %} data-mano-obra{% endif %}>
     {% csrf_token %}
-    <div class="modal-fields">
-      {% for campo in form_hora %}
-      <div class="field">
-        <label for="{{ campo.id_for_label }}">{{ campo.label }}{% if campo.field.required %} *{% endif %}</label>
-        {{ campo }}
-        {% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
-      </div>
-      {% endfor %}
-    </div>
-    <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_orden' orden.pk %}?vista={{ vista }}">Cancelar</a><button class="button button-primary" type="submit">Registrar</button></div>
+    {% include "costos/campos.html" with form=form_registro %}
+    {% if tipo_registro == 'mano-obra' %}
+    <script type="application/json" data-costos-tarifas>{ {% for p in form_registro.procesos %}"{{ p.pk }}": "{{ p.costo_hora|default_if_none:'' }}"{% if not forloop.last %}, {% endif %}{% endfor %} }</script>
+    <p class="muted">Importe: <strong data-importe-mo>—</strong></p>
+    {% endif %}
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_orden' orden.pk %}">Cancelar</a><button class="button button-primary" type="submit">Registrar</button></div>
   </form>
 </section></div>
-{% elif form_cargo %}
-<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Cargo directo">
-  <div class="modal-header"><div><h2>Cargo directo</h2><p>Cargo manual en OT-{{ orden.pk }}. Los servicios de terceros no capitalizables usan «afecta al mayor» desmarcado.</p></div><a class="modal-close" href="{% url 'costos_orden' orden.pk %}?vista={{ vista }}" aria-label="Cerrar">×</a></div>
-  <form class="modal-form" method="post" action="{% url 'costos_cargo_nuevo' orden.pk %}?vista={{ vista }}" novalidate>
+{% elif form_anular %}
+<div class="modal-backdrop" data-costos-modal><section class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloAnular">
+  <div class="modal-header"><div><h2 id="tituloAnular">Anular registro</h2><p>{{ registro_anular.get_elemento_display }} · {{ registro_anular.descripcion }} · ${{ registro_anular.importe|floatformat:"2" }}. El registro queda visible como anulado.</p></div><a class="modal-close" href="{% url 'costos_orden' orden.pk %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'costos_registro_anular' orden.pk registro_anular.pk %}" novalidate data-costos-form>
     {% csrf_token %}
-    <div class="modal-fields">
-      {% for campo in form_cargo %}
-      <div class="field">
-        <label for="{{ campo.id_for_label }}">{{ campo.label }}{% if campo.field.required %} *{% endif %}</label>
-        {{ campo }}
-        {% if campo.help_text %}<small class="help">{{ campo.help_text }}</small>{% endif %}
-        {% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
-      </div>
-      {% endfor %}
+    <p class="form-section">Vista previa del contra-asiento</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Cuenta</th><th class="num">Debe</th><th class="num">Haber</th></tr></thead>
+        <tbody>
+          {% for cuenta, importe in lineas_anulacion %}
+          <tr><td>{{ cuenta.codigo }} · {{ cuenta.denominacion }}</td><td class="num">{% if importe > 0 %}${{ importe|floatformat:"2" }}{% endif %}</td><td class="num">{% if importe < 0 %}${{ importe|stringformat:".2f"|slice:"1:" }}{% endif %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
-    <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_orden' orden.pk %}?vista={{ vista }}">Cancelar</a><button class="button button-primary" type="submit">Registrar cargo</button></div>
-  </form>
-</section></div>
-{% elif form_cierre %}
-<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Cerrar orden">
-  <div class="modal-header"><div><h2>Cerrar orden de trabajo</h2><p>OT-{{ orden.pk }} · {{ orden.juego.nombre }}. Los saldos capitalizables se trasladan al intangible (Videojuegos terminados). Acción definitiva.</p></div><a class="modal-close" href="{% url 'costos_orden' orden.pk %}?vista={{ vista }}" aria-label="Cerrar">×</a></div>
-  <form class="modal-form" method="post" action="{% url 'costos_orden_cerrar' orden.pk %}?vista={{ vista }}" novalidate>
-    {% csrf_token %}
-    <div class="modal-fields">
-      {% for campo in form_cierre %}
-      <div class="field full">
-        <label for="{{ campo.id_for_label }}">{{ campo.label }}{% if campo.field.required %} *{% endif %}</label>
-        {{ campo }}
-        {% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
-      </div>
-      {% endfor %}
-    </div>
-    <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_orden' orden.pk %}?vista={{ vista }}">Cancelar</a><button class="button button-primary" type="submit">Cerrar orden</button></div>
+    {% include "costos/campos.html" with form=form_anular %}
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_orden' orden.pk %}">Cancelar</a><button class="button button-primary" type="submit">Confirmar anulación</button></div>
   </form>
 </section></div>
 {% endif %}
 {% endblock %}
+
+{% block scripts %}{{ block.super }}<script src="{% static 'costos/costos.js' %}"></script>{% endblock %}

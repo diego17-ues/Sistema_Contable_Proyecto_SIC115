@@ -4,7 +4,7 @@
 {% block server_rendered %} data-server-rendered="true"{% endblock %}
 
 {% block page_content %}
-<div class="page-heading"><div><h1>Órdenes de trabajo</h1><p>Costeo real por juego: horas, cargos, fondos y depreciación.</p></div><div class="heading-actions"><a class="button button-primary" href="{% url 'costos_orden_nueva' %}">＋ Nueva orden</a> <a class="button button-secondary" href="{% url 'costos_catalogos' %}">Catálogos y cálculos</a></div></div>
+<div class="page-heading"><div><h1>Órdenes de trabajo</h1><p>Costeo real por juego: mano de obra directa, costos directos y costos indirectos de desarrollo.</p></div><div class="heading-actions"><a class="button button-primary" href="{% url 'costos_orden_nueva' %}">＋ Nueva orden</a> <a class="button button-secondary" href="{% url 'costos_catalogos' %}">Catálogos</a></div></div>
 <form class="filter-bar" method="get" action="{% url 'costos_ordenes' %}" novalidate>
   <div class="field">
     <label for="{{ filtro.estado.id_for_label }}">Estado</label>
@@ -14,23 +14,22 @@
   {% if estado %}<a class="text-button" href="{% url 'costos_ordenes' %}">Limpiar</a>{% endif %}
 </form>
 <section class="card">
-  <div class="card-header"><div><h2>Órdenes</h2><p>Una orden por juego; se cierra al lanzar el título.</p></div><span class="tag">{{ pagina.paginator.count }} orden{{ pagina.paginator.count|pluralize }}</span></div>
+  <div class="card-header"><div><h2>Órdenes</h2><p>Una orden por juego.</p></div><span class="tag">{{ pagina.paginator.count }} orden{{ pagina.paginator.count|pluralize:"es" }}</span></div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Orden</th><th>Juego</th><th>Estado</th><th>Capitalizable desde</th><th class="num">Costo contable</th><th class="num">Costo de gestión</th><th></th></tr></thead>
+      <thead><tr><th>Orden</th><th>Juego</th><th>Estado</th><th>Inicio</th><th class="num">Costo acumulado</th><th></th></tr></thead>
       <tbody>
         {% for orden in pagina %}
         <tr>
           <td><strong>OT-{{ orden.pk }}</strong></td>
           <td><strong>{{ orden.juego.nombre }}</strong></td>
-          <td><span class="tag {% if orden.abierta %}tag-open{% else %}tag-muted{% endif %}">{% if orden.abierta %}Abierta{% else %}Cerrada{% endif %}</span></td>
-          <td>{{ orden.capitalizable_desde|date:"d/m/Y"|default:"—" }}</td>
-          <td class="num"><strong>${{ orden.saldos.costo_contable|floatformat:"2" }}</strong></td>
-          <td class="num">${{ orden.saldos.costo_gestion|floatformat:"2" }}</td>
+          <td><span class="tag {% if orden.abierta %}tag-open{% else %}tag-muted{% endif %}">{{ orden.get_estado_display }}</span></td>
+          <td>{{ orden.fecha_inicio|date:"d/m/Y" }}</td>
+          <td class="num"><strong>${{ orden.total_vigente|default:0|floatformat:"2" }}</strong></td>
           <td class="num"><a class="text-button" href="{% url 'costos_orden' orden.pk %}">Abrir</a></td>
         </tr>
         {% empty %}
-        <tr><td colspan="7"><div class="empty-state"><strong>No hay órdenes de trabajo{% if estado %} con ese estado{% endif %}.</strong><br>Crea la primera con «＋ Nueva orden».</div></td></tr>
+        <tr><td colspan="6"><div class="empty-state"><strong>No hay órdenes de trabajo{% if estado %} con ese estado{% endif %}.</strong><br>Crea la primera con «＋ Nueva orden».</div></td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -42,23 +41,15 @@
 
 {% block modal %}
 {% if form_nueva %}
-<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Nueva orden de trabajo">
-  <div class="modal-header"><div><h2>Nueva orden de trabajo</h2><p>Una orden por juego. Si el juego no existe, se crea al registrar la orden.</p></div><a class="modal-close" href="{% url 'costos_ordenes' %}" aria-label="Cerrar">×</a></div>
-  <form class="modal-form" method="post" action="{% url 'costos_orden_nueva' %}" novalidate>
+<div class="modal-backdrop" data-costos-modal><section class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloNuevaOrden">
+  <div class="modal-header"><div><h2 id="tituloNuevaOrden">Nueva orden de trabajo</h2><p>Una orden por juego. Si el juego no existe, se crea al registrar la orden.</p></div><a class="modal-close" href="{% url 'costos_ordenes' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'costos_orden_nueva' %}" novalidate data-costos-form>
     {% csrf_token %}
-    {% for error in form_nueva.non_field_errors %}<span class="form-error">{{ error }}</span>{% endfor %}
-    <div class="modal-fields">
-      {% for campo in form_nueva %}
-      <div class="field{% if campo.name == 'capitalizable_desde' %} full{% endif %}">
-        <label for="{{ campo.id_for_label }}">{{ campo.label }}{% if campo.field.required %} *{% endif %}</label>
-        {{ campo }}
-        {% if campo.help_text %}<small class="help">{{ campo.help_text }}</small>{% endif %}
-        {% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
-      </div>
-      {% endfor %}
-    </div>
+    {% include "costos/campos.html" with form=form_nueva %}
     <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_ordenes' %}">Cancelar</a><button class="button button-primary" type="submit">Crear orden</button></div>
   </form>
 </section></div>
 {% endif %}
 {% endblock %}
+
+{% block scripts %}{{ block.super }}<script src="{% static 'costos/costos.js' %}"></script>{% endblock %}

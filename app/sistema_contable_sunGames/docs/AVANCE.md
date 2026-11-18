@@ -1,5 +1,51 @@
 # Avance — Subsistema de Costos (Órdenes de Trabajo)
 
+## Etapa 1 · Fase 1 — Limpieza y registro de los tres elementos del costo
+
+Rama: `devin-branch` (por instrucción del usuario; AGENTS2.md indicaba
+`costos/ordenes-trabajo`). Sin push ni pull request. Fecha: 2026-11-18.
+
+**Eliminado del módulo** (migración nueva `costos/0004`, las aplicadas no
+se tocaron): cortes de costos, costo de gestión, `afecta_mayor`,
+servicios profesionales como cargo, fondos compartidos, registro de
+equipos y depreciación, salarios de referencia y parámetros de cálculo,
+tasas por proceso con ajustes de sobre/subaplicación, mapeos de cuentas
+origen/reclasificación, horas y cargos del modelo anterior, y el cierre
+de orden con traslado al intangible (fuera de alcance).
+
+**Nuevo**:
+- `OrdenTrabajo` con `fecha_inicio`; `Proceso` con `costo_hora`
+  propuesto (configurable) y `activo`; procesos Diseño, Programación,
+  Arte, Audio y QA.
+- `ConfiguracionCuentaCosto`: por elemento, cuenta de costo (debe),
+  contrapartidas permitidas y contrapartida por defecto, tomadas del
+  catálogo y editables en *Costos · Catálogos*. Sin configuración el
+  elemento queda bloqueado.
+- `RegistroCosto` (mano de obra directa: proceso, horas, costo/hora,
+  importe = horas × costo; costo directo e indirecto: proceso opcional,
+  descripción, monto). Inmutable; se anula con contra-asiento y queda
+  visible como anulado.
+- `AsientoCosto`: origen (tipo, orden, registro) y clave de idempotencia
+  de cada asiento. Los asientos se crean con `TransaccionRepository` del
+  Libro Mayor (sin escribir directo en sus tablas), cuadrados, con la
+  orden como auxiliar en la referencia (`OT-<id> · R<registro>`).
+- Período cerrado u orden cerrada rechazan registros; el doble envío no
+  duplica (clave oculta por formulario).
+- Modales de nueva orden, mano de obra, costo directo, costo indirecto y
+  anulación (con vista previa del contra-asiento): Escape, foco
+  atrapado, validación en línea y guardar deshabilitado al enviar
+  (`costos/static/costos/costos.js`).
+- Pruebas: `costos/tests/test_costos.py` (unitarias con repositorio en
+  memoria e integración PostgreSQL). Suite completa: 313 pruebas OK.
+- Decisiones por defecto registradas en `docs/PREGUNTAS.md` (14–21).
+
+**Pendiente (Fase 2)**: hoja de costos por secciones, licencias
+estimadas, costo unitario, vínculo con la estimación y capturas.
+
+---
+
+## Historial anterior (modelo reemplazado en la Etapa 1)
+
 Rama: `costos/ordenes-trabajo` (desde `main`).
 Fecha: 2026-11-18.
 
