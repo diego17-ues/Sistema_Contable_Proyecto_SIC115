@@ -23,6 +23,19 @@ class Accion(models.TextChoices):
     CONCILIACION_VENTAS = (
         "CONCILIACION_VENTAS", "Conciliación de ventas Steam"
     )
+    ALTA_JUEGO = "ALTA_JUEGO", "Alta de juego para estimación"
+    REGISTRO_ESTIMACION = (
+        "REGISTRO_ESTIMACION", "Registro de estimación de experto"
+    )
+    CIERRE_RONDA_DELPHI = (
+        "CIERRE_RONDA_DELPHI", "Cierre de ronda Delphi"
+    )
+    GENERACION_PRESUPUESTO = (
+        "GENERACION_PRESUPUESTO", "Generación de versión de presupuesto"
+    )
+    APROBACION_PRESUPUESTO = (
+        "APROBACION_PRESUPUESTO", "Aprobación de versión de presupuesto"
+    )
 
 
 class Resultado(models.TextChoices):
