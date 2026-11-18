@@ -1,0 +1,51 @@
+{% extends "sic_sunGames/index.html" %}
+
+{% block server_rendered %} data-server-rendered="true"{% endblock %}
+
+{% block page_content %}
+<div class="page-heading"><div><h1>Estimación de costos</h1><p>Estimación por juicio de expertos (Delphi) de los juegos en desarrollo.</p></div><div class="heading-actions"><a class="button button-secondary" href="{% url 'estimacion_catalogos' %}">Parámetros y catálogos</a><a class="button button-primary" href="{% url 'estimacion_nuevo' %}">＋ Nueva estimación</a></div></div>
+<section class="card">
+  <div class="card-header"><div><h2>Juegos</h2><p>Estimaciones y versiones de presupuesto</p></div><span class="tag">{{ pagina.paginator.count }} juego{{ pagina.paginator.count|pluralize }}</span></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Juego</th><th>Fases</th><th>Rondas</th><th>Versiones</th><th></th></tr></thead>
+      <tbody>
+        {% for juego in pagina %}
+        <tr>
+          <td><strong>{{ juego.nombre }}</strong></td>
+          <td>{{ juego.fases.count }}</td>
+          <td>{{ juego.rondas.count }}</td>
+          <td>{{ juego.versiones.count }}</td>
+          <td class="num"><a class="text-button" href="{% url 'estimacion_juego' juego.pk %}">Abrir</a></td>
+        </tr>
+        {% empty %}
+        <tr><td class="empty-cell" colspan="5">No hay juegos registrados.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "sic_sunGames/paginacion.html" %}
+</section>
+{% endblock %}
+
+{% block modal %}
+{% if form %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Nueva estimación">
+  <div class="modal-header"><div><h2>Nueva estimación</h2><p>Registra el juego y sus fases de estimación.</p></div><a class="modal-close" href="{% url 'estimacion' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'estimacion_nuevo' %}" novalidate>
+    {% csrf_token %}
+    <div class="modal-fields">
+      {% for campo in form %}
+      <div class="field{% if campo.name == 'fases' %} full{% endif %}">
+        <label for="{{ campo.id_for_label }}">{{ campo.label }} *</label>
+        {{ campo }}
+        {% if campo.help_text %}<small>{{ campo.help_text }}</small>{% endif %}
+        {% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion' %}">Cancelar</a><button class="button button-primary" type="submit">Registrar juego</button></div>
+  </form>
+</section></div>
+{% endif %}
+{% endblock %}

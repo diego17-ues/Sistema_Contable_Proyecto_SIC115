@@ -1,0 +1,110 @@
+{% extends "sic_sunGames/index.html" %}
+
+{% block server_rendered %} data-server-rendered="true"{% endblock %}
+
+{% block page_content %}
+<div class="page-heading"><div><h1>Parámetros y catálogos</h1><p>Roles, expertos, salarios de referencia y parámetros con vigencia del módulo de estimación.</p></div><div class="heading-actions"><a class="button button-secondary" href="{% url 'estimacion' %}">← Estimación</a></div></div>
+
+<section class="card">
+  <div class="card-header"><div><h2>Roles de estimación</h2><p>Puesto y nivel</p></div><a class="button button-primary" href="{% url 'estimacion_rol_nuevo' %}">＋ Nuevo rol</a></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Rol</th><th class="num">Nivel</th></tr></thead>
+    <tbody>
+      {% for rol in roles %}<tr><td>{{ rol.nombre }}</td><td class="num">{{ rol.nivel }}</td></tr>{% empty %}<tr><td class="empty-cell" colspan="2">Sin roles registrados.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+<section class="card">
+  <div class="card-header"><div><h2>Expertos</h2><p>Personas que estiman por juicio</p></div><a class="button button-primary" href="{% url 'estimacion_experto_nuevo' %}">＋ Nuevo experto</a></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Nombre</th></tr></thead>
+    <tbody>
+      {% for experto in expertos %}<tr><td>{{ experto.nombre }}</td></tr>{% empty %}<tr><td class="empty-cell">Sin expertos registrados.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+<section class="card">
+  <div class="card-header"><div><h2>Salarios de referencia</h2><p>Salario bruto mensual por rol, con vigencia</p></div><a class="button button-primary" href="{% url 'estimacion_salario_nuevo' %}">＋ Nuevo salario</a></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Rol</th><th class="num">Salario bruto</th><th>Vigente desde</th><th>Vigente hasta</th></tr></thead>
+    <tbody>
+      {% for salario in salarios %}<tr><td>{{ salario.rol }}</td><td class="num">${{ salario.salario_bruto }}</td><td>{{ salario.vigente_desde|date:"d/m/Y" }}</td><td>{{ salario.vigente_hasta|date:"d/m/Y"|default:"—" }}</td></tr>{% empty %}<tr><td class="empty-cell" colspan="4">Sin salarios registrados.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+<section class="card">
+  <div class="card-header"><div><h2>Parámetros</h2><p>Valores con fecha de vigencia; nunca se fijan en el código</p></div><a class="button button-primary" href="{% url 'estimacion_parametro_nuevo' %}">＋ Nuevo parámetro</a></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Clave</th><th class="num">Valor</th><th>Vigente desde</th><th>Vigente hasta</th><th>Verificado</th></tr></thead>
+    <tbody>
+      {% for parametro in pagina %}<tr><td>{{ parametro.clave }}</td><td class="num">{{ parametro.valor }}</td><td>{{ parametro.vigente_desde|date:"d/m/Y" }}</td><td>{{ parametro.vigente_hasta|date:"d/m/Y"|default:"—" }}</td><td>{% if parametro.verificado %}<span class="tag tag-open">Sí</span>{% else %}<span class="tag">No</span>{% endif %}</td></tr>{% empty %}<tr><td class="empty-cell" colspan="5">Sin parámetros registrados.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  {% include "sic_sunGames/paginacion.html" %}
+</section>
+{% endblock %}
+
+{% block modal %}
+{% if form_rol %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Nuevo rol">
+  <div class="modal-header"><div><h2>Nuevo rol</h2><p>Puesto de desarrollo con su nivel.</p></div><a class="modal-close" href="{% url 'estimacion_catalogos' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'estimacion_rol_nuevo' %}" novalidate>
+    {% csrf_token %}
+    {% if form_rol.non_field_errors %}<div class="form-error">{{ form_rol.non_field_errors }}</div>{% endif %}
+    <div class="modal-fields">
+      <div class="field"><label for="{{ form_rol.nombre.id_for_label }}">{{ form_rol.nombre.label }} *</label>{{ form_rol.nombre }}{% for error in form_rol.nombre.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+      <div class="field"><label for="{{ form_rol.nivel.id_for_label }}">{{ form_rol.nivel.label }} *</label>{{ form_rol.nivel }}{% for error in form_rol.nivel.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+    </div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_catalogos' %}">Cancelar</a><button class="button button-primary" type="submit">Agregar rol</button></div>
+  </form>
+</section></div>
+{% elif form_experto %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Nuevo experto">
+  <div class="modal-header"><div><h2>Nuevo experto</h2><p>Persona que participará en las rondas Delphi.</p></div><a class="modal-close" href="{% url 'estimacion_catalogos' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'estimacion_experto_nuevo' %}" novalidate>
+    {% csrf_token %}
+    {% if form_experto.non_field_errors %}<div class="form-error">{{ form_experto.non_field_errors }}</div>{% endif %}
+    <div class="modal-fields">
+      <div class="field"><label for="{{ form_experto.nombre.id_for_label }}">{{ form_experto.nombre.label }} *</label>{{ form_experto.nombre }}{% for error in form_experto.nombre.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+    </div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_catalogos' %}">Cancelar</a><button class="button button-primary" type="submit">Agregar experto</button></div>
+  </form>
+</section></div>
+{% elif form_parametro %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Nuevo parámetro">
+  <div class="modal-header"><div><h2>Nuevo parámetro</h2><p>La vigencia no puede traslaparse con otra del mismo parámetro.</p></div><a class="modal-close" href="{% url 'estimacion_catalogos' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'estimacion_parametro_nuevo' %}" novalidate>
+    {% csrf_token %}
+    {% if form_parametro.non_field_errors %}<div class="form-error">{{ form_parametro.non_field_errors }}</div>{% endif %}
+    <div class="modal-fields">
+      {% for campo in form_parametro %}
+      <div class="field{% if campo.name == 'clave' %} full{% endif %}">
+        <label for="{{ campo.id_for_label }}">{{ campo.label }}{% if campo.field.required %} *{% endif %}</label>
+        {{ campo }}
+        {% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_catalogos' %}">Cancelar</a><button class="button button-primary" type="submit">Registrar parámetro</button></div>
+  </form>
+</section></div>
+{% elif form_salario %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Nuevo salario">
+  <div class="modal-header"><div><h2>Salario de referencia</h2><p>Salario bruto mensual del rol; la vigencia no puede traslaparse.</p></div><a class="modal-close" href="{% url 'estimacion_catalogos' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'estimacion_salario_nuevo' %}" novalidate>
+    {% csrf_token %}
+    {% if form_salario.non_field_errors %}<div class="form-error">{{ form_salario.non_field_errors }}</div>{% endif %}
+    <div class="modal-fields">
+      <div class="field"><label for="id_rol">{{ form_salario.rol.label }} *</label><select id="id_rol" name="rol">{% for r in roles %}<option value="{{ r.pk }}">{{ r }}</option>{% endfor %}</select>{% for error in form_salario.rol.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+      <div class="field"><label for="id_salario_bruto">{{ form_salario.salario_bruto.label }} *</label>{{ form_salario.salario_bruto }}{% for error in form_salario.salario_bruto.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+      <div class="field"><label for="id_vigente_desde">{{ form_salario.vigente_desde.label }} *</label>{{ form_salario.vigente_desde }}{% for error in form_salario.vigente_desde.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+      <div class="field"><label for="id_vigente_hasta">{{ form_salario.vigente_hasta.label }}</label>{{ form_salario.vigente_hasta }}{% for error in form_salario.vigente_hasta.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+    </div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_catalogos' %}">Cancelar</a><button class="button button-primary" type="submit">Registrar salario</button></div>
+  </form>
+</section></div>
+{% endif %}
+{% endblock %}

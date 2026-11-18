@@ -19,6 +19,7 @@ SCREEN_URL_NAMES = {
     "operations": "operations",
     "users": "users",
     "audit": "audit",
+    "estimacion": "estimacion",
 }
 
 
@@ -38,7 +39,12 @@ def contexto_panel(request, screen):
         acceso.verificar_acceso(request.user, screen)
     except UsuarioError as error:
         raise PermissionDenied(str(error)) from error
-    estado_guardado = crear_cierre_service().estado_actual(request.user)
+    try:
+        estado_guardado = crear_cierre_service().estado_actual(request.user)
+    except UsuarioError:
+        # Roles sin acceso a estados financieros (p. ej. Contador de
+        # Costos) no consultan el período contable.
+        estado_guardado = EstadoPeriodo.ABIERTO
     estado_periodo = (
         "CERRADO_PROVISIONAL"
         if estado_guardado == EstadoPeriodo.CIERRE_PROVISIONAL

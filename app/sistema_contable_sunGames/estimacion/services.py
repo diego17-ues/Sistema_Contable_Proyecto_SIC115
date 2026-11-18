@@ -231,6 +231,11 @@ class EstimacionService:
         juego = self._repositorio.obtener_juego(juego_id)
         return self._repositorio.rondas_de(juego)
 
+    def estimaciones(self, actor, juego_id, ronda=None):
+        self._verificar(actor)
+        juego = self._repositorio.obtener_juego(juego_id)
+        return self._repositorio.estimaciones_de(juego, ronda=ronda)
+
     # --- Consolidación ---
 
     @staticmethod
