@@ -1,6 +1,8 @@
 {% extends "sic_sunGames/index.html" %}
 {% load static %}
 
+{% block server_rendered %} data-server-rendered="true"{% endblock %}
+
 {% block page_content %}
 <div class="page-heading"><div><h1>Costos · Catálogos y cálculos</h1><p>Procesos, parámetros, salarios, mapeo de cuentas, fondos, equipos y cortes.</p></div><div class="heading-actions"><a class="button button-secondary" href="{% url 'costos_ordenes' %}">← Órdenes</a></div></div>
 

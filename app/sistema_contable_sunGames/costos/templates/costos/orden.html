@@ -1,6 +1,8 @@
 {% extends "sic_sunGames/index.html" %}
 {% load static %}
 
+{% block server_rendered %} data-server-rendered="true"{% endblock %}
+
 {% block page_content %}
 <div class="page-heading">
   <div><h1>OT-{{ orden.pk }} · {{ orden.juego.nombre }}</h1>

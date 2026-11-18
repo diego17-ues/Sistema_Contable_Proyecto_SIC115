@@ -1,6 +1,8 @@
 {% extends "sic_sunGames/index.html" %}
 {% load static %}
 
+{% block server_rendered %} data-server-rendered="true"{% endblock %}
+
 {% block page_content %}
 <div class="page-heading"><div><h1>Órdenes de trabajo</h1><p>Costeo real por juego: horas, cargos, fondos y depreciación.</p></div><div class="heading-actions"><a class="button button-primary" href="{% url 'costos_orden_nueva' %}">＋ Nueva orden</a> <a class="button button-secondary" href="{% url 'costos_catalogos' %}">Catálogos y cálculos</a></div></div>
 <form class="filter-bar" method="get" action="{% url 'costos_ordenes' %}" novalidate>
