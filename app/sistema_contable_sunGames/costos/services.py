@@ -50,7 +50,9 @@ from .models import (
     Proceso,
 )
 
-ROLES_COSTOS = frozenset({Rol.ADMINISTRADOR, Rol.CONTADOR_GENERAL})
+ROLES_COSTOS = frozenset({
+    Rol.ADMINISTRADOR, Rol.CONTADOR_GENERAL, "CONTADOR_COSTOS",
+})
 CENTAVO = Decimal("0.01")
 CONFIRMACION = "CONFIRMAR"
 ORIGENES_MANUALES = {

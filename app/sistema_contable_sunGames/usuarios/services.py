@@ -178,9 +178,14 @@ class AutenticacionService:
 class AccesoService:
     """Área inicial y módulos autorizados por rol (CU-01)."""
 
+    # El rol CONTADOR_COSTOS existe en la base de datos (altas previas)
+    # aunque no está en Rol.choices; se le da acceso solo a costos.
+    ROL_CONTADOR_COSTOS = "CONTADOR_COSTOS"
+
     AREA_INICIAL = {
         Rol.CONTADOR_GENERAL: "dashboard",
         Rol.ADMINISTRADOR: "users",
+        ROL_CONTADOR_COSTOS: "costos_ordenes",
     }
     MODULOS_CONTADOR_GENERAL = frozenset(
         {"dashboard", "ledger", "accounts", "reports", "operations",
@@ -189,6 +194,7 @@ class AccesoService:
     MODULOS = {
         Rol.CONTADOR_GENERAL: MODULOS_CONTADOR_GENERAL,
         Rol.ADMINISTRADOR: MODULOS_CONTADOR_GENERAL | {"users", "audit"},
+        ROL_CONTADOR_COSTOS: frozenset({"costos"}),
     }
 
     def area_inicial(self, usuario):
