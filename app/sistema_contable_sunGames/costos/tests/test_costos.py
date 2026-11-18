@@ -176,6 +176,15 @@ class RegistroServiceUnitTests(SimpleTestCase):
         with self.assertRaises(ConfiguracionNoEncontradaError):
             self._mano_obra()
 
+    def test_importe_redondeado_a_cero_rechaza(self):
+        with self.assertRaises(DatosInsuficientesError):
+            self.servicio.registrar_mano_obra(
+                self.actor, orden_id=1, fecha=FECHA, proceso_id=7,
+                horas="0.01", costo_hora="0.01", contrapartida_id=None,
+                clave="k3",
+            )
+        self.assertEqual(self.mayor.movimientos, [])
+
     def test_asiento_descuadrado_no_se_registra(self):
         registro = SimpleNamespace(pk=1, orden_id=1)
         with self.assertRaises(AsientoDescuadradoError):

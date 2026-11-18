@@ -260,11 +260,17 @@ class RegistroCostoService(CostosService):
                 "El costo por hora debe ser mayor que cero.",
                 campo="costo_hora",
             )
+        importe = calculos.importe_mano_obra(horas, costo_hora)
+        if importe <= 0:
+            raise DatosInsuficientesError(
+                "El importe (horas × costo por hora) debe ser de al menos "
+                "USD 0.01.", campo="horas",
+            )
         return self._registrar(
             actor, elemento=Elemento.MANO_OBRA, orden_id=orden_id,
             fecha=fecha, proceso=proceso,
             descripcion=f"Mano de obra · {proceso.nombre}",
-            importe=calculos.importe_mano_obra(horas, costo_hora),
+            importe=importe,
             contrapartida_id=contrapartida_id, clave=clave,
             horas=horas, costo_hora=costo_hora,
         )
@@ -285,7 +291,7 @@ class RegistroCostoService(CostosService):
             raise DatosInsuficientesError(
                 "Describe el costo.", campo="descripcion"
             )
-        importe = Decimal(importe or 0)
+        importe = calculos.a_centavos(importe or 0)
         if importe <= 0:
             raise DatosInsuficientesError(
                 "El monto debe ser mayor que cero.", campo="importe"
