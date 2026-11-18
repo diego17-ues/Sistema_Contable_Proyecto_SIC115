@@ -22,28 +22,13 @@ def _fecha(label, required=True):
 
 
 class JuegoForm(forms.Form):
-    """Alta de juego con sus fases (una por línea)."""
+    """Alta de juego; las fases fijas de SunGames se crean solas."""
 
     nombre = forms.CharField(
         label="Nombre del juego",
         max_length=150,
         error_messages={"required": CAMPO_OBLIGATORIO},
     )
-    fases = forms.CharField(
-        label="Fases de estimación",
-        widget=forms.Textarea(attrs={"rows": 5}),
-        help_text="Una fase por línea, en orden de estimación.",
-        error_messages={"required": CAMPO_OBLIGATORIO},
-    )
-
-    def clean_fases(self):
-        lineas = [
-            linea.strip() for linea in self.cleaned_data["fases"].splitlines()
-            if linea.strip()
-        ]
-        if not lineas:
-            raise forms.ValidationError(CAMPO_OBLIGATORIO)
-        return lineas
 
 
 class EstimacionForm(forms.Form):

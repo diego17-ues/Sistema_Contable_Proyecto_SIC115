@@ -10,6 +10,7 @@ from usuarios.exceptions import RolNoAutorizadoError, UsuarioInactivoError
 from usuarios.roles import Rol as RolUsuario
 
 from . import calculos
+from .fases import FASES_SUN_GAMES
 from .exceptions import (
     EstimacionInvalidaError,
     ParametroInvalidoError,
@@ -75,17 +76,19 @@ class EstimacionService:
 
     # --- Altas de catálogo ---
 
-    def crear_juego(self, actor, nombre, fases):
-        """Alta de un juego con sus fases de estimación."""
+    def crear_juego(self, actor, nombre):
+        """Alta de un juego con las fases fijas de SunGames."""
         self._verificar(actor)
         with self._transaccion():
             juego = self._repositorio.guardar_juego(
                 self._repositorio.nuevo_juego(nombre.strip())
             )
-            for orden, (nombre_fase, _) in enumerate(fases, start=1):
+            for orden, (nombre_fase, clasificacion) in enumerate(
+                FASES_SUN_GAMES, start=1
+            ):
                 self._repositorio.guardar_fase(
                     self._repositorio.nueva_fase(
-                        juego, nombre_fase.strip(), orden
+                        juego, nombre_fase, orden, clasificacion
                     )
                 )
             self._registrar(
@@ -283,6 +286,7 @@ class EstimacionService:
         return {
             "fase_id": primera.fase_id,
             "fase": primera.fase.nombre,
+            "clasificacion": primera.fase.get_clasificacion_display(),
             "rol_id": primera.rol_id,
             "rol": str(primera.rol),
             "expertos": len(grupo),

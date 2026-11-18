@@ -31,18 +31,24 @@
 {% block modal %}
 {% if form %}
 <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Nueva estimación">
-  <div class="modal-header"><div><h2>Nueva estimación</h2><p>Registra el juego y sus fases de estimación.</p></div><a class="modal-close" href="{% url 'estimacion' %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-header"><div><h2>Nueva estimación</h2><p>Registra el juego; se crean automáticamente las fases fijas de SunGames.</p></div><a class="modal-close" href="{% url 'estimacion' %}" aria-label="Cerrar">×</a></div>
   <form class="modal-form" method="post" action="{% url 'estimacion_nuevo' %}" novalidate>
     {% csrf_token %}
     <div class="modal-fields">
       {% for campo in form %}
-      <div class="field{% if campo.name == 'fases' %} full{% endif %}">
+      <div class="field">
         <label for="{{ campo.id_for_label }}">{{ campo.label }} *</label>
         {{ campo }}
         {% if campo.help_text %}<small>{{ campo.help_text }}</small>{% endif %}
         {% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
       </div>
       {% endfor %}
+      <div class="field full">
+        <label>Fases que se crearán</label>
+        <ol>
+          {% for nombre, clasificacion in fases_iniciales %}<li>{{ nombre }} <small>· {{ clasificacion }}</small></li>{% endfor %}
+        </ol>
+      </div>
     </div>
     <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion' %}">Cancelar</a><button class="button button-primary" type="submit">Registrar juego</button></div>
   </form>

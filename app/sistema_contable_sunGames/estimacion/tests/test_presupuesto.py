@@ -47,9 +47,9 @@ class PresupuestoTests(TestCase):
             self.admin, "Experto Uno"
         )
         self.juego = self.estimaciones.crear_juego(
-            self.admin, "Proyecto A", [("Preproducción", 1)]
+            self.admin, "Proyecto A"
         )
-        self.fase = self.juego.fases.get()
+        self.fase = self.juego.fases.get(nombre="Programación")
 
     def estimacion(self, o, m, p, ronda=1):
         return self.estimaciones.registrar_estimacion(

@@ -101,12 +101,23 @@ class Juego(models.Model):
         return self.nombre
 
 
+class ClasificacionContable(models.TextChoices):
+    CAPEX = "CAPEX", "Capitalizable (CAPEX)"
+    OPEX = "OPEX", "Gasto del período (OPEX)"
+    MIXTO = "MIXTO", "Mixto (OPEX/CAPEX)"
+
+
 class FaseEstimacion(models.Model):
     juego = models.ForeignKey(
         Juego, on_delete=models.PROTECT, related_name="fases"
     )
     nombre = models.CharField("nombre", max_length=120)
     orden = models.PositiveIntegerField("orden")
+    clasificacion = models.CharField(
+        "clasificación contable", max_length=10,
+        choices=ClasificacionContable.choices,
+        default=ClasificacionContable.OPEX,
+    )
 
     class Meta:
         ordering = ["orden", "id"]

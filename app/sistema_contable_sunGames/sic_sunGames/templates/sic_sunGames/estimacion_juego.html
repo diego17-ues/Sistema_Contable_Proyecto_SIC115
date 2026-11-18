@@ -15,11 +15,12 @@
   </div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Fase</th><th>Rol</th><th class="num">Expertos</th><th class="num">Horas E</th><th class="num">σ</th><th class="num">Media</th><th class="num">Mediana</th><th class="num">Coef. variación</th><th>Estado</th></tr></thead>
+      <thead><tr><th>Fase</th><th>Clasificación</th><th>Rol</th><th class="num">Expertos</th><th class="num">Horas E</th><th class="num">σ</th><th class="num">Media</th><th class="num">Mediana</th><th class="num">Coef. variación</th><th>Estado</th></tr></thead>
       <tbody>
         {% for grupo in consolidacion %}
         <tr>
           <td>{{ grupo.fase }}</td>
+          <td><span class="tag">{{ grupo.clasificacion }}</span></td>
           <td>{{ grupo.rol }}</td>
           <td class="num">{{ grupo.expertos }}</td>
           <td class="num">{{ grupo.horas_E }}</td>
@@ -30,7 +31,7 @@
           <td>{% if grupo.requiere_nueva_ronda %}<span class="tag">Nueva ronda</span>{% else %}<span class="tag tag-open">Consolidada</span>{% endif %}</td>
         </tr>
         {% empty %}
-        <tr><td class="empty-cell" colspan="9">Sin estimaciones en la ronda seleccionada.</td></tr>
+        <tr><td class="empty-cell" colspan="10">Sin estimaciones en la ronda seleccionada.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -96,13 +97,13 @@
     <summary><strong>Detalle v{{ version.numero }}</strong></summary>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Fase</th><th>Rol</th><th class="num">Horas E</th><th class="num">σ</th><th class="num">Tarifa</th><th class="num">Costo mano de obra</th></tr></thead>
+        <thead><tr><th>Fase</th><th>Clasificación</th><th>Rol</th><th class="num">Horas E</th><th class="num">σ</th><th class="num">Tarifa</th><th class="num">Costo mano de obra</th></tr></thead>
         <tbody>
           {% for linea in version.lineas.all %}
-          <tr><td>{{ linea.fase.nombre }}</td><td>{{ linea.rol }}</td><td class="num">{{ linea.horas_E }}</td><td class="num">{{ linea.sigma }}</td><td class="num">{{ linea.tarifa }}</td><td class="num">${{ linea.costo_mano_obra }}</td></tr>
+          <tr><td>{{ linea.fase.nombre }}</td><td>{{ linea.fase.get_clasificacion_display }}</td><td>{{ linea.rol }}</td><td class="num">{{ linea.horas_E }}</td><td class="num">{{ linea.sigma }}</td><td class="num">{{ linea.tarifa }}</td><td class="num">${{ linea.costo_mano_obra }}</td></tr>
           {% endfor %}
-          {% for costo in version.costos_directos.all %}<tr><td colspan="5">Directo: {{ costo.concepto }}</td><td class="num">${{ costo.monto }}</td></tr>{% endfor %}
-          {% for costo in version.costos_indirectos.all %}<tr><td colspan="5">Indirecto: {{ costo.departamento }}</td><td class="num">${{ costo.monto }}</td></tr>{% endfor %}
+          {% for costo in version.costos_directos.all %}<tr><td colspan="6">Directo: {{ costo.concepto }}</td><td class="num">${{ costo.monto }}</td></tr>{% endfor %}
+          {% for costo in version.costos_indirectos.all %}<tr><td colspan="6">Indirecto: {{ costo.departamento }}</td><td class="num">${{ costo.monto }}</td></tr>{% endfor %}
         </tbody>
       </table>
     </div>

@@ -12,6 +12,8 @@ from estimacion.composition import (
     crear_estimacion_service,
     crear_presupuesto_service,
 )
+from estimacion.fases import FASES_SUN_GAMES
+from estimacion.models import ClasificacionContable
 from estimacion.exceptions import EstimacionError, VersionInmutableError
 from estimacion.forms import (
     CostoForm,
@@ -49,7 +51,14 @@ def _render_juegos(request, servicio, **extra):
     except UsuarioError as error:
         raise _sin_permiso(error) from error
     contexto = contexto_panel(request, "estimacion")
-    contexto.update(pagina=_pagina(request, juegos), **extra)
+    contexto.update(
+        pagina=_pagina(request, juegos),
+        fases_iniciales=[
+            (nombre, ClasificacionContable(codigo).label)
+            for nombre, codigo in FASES_SUN_GAMES
+        ],
+        **extra,
+    )
     return render(request, JUEGOS_TEMPLATE, contexto)
 
 
@@ -121,12 +130,8 @@ def juego_nuevo(request):
         return _render_juegos(request, servicio, form=JuegoForm())
     form = JuegoForm(request.POST)
     if form.is_valid():
-        fases = [(nombre, orden) for orden, nombre in
-                 enumerate(form.cleaned_data["fases"], start=1)]
         try:
-            servicio.crear_juego(
-                request.user, form.cleaned_data["nombre"], fases
-            )
+            servicio.crear_juego(request.user, form.cleaned_data["nombre"])
         except UsuarioError as error:
             raise _sin_permiso(error) from error
         except EstimacionError as error:

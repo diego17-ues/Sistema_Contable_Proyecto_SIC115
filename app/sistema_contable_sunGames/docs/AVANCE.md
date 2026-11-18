@@ -51,8 +51,8 @@ Rama: `costos/estimacion`. Fecha: 2026-11-18.
 
 ## Pruebas
 
-`python manage.py test estimacion usuarios` → **105 pruebas OK**
-(32 del módulo de estimación, resto de usuarios).
+`python manage.py test estimacion usuarios` → **106 pruebas OK**
+(33 del módulo de estimación, resto de usuarios).
 Suite completa: **281 pruebas, 52 errores**, idénticos a los 52 errores
 preexistentes de `main` (incompatibilidad Django 4.2 / Python 3.14 en el
 instrumentado de plantillas del cliente de pruebas). No se introdujeron
@@ -66,8 +66,13 @@ punto de acceso por rol.
 - Línea de presupuesto: PERT sobre las medias de O, M y P por fase/rol;
   `horas_E` y `sigma` resultantes; `costo = horas_E × tarifa_efectiva`.
 - "Alerta" por falta de salario = registro `RECHAZADO` en bitácora.
-- Fases del juego se capturan como lista de nombres (una por línea) al
-  alta; el orden es el orden de captura.
+- Fases del juego: fijas de SunGames (`estimacion/fases.py`, matriz de
+  funciones entregada por el usuario). Al alta del juego se crean las 9
+  fases en orden con su clasificación contable (CAPEX/OPEX/MIXTO,
+  `FaseEstimacion.clasificacion`, migración 0003). Ya no se capturan a
+  mano; la clasificación se muestra en la consolidación y en el detalle
+  de cada versión. Los juegos creados antes conservan sus fases
+  originales (sin clasificación propia → OPEX por defecto).
 - Parámetros y salarios se administran desde la pantalla «Parámetros y
   catálogos» del propio módulo, disponible para Administrador y
   Contador de Costos.

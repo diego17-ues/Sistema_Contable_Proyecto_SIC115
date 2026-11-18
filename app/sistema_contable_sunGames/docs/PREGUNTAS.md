@@ -52,5 +52,13 @@ documenta la decisión tomada para poder revertirla.
     cerró en otra fecha, ¿el umbral debe ser el vigente al cierre o al
     día de la consulta?
 
-11. **Fases del juego**: se capturan como texto libre al crear el juego.
-    ¿Se requiere catálogo de fases típicas de desarrollo de videojuegos?
+11. **Fases del juego**: resuelto — fases fijas de SunGames definidas en
+    `estimacion/fases.py` según la matriz de funciones entregada; cada
+    una con clasificación contable CAPEX/OPEX/MIXTO.
+
+12. **Reglas de corte CAPEX/OPEX**: la matriz define cortes temporales
+    (prototipo jugable, Gold Master, timesheet para Dirección de
+    producto). La estimación registra la clasificación por fase, pero
+    el costeo real (fase posterior) necesitará la fecha de corte por
+    juego/título. ¿Dónde se registrará esa fecha (¿catálogo del juego,
+    hito del proyecto)?

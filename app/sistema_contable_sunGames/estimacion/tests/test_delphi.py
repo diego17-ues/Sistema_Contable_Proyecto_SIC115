@@ -43,10 +43,21 @@ class DelphiTests(TestCase):
         self.experto2 = self.servicio.crear_experto(
             self.admin, "Experto Dos"
         )
-        self.juego = self.servicio.crear_juego(
-            self.admin, "Proyecto A", [("Preproducción", 1)]
+        self.juego = self.servicio.crear_juego(self.admin, "Proyecto A")
+        self.fase = self.juego.fases.get(nombre="Programación")
+
+    def test_juego_crea_fases_fijas(self):
+        fases = list(self.juego.fases.all())
+        self.assertEqual(len(fases), 9)
+        self.assertEqual(
+            [f.orden for f in fases], list(range(1, 10))
         )
-        self.fase = self.juego.fases.get()
+        self.assertEqual(fases[0].nombre, "Dirección de producto / productor")
+        self.assertEqual(fases[0].clasificacion, "MIXTO")
+        self.assertEqual(fases[1].clasificacion, "CAPEX")
+        self.assertEqual(fases[2].clasificacion, "CAPEX")
+        self.assertEqual(fases[3].clasificacion, "OPEX")
+        self.assertEqual(fases[8].nombre, "Finanzas, legal y administración")
 
     def estimacion(self, experto, o, m, p, ronda=1):
         return self.servicio.registrar_estimacion(
@@ -130,7 +141,7 @@ class DelphiTests(TestCase):
         with self.assertRaises(RolNoAutorizadoError):
             self.servicio.listar_juegos(self.general)
         with self.assertRaises(RolNoAutorizadoError):
-            self.servicio.crear_juego(self.general, "X", [])
+            self.servicio.crear_juego(self.general, "X")
 
     def test_contador_costos_si_accede(self):
         juegos = self.servicio.listar_juegos(self.contador)

@@ -49,8 +49,11 @@ class EstimacionRepository:
         juego.save()
         return juego
 
-    def nueva_fase(self, juego, nombre, orden):
-        return FaseEstimacion(juego=juego, nombre=nombre, orden=orden)
+    def nueva_fase(self, juego, nombre, orden, clasificacion):
+        return FaseEstimacion(
+            juego=juego, nombre=nombre, orden=orden,
+            clasificacion=clasificacion,
+        )
 
     def guardar_fase(self, fase):
         fase.save()
