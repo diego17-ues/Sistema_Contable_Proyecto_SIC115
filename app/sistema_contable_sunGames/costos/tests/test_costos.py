@@ -45,6 +45,7 @@ from costos.services import (
 )
 from libro_mayor.models import EstadoPeriodo, Movimiento, PeriodoContable
 from libro_mayor.repositories import TransaccionRepository
+from usuarios.exceptions import RolNoAutorizadoError
 from usuarios.models import Usuario
 from usuarios.roles import Rol
 
@@ -139,7 +140,7 @@ class RegistroServiceUnitTests(SimpleTestCase):
         )
         self.repo = _RepoMemoria(config)
         self.mayor = _MayorMemoria()
-        self.actor = SimpleNamespace(activo=True, rol=Rol.CONTADOR_GENERAL)
+        self.actor = SimpleNamespace(activo=True, rol=Rol.CONTADOR_COSTOS)
         self.servicio = RegistroCostoService(self.repo, self.mayor, None,
                                              nullcontext)
 
@@ -200,7 +201,7 @@ class BaseCostos(TestCase):
     def setUp(self):
         self.actor = Usuario.objects.create(
             username="contador", nombre_completo="Contador",
-            rol=Rol.CONTADOR_GENERAL, activo=True,
+            rol=Rol.CONTADOR_COSTOS, activo=True,
         )
         self.repo = CostosRepository()
         self.ordenes = OrdenService(self.repo, None, transaction.atomic)
@@ -414,6 +415,19 @@ class VistasCostosTests(BaseCostos):
         self.actor.set_password("clave-segura-123")
         self.actor.save()
         self.client.force_login(self.actor)
+
+    def test_solo_el_contador_de_costos_accede(self):
+        for rol, nombre in ((Rol.CONTADOR_GENERAL, "general"),
+                            (Rol.ADMINISTRADOR, "admin")):
+            otro = Usuario.objects.create(
+                username=nombre, nombre_completo=nombre, rol=rol,
+                activo=True,
+            )
+            with self.assertRaises(RolNoAutorizadoError):
+                self.ordenes.listar(otro)
+            self.client.force_login(otro)
+            respuesta = self.client.get(reverse("costos_ordenes"))
+            self.assertEqual(respuesta.status_code, 403)
 
     def test_doble_envio_del_formulario_no_duplica(self):
         url = reverse("costos_registro_nuevo",

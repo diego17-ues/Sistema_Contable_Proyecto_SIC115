@@ -43,9 +43,8 @@ from .exceptions import (
 )
 from .models import AsientoCosto, Elemento, RegistroCosto
 
-ROLES_COSTOS = frozenset({
-    Rol.ADMINISTRADOR, Rol.CONTADOR_GENERAL, "CONTADOR_COSTOS",
-})
+# Módulo exclusivo del Contador de Costos (separado del Contador General).
+ROLES_COSTOS = frozenset({Rol.CONTADOR_COSTOS})
 
 
 def _verificar(actor):
