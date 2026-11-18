@@ -27,7 +27,7 @@
   const navGroups = [
     { label: 'Inicio', items: [{ id: 'dashboard', title: 'Dashboard', icon: '⌂' }] },
     { label: 'Contabilidad', items: [{ id: 'ledger', title: 'Libro Mayor', icon: '▤' }, { id: 'accounts', title: 'Catálogo de cuentas', icon: '☷' }, { id: 'reports', title: 'Estados financieros', icon: '▥' }] },
-    { label: 'Operación', items: [{ id: 'operations', title: 'Ventas', icon: '◫' }] },
+    { label: 'Operación', items: [{ id: 'operations', title: 'Ventas', icon: '◫' }, { id: 'costos', title: 'Órdenes de trabajo', icon: '◈' }] },
     { label: 'Administración', items: [{ id: 'users', title: 'Usuarios', icon: '♙' }, { id: 'audit', title: 'Auditoría', icon: '◷' }] },
   ];
 

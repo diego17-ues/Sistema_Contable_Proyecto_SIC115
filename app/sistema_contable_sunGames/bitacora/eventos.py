@@ -23,6 +23,12 @@ class Accion(models.TextChoices):
     CONCILIACION_VENTAS = (
         "CONCILIACION_VENTAS", "Conciliación de ventas Steam"
     )
+    ORDEN_TRABAJO = "ORDEN_TRABAJO", "Orden de trabajo"
+    CARGO_ORDEN = "CARGO_ORDEN", "Cargo de orden de trabajo"
+    FONDO_COMPARTIDO = "FONDO_COMPARTIDO", "Fondo compartido de costos"
+    EQUIPO_COSTOS = "EQUIPO_COSTOS", "Equipo para costeo"
+    CORTE_COSTOS = "CORTE_COSTOS", "Corte de costos"
+    CATALOGO_COSTOS = "CATALOGO_COSTOS", "Catálogo de costos"
 
 
 class Resultado(models.TextChoices):

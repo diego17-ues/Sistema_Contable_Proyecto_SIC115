@@ -17,6 +17,7 @@ SCREEN_URL_NAMES = {
     "accounts": "accounts",
     "reports": "reports",
     "operations": "operations",
+    "costos": "costos_ordenes",
     "users": "users",
     "audit": "audit",
 }

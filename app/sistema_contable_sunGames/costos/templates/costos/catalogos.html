@@ -1,0 +1,264 @@
+{% extends "sic_sunGames/index.html" %}
+{% load static %}
+
+{% block page_content %}
+<div class="page-heading"><div><h1>Costos · Catálogos y cálculos</h1><p>Procesos, parámetros, salarios, mapeo de cuentas, fondos, equipos y cortes.</p></div><div class="heading-actions"><a class="button button-secondary" href="{% url 'costos_ordenes' %}">← Órdenes</a></div></div>
+
+<section class="card">
+  <div class="card-header"><div><h2>Procesos de desarrollo</h2><p>Programación, arte, audio y QA: sus tasas se aplican a las horas de cada orden.</p></div><a class="text-button" href="{% url 'costos_proceso_nuevo' %}">＋ Proceso</a></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Proceso</th><th>Descripción</th></tr></thead>
+      <tbody>
+        {% for proceso in procesos %}
+        <tr><td><strong>{{ proceso.nombre }}</strong></td><td>{{ proceso.descripcion|default:"—" }}</td></tr>
+        {% empty %}
+        <tr><td colspan="2"><div class="empty-state"><strong>Sin procesos registrados.</strong></div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-header"><div><h2>Costo de procesos por período</h2><p>{% if periodo_cp %}Período: <strong>{{ periodo_cp }}</strong> ({{ periodo_cp.fecha_inicio|date:"d/m/Y" }} – {{ periodo_cp.fecha_fin|date:"d/m/Y" }}){% else %}No hay período abierto.{% endif %}</p></div><a class="text-button" href="{% url 'costos_costo_proceso_nuevo' %}">＋ Costo de proceso</a></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Proceso</th><th class="num">Costo (USD)</th><th class="num">Horas base</th><th class="num">Tasa real</th><th class="num">Tasa presupuestada</th></tr></thead>
+      <tbody>
+        {% for cp in costos_proceso %}
+        <tr>
+          <td><strong>{{ cp.proceso.nombre }}</strong></td>
+          <td class="num">${{ cp.costo|floatformat:"2" }}</td>
+          <td class="num">{{ cp.horas_base|floatformat:"2" }}</td>
+          <td class="num">${{ cp.tasa_real|floatformat:"4"|default:"—" }}</td>
+          <td class="num">{% if cp.tasa_presupuestada %}${{ cp.tasa_presupuestada|floatformat:"4" }}{% else %}—{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5"><div class="empty-state"><strong>Sin costos de proceso en el período.</strong><br>Regístralos para aplicar tasas a las órdenes.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-body">
+    <form method="post" action="{% url 'costos_tasas_aplicar' %}" class="filter-bar" novalidate>
+      {% csrf_token %}
+      <div class="field"><label for="{{ form_tasas.periodo.id_for_label }}">Período</label>{{ form_tasas.periodo }}</div>
+      <div class="field"><label for="{{ form_tasas.usar_presupuestada.id_for_label }}">Tasa</label>{{ form_tasas.usar_presupuestada }} {{ form_tasas.usar_presupuestada.label }}</div>
+      <button class="button button-primary" type="submit">Aplicar tasas a las órdenes</button>
+    </form>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-header"><div><h2>Parámetros con vigencia</h2><p>Horas semanales, semanas al año y tasa de cargas patronales. Sin vigencia no se calcula mano de obra.</p></div><a class="text-button" href="{% url 'costos_parametro_nuevo' %}">＋ Parámetro</a></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Concepto</th><th class="num">Valor</th><th>Vigencia</th><th>Verificado</th></tr></thead>
+      <tbody>
+        {% for p in parametros %}
+        <tr>
+          <td><strong>{{ p.concepto }}</strong><small>{{ p.descripcion }}</small></td>
+          <td class="num">{{ p.valor }}</td>
+          <td>{{ p.vigente_desde|date:"d/m/Y" }}{% if p.vigente_hasta %} – {{ p.vigente_hasta|date:"d/m/Y" }}{% else %} – ∞{% endif %}</td>
+          <td>{% if p.verificado %}<span class="tag tag-open">Verificado</span>{% else %}<span class="tag tag-warn">VERIFICAR</span>{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4"><div class="empty-state"><strong>Sin parámetros.</strong><br>Se necesitan horas_semana, semanas_año y tasa_cargas_patronales.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-header"><div><h2>Salarios de referencia</h2><p>Salario bruto por rol con vigencia; de aquí sale el costo por hora pagada.</p></div><a class="text-button" href="{% url 'costos_salario_nuevo' %}">＋ Salario</a></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Rol</th><th class="num">Salario bruto</th><th>Vigencia</th><th>Verificado</th></tr></thead>
+      <tbody>
+        {% for s in salarios %}
+        <tr>
+          <td><strong>{{ s.rol }}</strong></td>
+          <td class="num">${{ s.salario_bruto|floatformat:"2" }}</td>
+          <td>{{ s.vigente_desde|date:"d/m/Y" }}{% if s.vigente_hasta %} – {{ s.vigente_hasta|date:"d/m/Y" }}{% else %} – ∞{% endif %}</td>
+          <td>{% if s.verificado %}<span class="tag tag-open">Verificado</span>{% else %}<span class="tag tag-warn">VERIFICAR</span>{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4"><div class="empty-state"><strong>Sin salarios de referencia.</strong><br>Sin salario vigente no se puede registrar mano de obra.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-header"><div><h2>Mapeo concepto → cuenta</h2><p>Las cuentas se toman del catálogo real; si falta el código, el tipo de cargo queda bloqueado.</p></div><a class="text-button" href="{% url 'costos_mapeo_nuevo' %}">＋ Mapeo</a></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Concepto</th><th>Cuenta</th><th>Denominación</th></tr></thead>
+      <tbody>
+        {% for m in mapeos %}
+        <tr><td>{{ m.get_concepto_display }}</td><td><strong>{{ m.cuenta.codigo }}</strong></td><td>{{ m.cuenta.denominacion }}</td></tr>
+        {% empty %}
+        <tr><td colspan="3"><div class="empty-state"><strong>Sin mapeos.</strong><br>Configura mano_obra, servicio_directo, indirecto e intangible.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-header"><div><h2>Fondos compartidos</h2><p>Servicios de terceros a repartir por horas de desarrollo. Se distribuyen una sola vez; los cargos no afectan el mayor.</p></div><a class="text-button" href="{% url 'costos_fondo_nuevo' %}">＋ Fondo</a></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Nombre</th><th class="num">Monto</th><th>Fecha</th><th>Estado</th><th></th></tr></thead>
+      <tbody>
+        {% for fondo in fondos %}
+        <tr>
+          <td><strong>{{ fondo.nombre }}</strong><small>{{ fondo.descripcion }}</small></td>
+          <td class="num">${{ fondo.monto|floatformat:"2" }}</td>
+          <td>{{ fondo.fecha|date:"d/m/Y" }}</td>
+          <td><span class="tag {% if fondo.estado == 'DISTRIBUIDO' %}tag-muted{% else %}tag-open{% endif %}">{{ fondo.get_estado_display }}</span></td>
+          <td class="num">{% if fondo.estado == 'PENDIENTE' %}<form method="post" action="{% url 'costos_fondo_distribuir' fondo.pk %}">{% csrf_token %}<button class="button button-secondary" type="submit">Distribuir</button></form>{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5"><div class="empty-state"><strong>Sin fondos compartidos.</strong></div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-header"><div><h2>Equipos</h2><p>Depreciación línea recta automática: exclusivo va a su orden, compartido por tasa/hora máquina, ocioso y administración no generan cargos.</p></div><a class="text-button" href="{% url 'costos_equipo_nuevo' %}">＋ Equipo</a></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Equipo</th><th class="num">Costo</th><th class="num">Residual</th><th class="num">Vida útil</th><th>Uso</th><th class="num">Cuota/mes</th><th></th></tr></thead>
+      <tbody>
+        {% for equipo in equipos %}
+        <tr>
+          <td><strong>{{ equipo.nombre }}</strong><small>{{ equipo.fecha_adquisicion|date:"d/m/Y" }}</small></td>
+          <td class="num">${{ equipo.costo|floatformat:"2" }}</td>
+          <td class="num">${{ equipo.valor_residual|floatformat:"2" }}</td>
+          <td class="num">{{ equipo.vida_util_meses }} m</td>
+          <td>{{ equipo.get_tipo_uso_display }}{% if equipo.orden %} · {{ equipo.orden.juego.nombre }}{% endif %}</td>
+          <td class="num">{% if equipo.cuota_mensual %}${{ equipo.cuota_mensual|floatformat:"2" }}{% else %}—{% endif %}</td>
+          <td class="num"><a class="text-button" href="{% url 'costos_uso_equipo_nuevo' equipo.pk %}">＋ Uso</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7"><div class="empty-state"><strong>Sin equipos registrados.</strong></div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-body">
+    <form method="post" action="{% url 'costos_depreciacion_generar' %}" class="filter-bar" novalidate>
+      {% csrf_token %}
+      <div class="field"><label for="{{ form_depreciacion.anio.id_for_label }}">Año</label>{{ form_depreciacion.anio }}</div>
+      <div class="field"><label for="{{ form_depreciacion.mes.id_for_label }}">Mes</label>{{ form_depreciacion.mes }}</div>
+      <button class="button button-primary" type="submit">Generar depreciación del mes</button>
+    </form>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-header"><div><h2>Cortes de costos</h2><p>Trasladan los saldos de la serie 41 al intangible sin cerrar el Libro Mayor. El provisional se revierte; el definitivo no.</p></div><a class="text-button" href="{% url 'costos_corte_nuevo' %}">＋ Corte</a></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Fecha</th><th>Período</th><th>Tipo</th><th>Estado</th><th>Líneas</th><th>Motivo</th><th></th></tr></thead>
+      <tbody>
+        {% for corte in cortes %}
+        <tr>
+          <td>{{ corte.fecha|date:"d/m/Y" }}</td>
+          <td>{{ corte.periodo }}</td>
+          <td>{{ corte.get_tipo_display }}</td>
+          <td><span class="tag {% if corte.estado == 'VIGENTE' %}tag-warn{% else %}tag-muted{% endif %}">{{ corte.get_estado_display }}</span></td>
+          <td>{{ corte.detalles.count }} línea{{ corte.detalles.count|pluralize }}</td>
+          <td>{{ corte.motivo }}</td>
+          <td class="num">{% if corte.tipo == 'PROVISIONAL' and corte.estado == 'VIGENTE' %}<form method="post" action="{% url 'costos_corte_revertir' corte.pk %}">{% csrf_token %}<button class="button button-secondary" type="submit">Revertir</button></form>{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7"><div class="empty-state"><strong>Sin cortes registrados.</strong></div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block modal %}
+{% if form_proceso %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Nuevo proceso">
+  <div class="modal-header"><div><h2>Nuevo proceso</h2><p>Proceso de desarrollo para imputar horas.</p></div><a class="modal-close" href="{% url 'costos_catalogos' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'costos_proceso_nuevo' %}" novalidate>{% csrf_token %}
+    <div class="modal-fields">{% for campo in form_proceso %}<div class="field"><label for="{{ campo.id_for_label }}">{{ campo.label }}{% if campo.field.required %} *{% endif %}</label>{{ campo }}{% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>{% endfor %}</div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_catalogos' %}">Cancelar</a><button class="button button-primary" type="submit">Registrar</button></div>
+  </form>
+</section></div>
+{% elif form_costo_proceso %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Costo de proceso">
+  <div class="modal-header"><div><h2>Costo de proceso por período</h2><p>Costo real y horas base; la tasa es costo ÷ horas base.</p></div><a class="modal-close" href="{% url 'costos_catalogos' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'costos_costo_proceso_nuevo' %}" novalidate>{% csrf_token %}
+    <div class="modal-fields">{% for campo in form_costo_proceso %}<div class="field"><label for="{{ campo.id_for_label }}">{{ campo.label }}{% if campo.field.required %} *{% endif %}</label>{{ campo }}{% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>{% endfor %}</div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_catalogos' %}">Cancelar</a><button class="button button-primary" type="submit">Registrar</button></div>
+  </form>
+</section></div>
+{% elif form_parametro %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Nuevo parámetro">
+  <div class="modal-header"><div><h2>Nuevo parámetro</h2><p>Parámetro con vigencia. Las cifras laborales quedan VERIFICAR.</p></div><a class="modal-close" href="{% url 'costos_catalogos' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'costos_parametro_nuevo' %}" novalidate>{% csrf_token %}
+    <div class="modal-fields">{% for campo in form_parametro %}<div class="field"><label for="{{ campo.id_for_label }}">{{ campo.label }}{% if campo.field.required %} *{% endif %}</label>{{ campo }}{% if campo.help_text %}<small class="help">{{ campo.help_text }}</small>{% endif %}{% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>{% endfor %}</div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_catalogos' %}">Cancelar</a><button class="button button-primary" type="submit">Registrar</button></div>
+  </form>
+</section></div>
+{% elif form_salario %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Nuevo salario">
+  <div class="modal-header"><div><h2>Salario de referencia</h2><p>Salario bruto por rol con vigencia.</p></div><a class="modal-close" href="{% url 'costos_catalogos' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'costos_salario_nuevo' %}" novalidate>{% csrf_token %}
+    <div class="modal-fields">{% for campo in form_salario %}<div class="field"><label for="{{ campo.id_for_label }}">{{ campo.label }}{% if campo.field.required %} *{% endif %}</label>{{ campo }}{% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>{% endfor %}</div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_catalogos' %}">Cancelar</a><button class="button button-primary" type="submit">Registrar</button></div>
+  </form>
+</section></div>
+{% elif form_mapeo %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Nuevo mapeo">
+  <div class="modal-header"><div><h2>Mapeo concepto → cuenta</h2><p>Elige la cuenta del catálogo real. Si no existe, el cargo queda bloqueado.</p></div><a class="modal-close" href="{% url 'costos_catalogos' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'costos_mapeo_nuevo' %}" novalidate>{% csrf_token %}
+    <div class="modal-fields">{% for campo in form_mapeo %}<div class="field"><label for="{{ campo.id_for_label }}">{{ campo.label }}{% if campo.field.required %} *{% endif %}</label>{{ campo }}{% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>{% endfor %}</div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_catalogos' %}">Cancelar</a><button class="button button-primary" type="submit">Registrar</button></div>
+  </form>
+</section></div>
+{% elif form_fondo %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Nuevo fondo compartido">
+  <div class="modal-header"><div><h2>Fondo compartido</h2><p>Servicios de terceros que se reparten por horas de desarrollo. No afecta el mayor.</p></div><a class="modal-close" href="{% url 'costos_catalogos' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'costos_fondo_nuevo' %}" novalidate>{% csrf_token %}
+    <div class="modal-fields">{% for campo in form_fondo %}<div class="field"><label for="{{ campo.id_for_label }}">{{ campo.label }}{% if campo.field.required %} *{% endif %}</label>{{ campo }}{% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>{% endfor %}</div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_catalogos' %}">Cancelar</a><button class="button button-primary" type="submit">Registrar</button></div>
+  </form>
+</section></div>
+{% elif form_equipo %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Nuevo equipo">
+  <div class="modal-header"><div><h2>Nuevo equipo</h2><p>Costo, vida útil y valor residual para depreciación línea recta.</p></div><a class="modal-close" href="{% url 'costos_catalogos' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'costos_equipo_nuevo' %}" novalidate>{% csrf_token %}
+    <div class="modal-fields">{% for campo in form_equipo %}<div class="field"><label for="{{ campo.id_for_label }}">{{ campo.label }}{% if campo.field.required %} *{% endif %}</label>{{ campo }}{% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>{% endfor %}</div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_catalogos' %}">Cancelar</a><button class="button button-primary" type="submit">Registrar</button></div>
+  </form>
+</section></div>
+{% elif form_uso %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Uso de equipo">
+  <div class="modal-header"><div><h2>Uso de equipo</h2><p>Horas máquina del equipo en una orden durante el mes.</p></div><a class="modal-close" href="{% url 'costos_catalogos' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'costos_uso_equipo_nuevo' uso_equipo_id %}" novalidate>{% csrf_token %}
+    <div class="modal-fields">{% for campo in form_uso %}<div class="field"><label for="{{ campo.id_for_label }}">{{ campo.label }}{% if campo.field.required %} *{% endif %}</label>{{ campo }}{% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>{% endfor %}</div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_catalogos' %}">Cancelar</a><button class="button button-primary" type="submit">Registrar</button></div>
+  </form>
+</section></div>
+{% elif form_corte %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Nuevo corte de costos">
+  <div class="modal-header"><div><h2>Nuevo corte de costos</h2><p>Traslada los saldos capitalizables de la serie 41 al intangible. El provisional se puede revertir.</p></div><a class="modal-close" href="{% url 'costos_catalogos' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'costos_corte_nuevo' %}" novalidate>{% csrf_token %}
+    <div class="modal-fields">{% for campo in form_corte %}<div class="field"><label for="{{ campo.id_for_label }}">{{ campo.label }}{% if campo.field.required %} *{% endif %}</label>{{ campo }}{% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>{% endfor %}</div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_catalogos' %}">Cancelar</a><button class="button button-primary" type="submit">Generar corte</button></div>
+  </form>
+</section></div>
+{% endif %}
+{% endblock %}
