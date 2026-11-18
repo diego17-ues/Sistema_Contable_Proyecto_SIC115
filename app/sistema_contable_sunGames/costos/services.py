@@ -324,6 +324,18 @@ class RegistroCostoService(CostosService):
         fecha = self._hoy()
         self._verificar_periodo(fecha)
         lineas = self._lineas_anulacion(registro)
+        try:
+            return self._anular(actor, registro, lineas, fecha, motivo,
+                                clave)
+        except IntegrityError:
+            previo = self._repo.asiento_por_clave(clave)
+            if previo is None or previo.registro_id != registro.pk:
+                raise RegistroYaAnuladoError(
+                    "El registro ya está anulado."
+                ) from None
+            return previo.registro
+
+    def _anular(self, actor, registro, lineas, fecha, motivo, clave):
         with self._transaccion():
             self._asentar(
                 actor, registro, lineas, fecha=fecha,
