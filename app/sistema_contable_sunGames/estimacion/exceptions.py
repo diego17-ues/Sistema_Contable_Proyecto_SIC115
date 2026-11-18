@@ -30,6 +30,12 @@ class EstimacionInvalidaError(EstimacionError):
     mensaje = "La estimación no cumple O ≤ M ≤ P ni valores negativos."
 
 
+class EstimacionDuplicadaError(EstimacionError):
+    mensaje = (
+        "El experto ya registró estimaciones para este rol en la ronda."
+    )
+
+
 class RondaNoEncontradaError(EstimacionError):
     mensaje = "La ronda Delphi seleccionada no existe."
 

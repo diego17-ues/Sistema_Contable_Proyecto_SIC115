@@ -51,8 +51,8 @@ Rama: `costos/estimacion`. Fecha: 2026-11-18.
 
 ## Pruebas
 
-`python manage.py test estimacion usuarios` → **106 pruebas OK**
-(33 del módulo de estimación, resto de usuarios).
+`python manage.py test estimacion usuarios` → **111 pruebas OK**
+(38 del módulo de estimación, resto de usuarios).
 Suite completa: **281 pruebas, 52 errores**, idénticos a los 52 errores
 preexistentes de `main` (incompatibilidad Django 4.2 / Python 3.14 en el
 instrumentado de plantillas del cliente de pruebas). No se introdujeron
@@ -79,6 +79,17 @@ punto de acceso por rol.
 - Las vigencias de un mismo parámetro/salario no pueden traslaparse.
 - Eficiencia se aplica como parámetro global `eficiencia` (la edición
   por departamento queda pendiente, ver PREGUNTAS.md).
+- Captura Delphi: una sola ronda (ronda 1). El formulario registra una
+  matriz PERT por experto y rol que cubre las 9 fases a la vez
+  (`registrar_estimacion_matriz`); no se selecciona fase ni ronda.
+  Duplicado experto+rol+ronda → `EstimacionDuplicadaError`.
+- Costos de fabricación: `CostoFabricacion` por juego (directo e
+  indirecto: materiales, máquinas, equipo) capturado desde la ficha del
+  juego; `generar_version` los copia a los costos directos/indirectos
+  de la versión, por lo que entran al total junto a la mano de obra.
+- Versiones: nuevo estado `RECHAZADO` (borrador → rechazado, inmutable;
+  permite generar una versión nueva). Bitácora `RECHAZO_PRESUPUESTO` y
+  `REGISTRO_COSTO_FABRICACION`.
 
 ## Pendiente
 

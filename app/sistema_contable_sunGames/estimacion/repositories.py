@@ -12,6 +12,7 @@ from .exceptions import (
 )
 from .models import (
     CostoDirectoEstimado,
+    CostoFabricacion,
     CostoIndirectoEstimado,
     EstimacionExperto,
     Experto,
@@ -123,6 +124,11 @@ class EstimacionRepository:
     def guardar_estimacion(self, estimacion):
         estimacion.save()
         return estimacion
+
+    def estimaciones_existen(self, juego, rol, experto, ronda):
+        return EstimacionExperto.objects.filter(
+            juego=juego, rol=rol, experto=experto, ronda=ronda
+        ).exists()
 
     def rondas_de(self, juego):
         return RondaDelphi.objects.filter(juego=juego).order_by("numero")
@@ -263,5 +269,21 @@ class EstimacionRepository:
         return costo
 
     def guardar_costo_indirecto(self, costo):
+        costo.save()
+        return costo
+
+    # --- Costos de fabricación por juego ---
+
+    def costos_fabricacion_de(self, juego):
+        return CostoFabricacion.objects.filter(juego=juego).order_by(
+            "tipo", "id"
+        )
+
+    def nueva_costo_fabricacion(self, juego, tipo, concepto, monto):
+        return CostoFabricacion(
+            juego=juego, tipo=tipo, concepto=concepto, monto=monto
+        )
+
+    def guardar_costo_fabricacion(self, costo):
         costo.save()
         return costo

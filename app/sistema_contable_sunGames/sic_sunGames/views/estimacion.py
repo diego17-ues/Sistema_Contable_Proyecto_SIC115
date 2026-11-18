@@ -12,19 +12,18 @@ from estimacion.composition import (
     crear_estimacion_service,
     crear_presupuesto_service,
 )
-from estimacion.fases import FASES_SUN_GAMES
-from estimacion.models import ClasificacionContable
 from estimacion.exceptions import EstimacionError, VersionInmutableError
 from estimacion.forms import (
     CostoForm,
     CostoIndirectoForm,
-    EstimacionForm,
+    EstimacionMatrizForm,
     ExpertoForm,
     JuegoForm,
     ParametroForm,
     RolForm,
     SalarioForm,
 )
+from estimacion.models import TipoCostoFabricacion
 from usuarios.exceptions import UsuarioError
 
 from .pages import contexto_panel
@@ -51,14 +50,7 @@ def _render_juegos(request, servicio, **extra):
     except UsuarioError as error:
         raise _sin_permiso(error) from error
     contexto = contexto_panel(request, "estimacion")
-    contexto.update(
-        pagina=_pagina(request, juegos),
-        fases_iniciales=[
-            (nombre, ClasificacionContable(codigo).label)
-            for nombre, codigo in FASES_SUN_GAMES
-        ],
-        **extra,
-    )
+    contexto.update(pagina=_pagina(request, juegos), **extra)
     return render(request, JUEGOS_TEMPLATE, contexto)
 
 
@@ -79,6 +71,12 @@ def _contexto_juego(request, juego_id, servicio, **extra):
     presupuesto_service = crear_presupuesto_service()
     for version in versiones:
         version.total_estimado = presupuesto_service.total(version)
+    costos_fabricacion = list(
+        servicio.costos_fabricacion(request.user, juego_id)
+    )
+    form = extra.get("form")
+    if isinstance(form, EstimacionMatrizForm):
+        _adjuntar_filas_matriz(form, fases)
     contexto.update(
         juego=juego,
         fases=fases,
@@ -89,9 +87,23 @@ def _contexto_juego(request, juego_id, servicio, **extra):
         ronda_actual=ronda_actual,
         consolidacion=consolidacion,
         versiones=versiones,
+        costos_fabricacion=costos_fabricacion,
         **extra,
     )
     return contexto
+
+
+def _adjuntar_filas_matriz(form, fases):
+    """Campos PERT ligados a cada fase para la tabla del modal."""
+    form.filas = [
+        {
+            "fase": fase,
+            "optimista": form[f"fase_{fase.pk}_optimista"],
+            "moda": form[f"fase_{fase.pk}_moda"],
+            "pesimista": form[f"fase_{fase.pk}_pesimista"],
+        }
+        for fase in fases
+    ]
 
 
 def _ronda_actual(request, juego, fases):
@@ -151,31 +163,44 @@ def juego_detalle(request, juego_id):
     )
 
 
+RONDA_UNICA = 1
+
+
 @login_required
 @require_http_methods(["GET", "POST"])
 def estimacion_nueva(request, juego_id):
+    """Matriz PERT: un experto y rol estiman todas las fases (ronda 1)."""
     servicio = crear_estimacion_service()
     if request.method != "POST":
         return render(
             request, JUEGO_TEMPLATE,
             _contexto_juego(
-                request, juego_id, servicio, form=EstimacionForm()
+                request, juego_id, servicio,
+                form=EstimacionMatrizForm(
+                    fases=_fases_del_juego(request, servicio, juego_id)
+                ),
             ),
         )
-    form = EstimacionForm(request.POST)
+    fases = _fases_del_juego(request, servicio, juego_id)
+    form = EstimacionMatrizForm(request.POST, fases=fases)
     if form.is_valid():
         datos = form.cleaned_data
+        matriz = {
+            fase.pk: {
+                "optimista": datos[f"fase_{fase.pk}_optimista"],
+                "moda": datos[f"fase_{fase.pk}_moda"],
+                "pesimista": datos[f"fase_{fase.pk}_pesimista"],
+            }
+            for fase in fases
+        }
         try:
-            servicio.registrar_estimacion(
+            servicio.registrar_estimacion_matriz(
                 request.user,
                 juego_id=juego_id,
-                fase_id=datos["fase"],
                 rol_id=datos["rol"],
                 experto_id=datos["experto"],
-                ronda=datos["ronda"],
-                optimista=datos["optimista"],
-                moda=datos["moda"],
-                pesimista=datos["pesimista"],
+                ronda=RONDA_UNICA,
+                matriz=matriz,
                 justificacion=datos["justificacion"],
             )
         except UsuarioError as error:
@@ -183,12 +208,23 @@ def estimacion_nueva(request, juego_id):
         except EstimacionError as error:
             form.add_error(None, str(error))
         else:
-            messages.success(request, "Estimación registrada.")
+            messages.success(
+                request,
+                f"Estimación registrada para {len(matriz)} fases.",
+            )
             return redirect("estimacion_juego", juego_id=juego_id)
     return render(
         request, JUEGO_TEMPLATE,
         _contexto_juego(request, juego_id, servicio, form=form),
     )
+
+
+def _fases_del_juego(request, servicio, juego_id):
+    try:
+        juego = servicio.obtener_juego(request.user, juego_id)
+    except UsuarioError as error:
+        raise _sin_permiso(error) from error
+    return list(juego.fases.all())
 
 
 @login_required
@@ -367,6 +403,87 @@ def version_vigente(request, version_id):
     else:
         messages.success(
             request, f"Versión {version.numero} marcada como vigente."
+        )
+    return redirect("estimacion_juego", juego_id=version.juego_id)
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def juego_costo_directo(request, juego_id):
+    return _juego_costo(
+        request, juego_id, crear_estimacion_service(),
+        TipoCostoFabricacion.DIRECTO,
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def juego_costo_indirecto(request, juego_id):
+    return _juego_costo(
+        request, juego_id, crear_estimacion_service(),
+        TipoCostoFabricacion.INDIRECTO,
+    )
+
+
+def _juego_costo(request, juego_id, servicio, tipo):
+    """Costo directo/indirecto de fabricación estimado del juego."""
+    if request.method == "POST":
+        form = CostoForm(request.POST)
+        if form.is_valid():
+            datos = form.cleaned_data
+            try:
+                servicio.agregar_costo_fabricacion(
+                    request.user, juego_id, tipo,
+                    datos["concepto"], datos["monto"],
+                )
+            except UsuarioError as error:
+                raise _sin_permiso(error) from error
+            except EstimacionError as error:
+                form.add_error(None, str(error))
+            else:
+                messages.success(request, "Costo de fabricación registrado.")
+                return redirect("estimacion_juego", juego_id=juego_id)
+        return render(
+            request, JUEGO_TEMPLATE,
+            _contexto_juego(
+                request, juego_id, servicio,
+                form_fab=form, fab_tipo=tipo,
+            ),
+        )
+    return render(
+        request, JUEGO_TEMPLATE,
+        _contexto_juego(
+            request, juego_id, servicio,
+            form_fab=CostoForm(), fab_tipo=tipo,
+        ),
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def version_rechazar(request, version_id):
+    servicio = crear_presupuesto_service()
+    try:
+        version = servicio.obtener_version(request.user, version_id)
+    except UsuarioError as error:
+        raise _sin_permiso(error) from error
+    if request.method != "POST":
+        return render(
+            request, JUEGO_TEMPLATE,
+            _contexto_juego(
+                request, version.juego_id, crear_estimacion_service(),
+                resumen_version=version, accion="rechazar",
+            ),
+        )
+    try:
+        servicio.rechazar(request.user, version_id)
+    except UsuarioError as error:
+        raise _sin_permiso(error) from error
+    except EstimacionError as error:
+        messages.error(request, str(error))
+    else:
+        messages.success(
+            request, f"Versión {version.numero} rechazada."
         )
     return redirect("estimacion_juego", juego_id=version.juego_id)
 

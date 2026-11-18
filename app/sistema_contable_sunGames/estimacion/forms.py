@@ -31,44 +31,50 @@ class JuegoForm(forms.Form):
     )
 
 
-class EstimacionForm(forms.Form):
-    """Captura PERT de un experto para una fase, rol y ronda."""
+class EstimacionMatrizForm(forms.Form):
+    """Matriz PERT de un experto y rol para todas las fases del juego.
 
-    fase = forms.IntegerField(label="Fase", min_value=1)
+    Cada fase tiene sus campos optimista/moda/pesimista; la ronda es
+    única (ronda 1) y se fija en la vista.
+    """
+
     rol = forms.IntegerField(label="Rol", min_value=1)
     experto = forms.IntegerField(label="Experto", min_value=1)
-    ronda = forms.IntegerField(label="Ronda", min_value=1)
-    optimista = forms.DecimalField(
-        label="Optimista (O)", min_value=0, max_digits=10,
-        decimal_places=4,
-        error_messages={"required": CAMPO_OBLIGATORIO},
-    )
-    moda = forms.DecimalField(
-        label="Más probable (M)", min_value=0, max_digits=10,
-        decimal_places=4,
-        error_messages={"required": CAMPO_OBLIGATORIO},
-    )
-    pesimista = forms.DecimalField(
-        label="Pesimista (P)", min_value=0, max_digits=10,
-        decimal_places=4,
-        error_messages={"required": CAMPO_OBLIGATORIO},
-    )
     justificacion = forms.CharField(
         label="Justificación", required=False,
-        widget=forms.Textarea(attrs={"rows": 3}),
+        widget=forms.Textarea(attrs={"rows": 2}),
     )
+
+    def __init__(self, *args, fases=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fases = list(fases)
+        for fase in self.fases:
+            prefijo = f"fase_{fase.pk}_"
+            for nombre, etiqueta in (
+                ("optimista", "Optimista (O)"),
+                ("moda", "Más probable (M)"),
+                ("pesimista", "Pesimista (P)"),
+            ):
+                self.fields[prefijo + nombre] = forms.DecimalField(
+                    label=etiqueta, min_value=0, max_digits=10,
+                    decimal_places=4,
+                    error_messages={"required": CAMPO_OBLIGATORIO},
+                )
 
     def clean(self):
         datos = super().clean()
-        o = datos.get("optimista")
-        m = datos.get("moda")
-        p = datos.get("pesimista")
-        if o is not None and m is not None and p is not None:
-            if not (o <= m <= p):
-                self.add_error(
-                    "pesimista",
-                    "Debe cumplirse optimista ≤ más probable ≤ pesimista.",
-                )
+        for fase in self.fases:
+            prefijo = f"fase_{fase.pk}_"
+            o = datos.get(prefijo + "optimista")
+            m = datos.get(prefijo + "moda")
+            p = datos.get(prefijo + "pesimista")
+            if o is not None and m is not None and p is not None:
+                if not (o <= m <= p):
+                    self.add_error(
+                        prefijo + "pesimista",
+                        "Debe cumplirse optimista ≤ más probable ≤ "
+                        "pesimista.",
+                    )
         return datos
 
 

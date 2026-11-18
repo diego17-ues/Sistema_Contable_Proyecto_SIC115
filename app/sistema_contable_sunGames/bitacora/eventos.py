@@ -36,6 +36,13 @@ class Accion(models.TextChoices):
     APROBACION_PRESUPUESTO = (
         "APROBACION_PRESUPUESTO", "Aprobación de versión de presupuesto"
     )
+    RECHAZO_PRESUPUESTO = (
+        "RECHAZO_PRESUPUESTO", "Rechazo de versión de presupuesto"
+    )
+    REGISTRO_COSTO_FABRICACION = (
+        "REGISTRO_COSTO_FABRICACION",
+        "Registro de costo de fabricación estimado",
+    )
 
 
 class Resultado(models.TextChoices):

@@ -6,12 +6,13 @@ from django.test import TestCase
 from bitacora.models import RegistroBitacora
 from estimacion.composition import crear_estimacion_service
 from estimacion.exceptions import (
+    EstimacionDuplicadaError,
     EstimacionInvalidaError,
     ParametroInvalidoError,
     RondaCerradaError,
     RolNoEncontradoError,
 )
-from estimacion.models import Rol as RolEstimacion
+from estimacion.models import EstimacionExperto, Rol as RolEstimacion
 from usuarios.exceptions import RolNoAutorizadoError
 from usuarios.models import Usuario
 from usuarios.roles import Rol
@@ -65,6 +66,20 @@ class DelphiTests(TestCase):
             rol_id=self.rol.pk, experto_id=experto.pk, ronda=ronda,
             optimista=Decimal(str(o)), moda=Decimal(str(m)),
             pesimista=Decimal(str(p)),
+        )
+
+    def matriz(self, experto, ronda=1):
+        matriz = {
+            fase.pk: {
+                "optimista": Decimal("10"),
+                "moda": Decimal("20"),
+                "pesimista": Decimal("30"),
+            }
+            for fase in self.juego.fases.all()
+        }
+        return self.servicio.registrar_estimacion_matriz(
+            self.admin, juego_id=self.juego.pk, rol_id=self.rol.pk,
+            experto_id=experto.pk, ronda=ronda, matriz=matriz,
         )
 
     def test_flujo_delphi_completo(self):
@@ -127,6 +142,29 @@ class DelphiTests(TestCase):
             self.servicio.cerrar_ronda(
                 self.admin, self.juego.pk, 1, fecha=FECHA
             )
+
+    def test_matriz_registra_todas_las_fases(self):
+        creadas = self.matriz(self.experto1)
+        self.assertEqual(len(creadas), 9)
+        self.assertEqual(
+            EstimacionExperto.objects.filter(juego=self.juego).count(), 9
+        )
+        self.assertTrue(
+            all(e.ronda == 1 for e in creadas)
+        )
+
+    def test_matriz_duplicada_rechazada(self):
+        self.matriz(self.experto1)
+        with self.assertRaises(EstimacionDuplicadaError):
+            self.matriz(self.experto1)
+
+    def test_matriz_ronda_cerrada_rechazada(self):
+        self.matriz(self.experto1)
+        self.servicio.cerrar_ronda(
+            self.admin, self.juego.pk, 1, fecha=FECHA
+        )
+        with self.assertRaises(RondaCerradaError):
+            self.matriz(self.experto2)
 
     def test_estimacion_invalida_rechazada(self):
         with self.assertRaises(EstimacionInvalidaError):

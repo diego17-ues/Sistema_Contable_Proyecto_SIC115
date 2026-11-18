@@ -237,6 +237,7 @@ class EstadoVersion(models.TextChoices):
     BORRADOR = "BORRADOR", "Borrador"
     APROBADO = "APROBADO", "Aprobado"
     VIGENTE = "VIGENTE", "Vigente"
+    RECHAZADO = "RECHAZADO", "Rechazado"
 
 
 class VersionPresupuesto(models.Model):
@@ -292,7 +293,8 @@ class VersionPresupuesto(models.Model):
                 "estado", flat=True
             ).first()
             if anterior in (
-                self.Estado.APROBADO, self.Estado.VIGENTE
+                self.Estado.APROBADO, self.Estado.VIGENTE,
+                self.Estado.RECHAZADO,
             ):
                 self._verificar_cambio_permitido(anterior)
         super().save(*args, **kwargs)
@@ -351,6 +353,41 @@ class LineaPresupuesto(models.Model):
 
     def __str__(self):
         return f"{self.fase} / {self.rol}"
+
+
+class TipoCostoFabricacion(models.TextChoices):
+    DIRECTO = "DIRECTO", "Costo directo de fabricación"
+    INDIRECTO = "INDIRECTO", "Costo indirecto de fabricación"
+
+
+class CostoFabricacion(models.Model):
+    """Costo directo o indirecto de fabricación estimado del juego.
+
+    Cubre lo que no es mano de obra (materiales, máquinas, equipo);
+    al generar una versión se copia a sus costos directos/indirectos.
+    """
+
+    Tipo = TipoCostoFabricacion
+
+    juego = models.ForeignKey(
+        Juego, on_delete=models.PROTECT, related_name="costos_fabricacion"
+    )
+    tipo = models.CharField(
+        "tipo", max_length=10, choices=TipoCostoFabricacion.choices
+    )
+    concepto = models.CharField("concepto", max_length=150)
+    monto = models.DecimalField(
+        "monto", max_digits=MONTO_MAX_DIGITS,
+        decimal_places=MONTO_DECIMALES,
+    )
+
+    class Meta:
+        ordering = ["tipo", "id"]
+        verbose_name = "costo de fabricación estimado"
+        verbose_name_plural = "costos de fabricación estimados"
+
+    def __str__(self):
+        return f"{self.get_tipo_display()}: {self.concepto} {self.monto}"
 
 
 class CostoDirectoEstimado(models.Model):

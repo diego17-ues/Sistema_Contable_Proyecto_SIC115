@@ -197,6 +197,56 @@ class PresupuestoTests(TestCase):
         self.assertEqual(v1.estado, VersionPresupuesto.Estado.APROBADO)
         self.assertEqual(v2.estado, VersionPresupuesto.Estado.VIGENTE)
 
+    def test_costos_fabricacion_se_copian_a_la_version(self):
+        self.estimaciones.agregar_costo_fabricacion(
+            self.admin, self.juego.pk, "DIRECTO",
+            "Máquinas de desarrollo", Decimal("800"),
+        )
+        self.estimaciones.agregar_costo_fabricacion(
+            self.admin, self.juego.pk, "INDIRECTO",
+            "Mantenimiento de equipo", Decimal("200"),
+        )
+        self.ronda_aprobada()
+        version = self.presupuestos.generar_version(
+            self.admin, self.juego.pk, fecha=FECHA
+        )
+        self.assertEqual(version.costos_directos.count(), 1)
+        self.assertEqual(
+            version.costos_directos.get().concepto,
+            "Máquinas de desarrollo",
+        )
+        self.assertEqual(version.costos_indirectos.count(), 1)
+        self.assertEqual(
+            version.costos_indirectos.get().departamento,
+            "Mantenimiento de equipo",
+        )
+        linea = version.lineas.get()
+        self.assertEqual(
+            self.presupuestos.total(version),
+            linea.costo_mano_obra + Decimal("800") + Decimal("200"),
+        )
+
+    def test_version_rechazada_es_inmutable(self):
+        self.ronda_aprobada()
+        version = self.presupuestos.generar_version(
+            self.admin, self.juego.pk, fecha=FECHA
+        )
+        self.presupuestos.rechazar(self.admin, version.pk)
+        version.refresh_from_db()
+        self.assertEqual(
+            version.estado, VersionPresupuesto.Estado.RECHAZADO
+        )
+        with self.assertRaises(VersionInmutableError):
+            self.presupuestos.agregar_costo_directo(
+                self.admin, version.pk, "Otro", Decimal("50")
+            )
+        with self.assertRaises(VersionInmutableError):
+            self.presupuestos.aprobar(self.admin, version.pk)
+        v2 = self.presupuestos.generar_version(
+            self.admin, self.juego.pk, fecha=FECHA
+        )
+        self.assertEqual(v2.numero, 2)
+
     def test_modulo_no_consulta_el_libro_mayor(self):
         for modulo in (models, calculos, repositories, services,
                        composition):

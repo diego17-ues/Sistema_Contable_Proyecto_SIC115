@@ -63,6 +63,27 @@
 </section>
 
 <section class="card">
+  <div class="card-header"><div><h2>Costos de fabricación estimados</h2><p>Materiales, máquinas y equipo del juego; se copian a cada versión generada</p></div>
+    <div class="heading-actions">
+      <a class="button button-secondary" href="{% url 'estimacion_fab_directo' juego.pk %}">+ Costo directo</a>
+      <a class="button button-secondary" href="{% url 'estimacion_fab_indirecto' juego.pk %}">+ Costo indirecto</a>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Tipo</th><th>Concepto</th><th class="num">Monto</th></tr></thead>
+      <tbody>
+        {% for costo in costos_fabricacion %}
+        <tr><td>{{ costo.get_tipo_display }}</td><td>{{ costo.concepto }}</td><td class="num">${{ costo.monto }}</td></tr>
+        {% empty %}
+        <tr><td class="empty-cell" colspan="3">Sin costos de fabricación registrados.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
   <div class="card-header"><div><h2>Versiones de presupuesto</h2><p>Mano de obra estimada, costos directos e indirectos</p></div></div>
   <div class="table-wrap">
     <table>
@@ -81,6 +102,7 @@
             <a class="text-button" href="{% url 'estimacion_costo_directo' version.pk %}">+ Costo directo</a>
             <a class="text-button" href="{% url 'estimacion_costo_indirecto' version.pk %}">+ Costo indirecto</a>
             <a class="text-button" href="{% url 'estimacion_version_aprobar' version.pk %}">Aprobar</a>
+            <a class="text-button" href="{% url 'estimacion_version_rechazar' version.pk %}">Rechazar</a>
             {% elif version.estado == 'APROBADO' %}
             <a class="text-button" href="{% url 'estimacion_version_vigente' version.pk %}">Marcar vigente</a>
             {% endif %}
@@ -115,19 +137,35 @@
 {% block modal %}
 {% if form %}
 <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Registrar estimación">
-  <div class="modal-header"><div><h2>Registrar estimación</h2><p>Estimación PERT de un experto para una fase, rol y ronda.</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-header"><div><h2>Registrar estimación</h2><p>Ronda única · el experto estima todas las fases para el rol seleccionado.</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
   <form class="modal-form" method="post" action="{% url 'estimacion_registrar' juego.pk %}" novalidate>
     {% csrf_token %}
     {% if form.non_field_errors %}<div class="form-error">{{ form.non_field_errors }}</div>{% endif %}
     <div class="modal-fields">
-      <div class="field"><label for="id_fase">Fase *</label><select id="id_fase" name="fase">{% for f in fases %}<option value="{{ f.pk }}">{{ f.nombre }}</option>{% endfor %}</select></select>{% for error in form.fase.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
-      <div class="field"><label for="id_rol">Rol *</label><select id="id_rol" name="rol">{% for r in roles %}<option value="{{ r.pk }}">{{ r }}</option>{% endfor %}</select></select>{% for error in form.rol.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
-      <div class="field"><label for="id_experto">Experto *</label><select id="id_experto" name="experto">{% for x in expertos %}<option value="{{ x.pk }}">{{ x.nombre }}</option>{% endfor %}</select></select>{% for error in form.experto.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
-      <div class="field"><label for="id_ronda">Ronda *</label><input id="id_ronda" name="ronda" type="number" min="1" value="{{ ronda_actual|default:1 }}"/></div>
-      <div class="field"><label for="id_optimista">Optimista (O) *</label><input id="id_optimista" name="optimista" type="number" step="0.0001" min="0" value="{{ form.optimista.value|default:'' }}"/>{% for error in form.optimista.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
-      <div class="field"><label for="id_moda">Más probable (M) *</label><input id="id_moda" name="moda" type="number" step="0.0001" min="0" value="{{ form.moda.value|default:'' }}"/>{% for error in form.moda.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
-      <div class="field"><label for="id_pesimista">Pesimista (P) *</label><input id="id_pesimista" name="pesimista" type="number" step="0.0001" min="0" value="{{ form.pesimista.value|default:'' }}"/>{% for error in form.pesimista.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
-      <div class="field full"><label for="id_justificacion">Justificación</label><textarea id="id_justificacion" name="justificacion" rows="3">{{ form.justificacion.value|default:'' }}</textarea></div>
+      <div class="field"><label for="id_rol">Rol *</label><select id="id_rol" name="rol">{% for r in roles %}<option value="{{ r.pk }}">{{ r }}</option>{% endfor %}</select>{% for error in form.rol.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+      <div class="field"><label for="id_experto">Experto *</label><select id="id_experto" name="experto">{% for x in expertos %}<option value="{{ x.pk }}">{{ x.nombre }}</option>{% endfor %}</select>{% for error in form.experto.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Fase</th><th class="num">O</th><th class="num">M</th><th class="num">P</th></tr></thead>
+        <tbody>
+          {% for fila in form.filas %}
+          <tr>
+            <td>{{ fila.fase.nombre }}
+              {% for error in fila.optimista.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+              {% for error in fila.moda.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+              {% for error in fila.pesimista.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+            </td>
+            <td class="num">{{ fila.optimista }}</td>
+            <td class="num">{{ fila.moda }}</td>
+            <td class="num">{{ fila.pesimista }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="modal-fields">
+      <div class="field full"><label for="id_justificacion">Justificación</label><textarea id="id_justificacion" name="justificacion" rows="2">{{ form.justificacion.value|default:'' }}</textarea></div>
     </div>
     <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_juego' juego.pk %}">Cancelar</a><button class="button button-primary" type="submit">Registrar estimación</button></div>
   </form>
@@ -167,10 +205,28 @@
     <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_juego' juego.pk %}">Cancelar</a><button class="button button-primary" type="submit">Registrar costo</button></div>
   </form>
 </section></div>
+{% elif form_fab %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Costo de fabricación">
+  <div class="modal-header"><div><h2>{% if fab_tipo == 'DIRECTO' %}Costo directo{% else %}Costo indirecto{% endif %} de fabricación</h2><p>Materiales, máquinas y equipo estimados del juego; se copian a cada versión generada.</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% if fab_tipo == 'DIRECTO' %}{% url 'estimacion_fab_directo' juego.pk %}{% else %}{% url 'estimacion_fab_indirecto' juego.pk %}{% endif %}" novalidate>
+    {% csrf_token %}
+    {% if form_fab.non_field_errors %}<div class="form-error">{{ form_fab.non_field_errors }}</div>{% endif %}
+    <div class="modal-fields">
+      {% for campo in form_fab %}
+      <div class="field">
+        <label for="{{ campo.id_for_label }}">{{ campo.label }} *</label>
+        {{ campo }}
+        {% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_juego' juego.pk %}">Cancelar</a><button class="button button-primary" type="submit">Registrar costo</button></div>
+  </form>
+</section></div>
 {% elif resumen_version %}
 <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Confirmar versión">
-  <div class="modal-header"><div><h2>{% if accion == 'aprobar' %}Aprobar{% else %}Marcar vigente{% endif %} v{{ resumen_version.numero }}</h2><p>{% if accion == 'aprobar' %}La versión quedará aprobada y será inmutable; cualquier corrección crea una versión nueva.{% else %}La versión pasará a vigente y la vigente anterior volverá a aprobada.{% endif %}</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
-  <form class="modal-form" method="post" action="{% if accion == 'aprobar' %}{% url 'estimacion_version_aprobar' resumen_version.pk %}{% else %}{% url 'estimacion_version_vigente' resumen_version.pk %}{% endif %}">
+  <div class="modal-header"><div><h2>{% if accion == 'aprobar' %}Aprobar{% elif accion == 'rechazar' %}Rechazar{% else %}Marcar vigente{% endif %} v{{ resumen_version.numero }}</h2><p>{% if accion == 'aprobar' %}La versión quedará aprobada y será inmutable; cualquier corrección crea una versión nueva.{% elif accion == 'rechazar' %}La versión quedará rechazada y será inmutable; puede generar una versión nueva.{% else %}La versión pasará a vigente y la vigente anterior volverá a aprobada.{% endif %}</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% if accion == 'aprobar' %}{% url 'estimacion_version_aprobar' resumen_version.pk %}{% elif accion == 'rechazar' %}{% url 'estimacion_version_rechazar' resumen_version.pk %}{% else %}{% url 'estimacion_version_vigente' resumen_version.pk %}{% endif %}">
     {% csrf_token %}
     <div class="modal-fields"><div class="field"><label>Juego</label><input value="{{ juego.nombre }}" readonly /></div><div class="field"><label>Versión</label><input value="v{{ resumen_version.numero }} · {{ resumen_version.get_estado_display }}" readonly /></div></div>
     <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_juego' juego.pk %}">Cancelar</a><button class="button button-primary" type="submit">Confirmar</button></div>

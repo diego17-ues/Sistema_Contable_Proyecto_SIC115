@@ -12,6 +12,7 @@ from usuarios.roles import Rol as RolUsuario
 from . import calculos
 from .fases import FASES_SUN_GAMES
 from .exceptions import (
+    EstimacionDuplicadaError,
     EstimacionInvalidaError,
     ParametroInvalidoError,
     RondaCerradaError,
@@ -73,6 +74,29 @@ class EstimacionService:
     def salarios(self, actor):
         self._verificar(actor)
         return self._repositorio.salarios()
+
+    def costos_fabricacion(self, actor, juego_id):
+        """Costos directos e indirectos de fabricación estimados."""
+        self._verificar(actor)
+        juego = self._repositorio.obtener_juego(juego_id)
+        return self._repositorio.costos_fabricacion_de(juego)
+
+    def agregar_costo_fabricacion(self, actor, juego_id, tipo,
+                                  concepto, monto):
+        self._verificar(actor)
+        with self._transaccion():
+            juego = self._repositorio.obtener_juego(juego_id)
+            costo = self._repositorio.guardar_costo_fabricacion(
+                self._repositorio.nueva_costo_fabricacion(
+                    juego, tipo, concepto.strip(), monto
+                )
+            )
+            self._registrar(
+                Accion.REGISTRO_COSTO_FABRICACION, actor,
+                f"{juego.nombre} · {costo.concepto}"[:60],
+                detalle=f"{costo.get_tipo_display()} {costo.monto}",
+            )
+        return costo
 
     # --- Altas de catálogo ---
 
@@ -186,6 +210,50 @@ class EstimacionService:
                 f"Estimación {estimacion.pk}",
             )
         return estimacion
+
+    def registrar_estimacion_matriz(self, actor, *, juego_id, rol_id,
+                                     experto_id, ronda, matriz,
+                                     justificacion=""):
+        """Registra la matriz PERT de un experto/rol para todas las fases.
+
+        `matriz` es {fase_id: {"optimista", "moda", "pesimista"}}.
+        """
+        self._verificar(actor)
+        with self._transaccion():
+            juego = self._repositorio.obtener_juego(juego_id)
+            ronda_db = self._repositorio.ronda_o_nueva(juego, ronda)
+            if ronda_db.cerrada:
+                raise RondaCerradaError()
+            rol = self._repositorio.obtener_rol(rol_id)
+            experto = self._repositorio.obtener_experto(experto_id)
+            if self._repositorio.estimaciones_existen(
+                juego, rol, experto, ronda
+            ):
+                raise EstimacionDuplicadaError()
+            creadas = []
+            for fase_id, valores in matriz.items():
+                optimista = valores["optimista"]
+                moda = valores["moda"]
+                pesimista = valores["pesimista"]
+                self._validar_omp(optimista, moda, pesimista)
+                fase = self._repositorio.obtener_fase(fase_id, juego)
+                creadas.append(
+                    self._repositorio.guardar_estimacion(
+                        self._repositorio.nueva_estimacion(
+                            juego=juego, fase=fase, rol=rol,
+                            experto=experto, ronda=ronda,
+                            optimista=optimista, moda=moda,
+                            pesimista=pesimista,
+                            justificacion=justificacion,
+                        )
+                    )
+                )
+            self._registrar(
+                Accion.REGISTRO_ESTIMACION, actor,
+                f"{experto} · {rol} · ronda {ronda} "
+                f"({len(creadas)} fases)"[:60],
+            )
+        return creadas
 
     def consolidar(self, actor, juego_id, numero, *, fecha=None):
         """Media, mediana y coeficiente de variación por fase y rol.
@@ -402,6 +470,19 @@ class PresupuestoService:
                         version, departamento, monto
                     )
                 )
+            for costo in self._repositorio.costos_fabricacion_de(juego):
+                if costo.tipo == costo.Tipo.DIRECTO:
+                    self._repositorio.guardar_costo_directo(
+                        self._repositorio.nueva_linea_directa(
+                            version, costo.concepto, costo.monto
+                        )
+                    )
+                else:
+                    self._repositorio.guardar_costo_indirecto(
+                        self._repositorio.nueva_linea_indirecta(
+                            version, costo.concepto, costo.monto
+                        )
+                    )
             self._registrar(
                 Accion.GENERACION_PRESUPUESTO, actor,
                 f"{version} total {self.total(version)}",
@@ -436,6 +517,18 @@ class PresupuestoService:
             self._repositorio.guardar_version(version)
             self._registrar(
                 Accion.APROBACION_PRESUPUESTO, actor,
+                f"{version} por {actor.username}",
+            )
+        return version
+
+    def rechazar(self, actor, version_id):
+        """Rechaza un borrador; la versión queda inmutable."""
+        version = self._version_borrador(actor, version_id)
+        with self._transaccion():
+            version.estado = version.Estado.RECHAZADO
+            self._repositorio.guardar_version(version)
+            self._registrar(
+                Accion.RECHAZO_PRESUPUESTO, actor,
                 f"{version} por {actor.username}",
             )
         return version
