@@ -50,7 +50,7 @@ class UsuarioAltaFormTest(SimpleTestCase):
         )
 
     def test_rol_no_valido(self):
-        form = UsuarioAltaForm(data=self.datos(rol="CONTADOR_COSTOS"))
+        form = UsuarioAltaForm(data=self.datos(rol="INVENTADO"))
 
         self.assertFalse(form.is_valid())
         self.assertEqual(form.errors["rol"], ["Seleccione un rol permitido."])
@@ -93,11 +93,14 @@ class UsuarioAltaFormTest(SimpleTestCase):
         self.assertEqual(form["nombre_completo"].value(), "Juan Pérez")
         self.assertEqual(form["rol"].value(), Rol.CONTADOR_GENERAL)
 
-    def test_roles_disponibles_excluyen_contador_de_costos(self):
+    def test_roles_disponibles_incluyen_contador_de_costos(self):
         choices = UsuarioAltaForm().fields["rol"].choices
         etiquetas = [etiqueta for _, etiqueta in choices]
 
-        self.assertEqual(etiquetas, ["Administrador", "Contador General"])
+        self.assertEqual(
+            etiquetas,
+            ["Administrador", "Contador General", "Contador de Costos"],
+        )
 
 
 class CambioContrasenaFormTest(SimpleTestCase):

@@ -71,7 +71,7 @@ class AgregarUsuarioTest(BaseServicioTest):
             )
 
     def test_rechaza_rol_no_valido(self):
-        for rol in ("CONTADOR_COSTOS", "", "SUPERUSUARIO"):
+        for rol in ("INVENTADO", "", "SUPERUSUARIO"):
             with self.subTest(rol=rol), self.assertRaises(RolInvalidoError):
                 self.servicio.agregar(
                     self.admin, username="jperez", nombre_completo="Juan",

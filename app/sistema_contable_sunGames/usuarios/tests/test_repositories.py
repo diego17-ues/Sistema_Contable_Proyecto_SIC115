@@ -46,7 +46,7 @@ class UsuarioRepositoryTest(TestCase):
 
     def test_rol_fuera_de_catalogo_viola_restriccion(self):
         with self.assertRaises(IntegrityError), transaction.atomic():
-            self.crear(rol="CONTADOR_COSTOS")
+            self.crear(rol="INVENTADO")
 
     def test_existe_username(self):
         self.crear()

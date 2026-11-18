@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'estados_financieros',
     'ventas',
     'costos',
+    'estimacion',
 ]
 
 AUTH_USER_MODEL = 'usuarios.Usuario'

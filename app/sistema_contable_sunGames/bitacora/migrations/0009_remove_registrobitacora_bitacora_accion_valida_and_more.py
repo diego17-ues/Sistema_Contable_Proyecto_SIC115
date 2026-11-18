@@ -3,6 +3,17 @@
 from django.db import migrations, models
 
 
+ACCIONES = [
+    'INICIO_SESION', 'ALTA_USUARIO', 'DESACTIVACION_USUARIO',
+    'REACTIVACION_USUARIO', 'CAMBIO_CONTRASENA', 'ALTA_CUENTA',
+    'MODIFICACION_CUENTA', 'REGISTRO_TRANSACCION', 'CIERRE_PERIODO',
+    'REAPERTURA_PERIODO', 'EMISION_ESTADOS', 'DESCARGA_ESTADO_PDF',
+    'RECEPCION_VENTA', 'CONTABILIZACION_VENTA', 'CONCILIACION_VENTAS',
+    'ORDEN_TRABAJO', 'CARGO_ORDEN', 'FONDO_COMPARTIDO', 'EQUIPO_COSTOS',
+    'CORTE_COSTOS', 'CATALOGO_COSTOS',
+]
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -17,10 +28,36 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='registrobitacora',
             name='accion',
-            field=models.CharField(choices=[('INICIO_SESION', 'Inicio de sesión'), ('ALTA_USUARIO', 'Alta de usuario'), ('DESACTIVACION_USUARIO', 'Desactivación de usuario'), ('REACTIVACION_USUARIO', 'Reactivación de usuario'), ('CAMBIO_CONTRASENA', 'Cambio de contraseña'), ('ALTA_CUENTA', 'Alta de cuenta'), ('MODIFICACION_CUENTA', 'Modificación de cuenta'), ('REGISTRO_TRANSACCION', 'Registro de transacción'), ('CIERRE_PERIODO', 'Cierre de período'), ('REAPERTURA_PERIODO', 'Reapertura de período'), ('EMISION_ESTADOS', 'Emisión de estados financieros'), ('DESCARGA_ESTADO_PDF', 'Descarga de estado financiero en PDF'), ('RECEPCION_VENTA', 'Recepción de venta Steam'), ('CONTABILIZACION_VENTA', 'Contabilización de venta'), ('CONCILIACION_VENTAS', 'Conciliación de ventas Steam'), ('ORDEN_TRABAJO', 'Orden de trabajo'), ('CARGO_ORDEN', 'Cargo de orden de trabajo'), ('FONDO_COMPARTIDO', 'Fondo compartido de costos'), ('EQUIPO_COSTOS', 'Equipo para costeo'), ('CORTE_COSTOS', 'Corte de costos'), ('CATALOGO_COSTOS', 'Catálogo de costos')], max_length=40, verbose_name='acción'),
+            field=models.CharField(choices=[
+                ('INICIO_SESION', 'Inicio de sesión'),
+                ('ALTA_USUARIO', 'Alta de usuario'),
+                ('DESACTIVACION_USUARIO', 'Desactivación de usuario'),
+                ('REACTIVACION_USUARIO', 'Reactivación de usuario'),
+                ('CAMBIO_CONTRASENA', 'Cambio de contraseña'),
+                ('ALTA_CUENTA', 'Alta de cuenta'),
+                ('MODIFICACION_CUENTA', 'Modificación de cuenta'),
+                ('REGISTRO_TRANSACCION', 'Registro de transacción'),
+                ('CIERRE_PERIODO', 'Cierre de período'),
+                ('REAPERTURA_PERIODO', 'Reapertura de período'),
+                ('EMISION_ESTADOS', 'Emisión de estados financieros'),
+                ('DESCARGA_ESTADO_PDF',
+                 'Descarga de estado financiero en PDF'),
+                ('RECEPCION_VENTA', 'Recepción de venta Steam'),
+                ('CONTABILIZACION_VENTA', 'Contabilización de venta'),
+                ('CONCILIACION_VENTAS', 'Conciliación de ventas Steam'),
+                ('ORDEN_TRABAJO', 'Orden de trabajo'),
+                ('CARGO_ORDEN', 'Cargo de orden de trabajo'),
+                ('FONDO_COMPARTIDO', 'Fondo compartido de costos'),
+                ('EQUIPO_COSTOS', 'Equipo para costeo'),
+                ('CORTE_COSTOS', 'Corte de costos'),
+                ('CATALOGO_COSTOS', 'Catálogo de costos'),
+            ], max_length=40, verbose_name='acción'),
         ),
         migrations.AddConstraint(
             model_name='registrobitacora',
-            constraint=models.CheckConstraint(check=models.Q(('accion__in', ['INICIO_SESION', 'ALTA_USUARIO', 'DESACTIVACION_USUARIO', 'REACTIVACION_USUARIO', 'CAMBIO_CONTRASENA', 'ALTA_CUENTA', 'MODIFICACION_CUENTA', 'REGISTRO_TRANSACCION', 'CIERRE_PERIODO', 'REAPERTURA_PERIODO', 'EMISION_ESTADOS', 'DESCARGA_ESTADO_PDF', 'RECEPCION_VENTA', 'CONTABILIZACION_VENTA', 'CONCILIACION_VENTAS', 'ORDEN_TRABAJO', 'CARGO_ORDEN', 'FONDO_COMPARTIDO', 'EQUIPO_COSTOS', 'CORTE_COSTOS', 'CATALOGO_COSTOS'])), name='bitacora_accion_valida'),
+            constraint=models.CheckConstraint(
+                check=models.Q(('accion__in', ACCIONES)),
+                name='bitacora_accion_valida',
+            ),
         ),
     ]

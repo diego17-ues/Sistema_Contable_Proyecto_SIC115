@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import administracion, auth, catalogo, estados, mayor, pages, ventas
+from .views import administracion, auth, catalogo, estimacion, estados, mayor, pages, ventas
 
 urlpatterns = [
     path("", pages.index, name="index"),
@@ -34,6 +34,24 @@ urlpatterns = [
     path("api/steam/ventas/", ventas.steam_ventas, name="steam_ventas"),
     path("api/steam/latido/", ventas.steam_latido, name="steam_latido"),
     path("panel/ventas-costos/", pages.render_screen, {"screen": "operations"}, name="operations"),
+    path("panel/estimacion/", estimacion.estimaciones, name="estimacion"),
+    path("panel/estimacion/nuevo/", estimacion.juego_nuevo, name="estimacion_nuevo"),
+    path("panel/estimacion/catalogos/", estimacion.estimacion_catalogos, name="estimacion_catalogos"),
+    path("panel/estimacion/catalogos/rol/", estimacion.catalogo_rol, name="estimacion_rol_nuevo"),
+    path("panel/estimacion/catalogos/experto/", estimacion.catalogo_experto, name="estimacion_experto_nuevo"),
+    path("panel/estimacion/catalogos/parametro/", estimacion.catalogo_parametro, name="estimacion_parametro_nuevo"),
+    path("panel/estimacion/catalogos/salario/", estimacion.catalogo_salario, name="estimacion_salario_nuevo"),
+    path("panel/estimacion/<int:juego_id>/", estimacion.juego_detalle, name="estimacion_juego"),
+    path("panel/estimacion/<int:juego_id>/estimacion/", estimacion.estimacion_nueva, name="estimacion_registrar"),
+    path("panel/estimacion/<int:juego_id>/costo-directo/", estimacion.juego_costo_directo, name="estimacion_fab_directo"),
+    path("panel/estimacion/<int:juego_id>/costo-indirecto/", estimacion.juego_costo_indirecto, name="estimacion_fab_indirecto"),
+    path("panel/estimacion/<int:juego_id>/ronda/<int:numero>/cerrar/", estimacion.ronda_cerrar, name="estimacion_ronda_cerrar"),
+    path("panel/estimacion/<int:juego_id>/version/", estimacion.version_generar, name="estimacion_version_generar"),
+    path("panel/estimacion/version/<int:version_id>/costo-directo/", estimacion.version_costo_directo, name="estimacion_costo_directo"),
+    path("panel/estimacion/version/<int:version_id>/costo-indirecto/", estimacion.version_costo_indirecto, name="estimacion_costo_indirecto"),
+    path("panel/estimacion/version/<int:version_id>/aprobar/", estimacion.version_aprobar, name="estimacion_version_aprobar"),
+    path("panel/estimacion/version/<int:version_id>/rechazar/", estimacion.version_rechazar, name="estimacion_version_rechazar"),
+    path("panel/estimacion/version/<int:version_id>/vigente/", estimacion.version_vigente, name="estimacion_version_vigente"),
     path("panel/usuarios/", administracion.usuarios, name="users"),
     path("panel/usuarios/nuevo/", administracion.usuario_nuevo, name="usuario_nuevo"),
     path("panel/usuarios/<str:username>/", administracion.usuario_detalle, name="usuario_detalle"),

@@ -1,0 +1,236 @@
+{% extends "sic_sunGames/index.html" %}
+
+{% block server_rendered %} data-server-rendered="true"{% endblock %}
+
+{% block page_content %}
+<div class="page-heading"><div><h1>{{ juego.nombre }}</h1><p>Estimación Delphi por fases y roles; versiones de presupuesto.</p></div><div class="heading-actions"><a class="button button-secondary" href="{% url 'estimacion' %}">← Juegos</a><a class="button button-primary" href="{% url 'estimacion_registrar' juego.pk %}">＋ Registrar estimación</a></div></div>
+
+<section class="card">
+  <div class="card-header"><div><h2>Rondas Delphi</h2><p>Consolidación por fase y rol</p></div>
+    <div class="heading-actions">
+      {% for ronda in rondas %}<a class="button button-secondary" href="{% url 'estimacion_juego' juego.pk %}?ronda={{ ronda.numero }}">Ronda {{ ronda.numero }}{% if ronda.cerrada %} · cerrada{% endif %}</a>{% empty %}<span class="tag">Sin rondas</span>{% endfor %}
+      {% if ronda_actual %}<a class="button button-secondary" href="{% url 'estimacion_ronda_cerrar' juego.pk ronda_actual %}">Cerrar ronda {{ ronda_actual }}</a>{% endif %}
+      <a class="button button-gold" href="{% url 'estimacion_version_generar' juego.pk %}">Generar versión</a>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Fase</th><th>Clasificación</th><th>Rol</th><th class="num">Expertos</th><th class="num">Horas E</th><th class="num">σ</th><th class="num">Media</th><th class="num">Mediana</th><th class="num">Coef. variación</th><th>Estado</th></tr></thead>
+      <tbody>
+        {% for grupo in consolidacion %}
+        <tr>
+          <td>{{ grupo.fase }}</td>
+          <td><span class="tag">{{ grupo.clasificacion }}</span></td>
+          <td>{{ grupo.rol }}</td>
+          <td class="num">{{ grupo.expertos }}</td>
+          <td class="num">{{ grupo.horas_E }}</td>
+          <td class="num">{{ grupo.sigma }}</td>
+          <td class="num">{{ grupo.media }}</td>
+          <td class="num">{{ grupo.mediana }}</td>
+          <td class="num">{{ grupo.coeficiente_variacion }}</td>
+          <td>{% if grupo.requiere_nueva_ronda %}<span class="tag">Nueva ronda</span>{% else %}<span class="tag tag-open">Consolidada</span>{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td class="empty-cell" colspan="10">Sin estimaciones en la ronda seleccionada.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-header"><div><h2>Estimaciones{% if ronda_actual %} · ronda {{ ronda_actual }}{% endif %}</h2><p>Optimista, más probable y pesimista por experto</p></div></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Fase</th><th>Rol</th><th>Experto</th><th class="num">O</th><th class="num">M</th><th class="num">P</th><th>Justificación</th></tr></thead>
+      <tbody>
+        {% for e in estimaciones %}{% if e.ronda == ronda_actual %}
+        <tr>
+          <td>{{ e.fase.nombre }}</td>
+          <td>{{ e.rol }}</td>
+          <td>{{ e.experto.nombre }}</td>
+          <td class="num">{{ e.optimista }}</td>
+          <td class="num">{{ e.moda }}</td>
+          <td class="num">{{ e.pesimista }}</td>
+          <td>{{ e.justificacion|default:"—"|truncatechars:60 }}</td>
+        </tr>
+        {% endif %}{% empty %}
+        <tr><td class="empty-cell" colspan="7">Sin estimaciones registradas.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-header"><div><h2>Costos de fabricación estimados</h2><p>Materiales, máquinas y equipo del juego; se copian a cada versión generada</p></div>
+    <div class="heading-actions">
+      <a class="button button-secondary" href="{% url 'estimacion_fab_directo' juego.pk %}">+ Costo directo</a>
+      <a class="button button-secondary" href="{% url 'estimacion_fab_indirecto' juego.pk %}">+ Costo indirecto</a>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Tipo</th><th>Concepto</th><th class="num">Monto</th></tr></thead>
+      <tbody>
+        {% for costo in costos_fabricacion %}
+        <tr><td>{{ costo.get_tipo_display }}</td><td>{{ costo.concepto }}</td><td class="num">${{ costo.monto }}</td></tr>
+        {% empty %}
+        <tr><td class="empty-cell" colspan="3">Sin costos de fabricación registrados.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-header"><div><h2>Versiones de presupuesto</h2><p>Mano de obra estimada, costos directos e indirectos</p></div></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Versión</th><th>Estado</th><th>Fecha</th><th>Autor</th><th class="num">Líneas</th><th class="num">Total estimado</th><th></th></tr></thead>
+      <tbody>
+        {% for version in versiones %}
+        <tr>
+          <td><strong>v{{ version.numero }}</strong></td>
+          <td><span class="tag {% if version.estado == 'VIGENTE' %}tag-open{% elif version.estado == 'APROBADO' %}tag-muted{% endif %}">{{ version.get_estado_display }}</span></td>
+          <td>{{ version.fecha|date:"d/m/Y H:i" }}</td>
+          <td>{{ version.autor.nombre_completo }}</td>
+          <td class="num">{{ version.lineas.count }}</td>
+          <td class="num">${{ version.total_estimado }}</td>
+          <td class="num">
+            {% if version.estado == 'BORRADOR' %}
+            <a class="text-button" href="{% url 'estimacion_costo_directo' version.pk %}">+ Costo directo</a>
+            <a class="text-button" href="{% url 'estimacion_costo_indirecto' version.pk %}">+ Costo indirecto</a>
+            <a class="text-button" href="{% url 'estimacion_version_aprobar' version.pk %}">Aprobar</a>
+            <a class="text-button" href="{% url 'estimacion_version_rechazar' version.pk %}">Rechazar</a>
+            {% elif version.estado == 'APROBADO' %}
+            <a class="text-button" href="{% url 'estimacion_version_vigente' version.pk %}">Marcar vigente</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td class="empty-cell" colspan="7">Sin versiones generadas.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% for version in versiones %}
+  <details class="card-body" style="padding:0 1rem 1rem">
+    <summary><strong>Detalle v{{ version.numero }}</strong></summary>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Fase</th><th>Clasificación</th><th>Rol</th><th class="num">Horas E</th><th class="num">σ</th><th class="num">Tarifa</th><th class="num">Costo mano de obra</th></tr></thead>
+        <tbody>
+          {% for linea in version.lineas.all %}
+          <tr><td>{{ linea.fase.nombre }}</td><td>{{ linea.fase.get_clasificacion_display }}</td><td>{{ linea.rol }}</td><td class="num">{{ linea.horas_E }}</td><td class="num">{{ linea.sigma }}</td><td class="num">{{ linea.tarifa }}</td><td class="num">${{ linea.costo_mano_obra }}</td></tr>
+          {% endfor %}
+          {% for costo in version.costos_directos.all %}<tr><td colspan="6">Directo: {{ costo.concepto }}</td><td class="num">${{ costo.monto }}</td></tr>{% endfor %}
+          {% for costo in version.costos_indirectos.all %}<tr><td colspan="6">Indirecto: {{ costo.departamento }}</td><td class="num">${{ costo.monto }}</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+  {% endfor %}
+</section>
+{% endblock %}
+
+{% block modal %}
+{% if form %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Registrar estimación">
+  <div class="modal-header"><div><h2>Registrar estimación</h2><p>Ronda única · el experto estima todas las fases para el rol seleccionado.</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'estimacion_registrar' juego.pk %}" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="form-error">{{ form.non_field_errors }}</div>{% endif %}
+    <div class="modal-fields">
+      <div class="field"><label for="id_rol">Rol *</label><select id="id_rol" name="rol">{% for r in roles %}<option value="{{ r.pk }}">{{ r }}</option>{% endfor %}</select>{% for error in form.rol.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+      <div class="field"><label for="id_experto">Experto *</label><select id="id_experto" name="experto">{% for x in expertos %}<option value="{{ x.pk }}">{{ x.nombre }}</option>{% endfor %}</select>{% for error in form.experto.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Fase</th><th class="num">O</th><th class="num">M</th><th class="num">P</th></tr></thead>
+        <tbody>
+          {% for fila in form.filas %}
+          <tr>
+            <td>{{ fila.fase.nombre }}
+              {% for error in fila.optimista.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+              {% for error in fila.moda.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+              {% for error in fila.pesimista.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+            </td>
+            <td class="num">{{ fila.optimista }}</td>
+            <td class="num">{{ fila.moda }}</td>
+            <td class="num">{{ fila.pesimista }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="modal-fields">
+      <div class="field full"><label for="id_justificacion">Justificación</label><textarea id="id_justificacion" name="justificacion" rows="2">{{ form.justificacion.value|default:'' }}</textarea></div>
+    </div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_juego' juego.pk %}">Cancelar</a><button class="button button-primary" type="submit">Registrar estimación</button></div>
+  </form>
+</section></div>
+{% elif resumen_ronda %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Cerrar ronda">
+  <div class="modal-header"><div><h2>Cerrar ronda {{ resumen_ronda.numero }}</h2><p>La ronda se consolida y queda cerrada con su aprobación registrada; no admite más estimaciones.</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'estimacion_ronda_cerrar' juego.pk resumen_ronda.numero %}">
+    {% csrf_token %}
+    <div class="modal-fields"><div class="field"><label>Juego</label><input value="{{ juego.nombre }}" readonly /></div><div class="field"><label>Ronda</label><input value="{{ resumen_ronda.numero }}" readonly /></div></div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_juego' juego.pk %}">Cancelar</a><button class="button button-primary" type="submit">Confirmar cierre</button></div>
+  </form>
+</section></div>
+{% elif form_version %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Generar versión">
+  <div class="modal-header"><div><h2>Generar versión de presupuesto</h2><p>Se generan las líneas desde la última ronda cerrada y aprobada, con los parámetros vigentes hoy. Si falta un salario vigente no se genera nada.</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'estimacion_version_generar' juego.pk %}">
+    {% csrf_token %}
+    <div class="modal-fields"><div class="field"><label>Juego</label><input value="{{ juego.nombre }}" readonly /></div></div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_juego' juego.pk %}">Cancelar</a><button class="button button-gold" type="submit">Generar borrador</button></div>
+  </form>
+</section></div>
+{% elif form_costo %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Agregar costo">
+  <div class="modal-header"><div><h2>{% if costo_directo %}Costo directo{% else %}Costo indirecto{% endif %} estimado</h2><p>Solo versiones en borrador admiten cambios.</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{{ costo_url }}" novalidate>
+    {% csrf_token %}
+    <div class="modal-fields">
+      {% for campo in form_costo %}
+      <div class="field">
+        <label for="{{ campo.id_for_label }}">{{ campo.label }} *</label>
+        {{ campo }}
+        {% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_juego' juego.pk %}">Cancelar</a><button class="button button-primary" type="submit">Registrar costo</button></div>
+  </form>
+</section></div>
+{% elif form_fab %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Costo de fabricación">
+  <div class="modal-header"><div><h2>{% if fab_tipo == 'DIRECTO' %}Costo directo{% else %}Costo indirecto{% endif %} de fabricación</h2><p>Materiales, máquinas y equipo estimados del juego; se copian a cada versión generada.</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% if fab_tipo == 'DIRECTO' %}{% url 'estimacion_fab_directo' juego.pk %}{% else %}{% url 'estimacion_fab_indirecto' juego.pk %}{% endif %}" novalidate>
+    {% csrf_token %}
+    {% if form_fab.non_field_errors %}<div class="form-error">{{ form_fab.non_field_errors }}</div>{% endif %}
+    <div class="modal-fields">
+      {% for campo in form_fab %}
+      <div class="field">
+        <label for="{{ campo.id_for_label }}">{{ campo.label }} *</label>
+        {{ campo }}
+        {% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_juego' juego.pk %}">Cancelar</a><button class="button button-primary" type="submit">Registrar costo</button></div>
+  </form>
+</section></div>
+{% elif resumen_version %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Confirmar versión">
+  <div class="modal-header"><div><h2>{% if accion == 'aprobar' %}Aprobar{% elif accion == 'rechazar' %}Rechazar{% else %}Marcar vigente{% endif %} v{{ resumen_version.numero }}</h2><p>{% if accion == 'aprobar' %}La versión quedará aprobada y será inmutable; cualquier corrección crea una versión nueva.{% elif accion == 'rechazar' %}La versión quedará rechazada y será inmutable; puede generar una versión nueva.{% else %}La versión pasará a vigente y la vigente anterior volverá a aprobada.{% endif %}</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% if accion == 'aprobar' %}{% url 'estimacion_version_aprobar' resumen_version.pk %}{% elif accion == 'rechazar' %}{% url 'estimacion_version_rechazar' resumen_version.pk %}{% else %}{% url 'estimacion_version_vigente' resumen_version.pk %}{% endif %}">
+    {% csrf_token %}
+    <div class="modal-fields"><div class="field"><label>Juego</label><input value="{{ juego.nombre }}" readonly /></div><div class="field"><label>Versión</label><input value="v{{ resumen_version.numero }} · {{ resumen_version.get_estado_display }}" readonly /></div></div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_juego' juego.pk %}">Cancelar</a><button class="button button-primary" type="submit">Confirmar</button></div>
+  </form>
+</section></div>
+{% endif %}
+{% endblock %}

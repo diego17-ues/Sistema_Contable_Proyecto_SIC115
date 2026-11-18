@@ -200,9 +200,19 @@ class AccesoServiceTests(SimpleTestCase):
             self.servicio.verificar_acceso(self.contador, modulo)
 
     def test_contador_general_no_accede_a_modulos_de_administrador(self):
-        for modulo in ("users", "audit"):
+        for modulo in ("users", "audit", "estimacion"):
             with self.assertRaises(RolNoAutorizadoError):
                 self.servicio.verificar_acceso(self.contador, modulo)
+
+    def test_administrador_y_contador_costos_acceden_a_estimacion(self):
+        costos = Usuario(username="costos", rol=Rol.CONTADOR_COSTOS)
+        self.servicio.verificar_acceso(self.admin, "estimacion")
+        self.servicio.verificar_acceso(costos, "estimacion")
+        self.assertEqual(self.servicio.area_inicial(costos), "estimacion")
+        with self.assertRaises(RolNoAutorizadoError):
+            self.servicio.verificar_acceso(costos, "ledger")
+        with self.assertRaises(RolNoAutorizadoError):
+            self.servicio.verificar_acceso(costos, "users")
 
     def test_usuario_inactivo_no_accede(self):
         self.contador.activo = False

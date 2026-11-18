@@ -29,6 +29,26 @@ class Accion(models.TextChoices):
     EQUIPO_COSTOS = "EQUIPO_COSTOS", "Equipo para costeo"
     CORTE_COSTOS = "CORTE_COSTOS", "Corte de costos"
     CATALOGO_COSTOS = "CATALOGO_COSTOS", "Catálogo de costos"
+    ALTA_JUEGO = "ALTA_JUEGO", "Alta de juego para estimación"
+    REGISTRO_ESTIMACION = (
+        "REGISTRO_ESTIMACION", "Registro de estimación de experto"
+    )
+    CIERRE_RONDA_DELPHI = (
+        "CIERRE_RONDA_DELPHI", "Cierre de ronda Delphi"
+    )
+    GENERACION_PRESUPUESTO = (
+        "GENERACION_PRESUPUESTO", "Generación de versión de presupuesto"
+    )
+    APROBACION_PRESUPUESTO = (
+        "APROBACION_PRESUPUESTO", "Aprobación de versión de presupuesto"
+    )
+    RECHAZO_PRESUPUESTO = (
+        "RECHAZO_PRESUPUESTO", "Rechazo de versión de presupuesto"
+    )
+    REGISTRO_COSTO_FABRICACION = (
+        "REGISTRO_COSTO_FABRICACION",
+        "Registro de costo de fabricación estimado",
+    )
 
 
 class Resultado(models.TextChoices):
