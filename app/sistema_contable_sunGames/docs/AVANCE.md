@@ -39,8 +39,31 @@ de orden con traslado al intangible (fuera de alcance).
   memoria e integración PostgreSQL). Suite completa: 313 pruebas OK.
 - Decisiones por defecto registradas en `docs/PREGUNTAS.md` (14–21).
 
-**Pendiente (Fase 2)**: hoja de costos por secciones, licencias
-estimadas, costo unitario, vínculo con la estimación y capturas.
+## Etapa 1 · Fase 2 — Hoja de costos, licencias, costo unitario y estimación
+
+- `OrdenTrabajo.licencias_estimadas` (positiva, editable) y
+  `estimacion_ref` (versión de presupuesto APROBADA o VIGENTE, solo
+  lectura) en la migración nueva `costos/0006`.
+- `OrdenService.resumen_orden(orden_id)`: totales por elemento y por
+  proceso, horas por proceso, costo total, licencias estimadas, costo
+  unitario (total ÷ licencias, 4 decimales, se muestra con 2; sin
+  licencias → «—»), estimación de referencia y su total (calculado por
+  `PresupuestoService.total` del módulo de estimación, sin variación).
+- Hoja de costos en la pantalla de la orden: secciones de mano de obra
+  directa, costos directos y costos indirectos siempre visibles (con
+  estado vacío), cada línea con fecha, proceso, descripción, horas y
+  costo/hora (mano de obra), monto, número de asiento y estado
+  (activo/anulado); subtotales, total en negrita, resumen por proceso,
+  licencias, total estimado y costo unitario. Botones de registro de los
+  tres elementos e «Imprimir» (hoja de estilo de impresión).
+- Responsive (`costos/static/costos/costos.css`): a ≤768 px las tablas se
+  vuelven tarjetas; sin scroll horizontal a 360, 768 y 1280 px.
+- Capturas: `docs/capturas/hoja_costos_360.png`, `hoja_costos_768.png`,
+  `hoja_costos_1280.png` y `modal_mano_obra_1280.png`.
+- Servidor de desarrollo reiniciado (`runserver` en :8000, tras
+  `collectstatic` porque `settings.DEBUG` está fijo en False y los
+  estáticos los sirve WhiteNoise); la hoja nueva se ve en el navegador.
+- Pruebas: 34 del módulo; suite completa OK.
 
 ---
 

@@ -81,7 +81,97 @@ class CostosService:
 
 
 class OrdenService(CostosService):
-    """Alta y consulta de órdenes de trabajo."""
+    """Alta y consulta de órdenes de trabajo y su hoja de costos."""
+
+    def __init__(self, repositorio, bitacora, transaccion=nullcontext,
+                 total_estimacion=None):
+        super().__init__(repositorio, bitacora, transaccion)
+        self._total_estimacion = total_estimacion
+
+    def resumen_orden(self, orden_id):
+        """Totales por elemento y por proceso, horas por proceso, costo
+        total, licencias, costo unitario y estimación de referencia."""
+        orden = self._orden(orden_id)
+        return self._resumen(orden, self._repo.registros_de_orden(orden))
+
+    def hoja_costos(self, actor, orden_id):
+        _verificar(actor)
+        orden = self._orden(orden_id)
+        registros = list(self._repo.registros_de_orden(orden))
+        resumen = self._resumen(orden, registros)
+        secciones = [
+            {"elemento": elemento.value, "nombre": elemento.label,
+             "registros": [r for r in registros
+                           if r.elemento == elemento.value],
+             "subtotal": resumen["por_elemento"][elemento.value]}
+            for elemento in Elemento
+        ]
+        return orden, secciones, resumen
+
+    def versiones_aprobadas(self, actor):
+        _verificar(actor)
+        return list(self._repo.versiones_aprobadas())
+
+    def actualizar_licencias(self, actor, orden_id, licencias):
+        _verificar(actor)
+        if licencias is None or int(licencias) <= 0:
+            raise DatosInsuficientesError(
+                "Las licencias estimadas deben ser mayores que cero.",
+                campo="licencias_estimadas",
+            )
+        orden = self._orden(orden_id)
+        orden.licencias_estimadas = int(licencias)
+        self._repo.guardar_orden(orden)
+        self._auditar(actor, Accion.ORDEN_TRABAJO, f"OT {orden.pk}",
+                      f"Licencias estimadas: {orden.licencias_estimadas}")
+        return orden
+
+    def vincular_estimacion(self, actor, orden_id, version_id):
+        """Vínculo de solo lectura con una versión aprobada o vigente."""
+        _verificar(actor)
+        orden = self._orden(orden_id)
+        version = None
+        if version_id:
+            version = self._repo.obtener_version(version_id)
+            if version is None:
+                raise DatosInsuficientesError(
+                    "Solo se vincula una versión de presupuesto aprobada.",
+                    campo="version",
+                )
+        orden.estimacion_ref = version
+        self._repo.guardar_orden(orden)
+        self._auditar(
+            actor, Accion.ORDEN_TRABAJO, f"OT {orden.pk}",
+            f"Estimación de referencia: {version.pk if version else '—'}",
+        )
+        return orden
+
+    def _resumen(self, orden, registros):
+        por_elemento, por_proceso, total = calculos.resumir(
+            registros, Elemento.values
+        )
+        version = orden.estimacion_ref
+        total_estimado = None
+        if version is not None and self._total_estimacion is not None:
+            total_estimado = self._total_estimacion(version)
+        return {
+            "por_elemento": por_elemento,
+            "por_proceso": [
+                {"proceso": f["proceso"], "importe": f["importe"]}
+                for f in por_proceso
+            ],
+            "horas_por_proceso": [
+                {"proceso": f["proceso"], "horas": f["horas"]}
+                for f in por_proceso if f["horas"]
+            ],
+            "total": total,
+            "licencias_estimadas": orden.licencias_estimadas,
+            "costo_unitario": calculos.costo_unitario(
+                total, orden.licencias_estimadas
+            ),
+            "estimacion_ref": version,
+            "total_estimado": total_estimado,
+        }
 
     def listar(self, actor, *, estado=None):
         _verificar(actor)

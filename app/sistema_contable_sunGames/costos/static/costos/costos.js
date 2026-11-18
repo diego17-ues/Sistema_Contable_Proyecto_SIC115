@@ -94,5 +94,6 @@
     if (modal) atraparFoco(modal);
     document.querySelectorAll('[data-costos-form]').forEach(prepararFormulario);
     document.querySelectorAll('[data-mano-obra]').forEach(prepararManoObra);
+    document.querySelectorAll('[data-imprimir]').forEach((boton) => boton.addEventListener('click', () => window.print()));
   });
 }());

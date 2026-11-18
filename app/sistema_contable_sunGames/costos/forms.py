@@ -153,3 +153,26 @@ class ConfiguracionCuentaForm(forms.Form):
             [self.cuentas[pk] for pk in datos["contrapartidas"]],
             self.cuentas[datos["contrapartida_defecto"]],
         )
+
+
+class LicenciasForm(forms.Form):
+    licencias_estimadas = forms.IntegerField(
+        label="Licencias estimadas", min_value=1,
+        widget=forms.NumberInput(attrs={"min": "1", "step": "1",
+                                        "inputmode": "numeric"}),
+    )
+
+
+class EstimacionRefForm(forms.Form):
+    def __init__(self, *args, versiones=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["version"].choices = [("", "— Sin vínculo —")] + [
+            (v.pk, f"{v.juego.nombre} · versión {v.numero} "
+                   f"({v.get_estado_display().lower()})")
+            for v in versiones
+        ]
+
+    version = forms.ChoiceField(
+        label="Versión de presupuesto aprobada", required=False,
+        help_text="Solo lectura: muestra el total estimado, sin variación.",
+    )

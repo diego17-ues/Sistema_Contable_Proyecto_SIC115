@@ -12,6 +12,7 @@ from django.db import models
 from django.utils import timezone
 
 from catalogo.models import Cuenta
+from estimacion.models import VersionPresupuesto
 from libro_mayor.models import Transaccion
 
 DINERO_MAX = 14
@@ -54,6 +55,15 @@ class OrdenTrabajo(models.Model):
     fecha_inicio = models.DateField(
         "fecha de inicio", default=timezone.localdate
     )
+    licencias_estimadas = models.PositiveIntegerField(
+        "licencias estimadas", null=True, blank=True,
+        validators=[MinValueValidator(1)],
+    )
+    estimacion_ref = models.ForeignKey(
+        VersionPresupuesto, on_delete=models.PROTECT, null=True,
+        blank=True, related_name="ordenes_trabajo",
+        verbose_name="estimación de referencia",
+    )
     creado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
         related_name="ordenes_creadas", null=True, blank=True,
@@ -62,6 +72,13 @@ class OrdenTrabajo(models.Model):
 
     class Meta:
         ordering = ["-fecha_creacion"]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(licencias_estimadas__isnull=True)
+                | models.Q(licencias_estimadas__gt=0),
+                name="orden_licencias_positivas",
+            ),
+        ]
 
     def __str__(self):
         return f"OT {self.pk} · {self.juego}"

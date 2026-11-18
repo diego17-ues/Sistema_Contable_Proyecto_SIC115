@@ -1,0 +1,41 @@
+/* Hoja de costos de la orden de trabajo (usa los tokens del layout). */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.hoja-resumen { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.hoja-dato { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; min-width: 0; }
+.hoja-dato span { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.hoja-dato strong { color: var(--navy); font: 800 20px Manrope, sans-serif; font-variant-numeric: tabular-nums; }
+.hoja-dato small { color: var(--muted); font-size: 10px; }
+.hoja-dato .text-button { align-self: flex-start; margin-top: 4px; }
+.hoja-seccion { margin-bottom: 16px; }
+.hoja-tabla td small { display: block; color: var(--red); font-size: 10px; }
+.hoja-anulado td { color: #8a949c; }
+.hoja-anulado td strong { text-decoration: line-through; }
+.hoja-total td { border-top: 2px solid var(--navy); color: var(--navy); font-weight: 800; }
+.hoja-acciones { flex-wrap: wrap; }
+.page-content { overflow-x: hidden; }
+
+@media (max-width: 1280px) {
+  .hoja-resumen { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 768px) {
+  .hoja-acciones .button { flex: 1 1 calc(50% - 8px); text-align: center; }
+  .hoja-tabla thead { display: none; }
+  .hoja-tabla, .hoja-tabla tbody, .hoja-tabla tr, .hoja-tabla td { display: block; width: 100%; }
+  .hoja-tabla tr { margin: 0 0 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; }
+  .hoja-tabla td { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border: 0; text-align: right; }
+  .hoja-tabla td::before { content: attr(data-label); color: var(--muted); font-size: 10px; font-weight: 700; text-align: left; }
+  .hoja-tabla td.hoja-accion { justify-content: flex-end; }
+  .hoja-tabla tr.hoja-vacia td, .hoja-tabla tr.hoja-total td:empty { display: block; text-align: center; }
+  .hoja-tabla tr.hoja-total td:empty { display: none; }
+  .hoja-tabla .num { text-align: right; }
+}
+@media (max-width: 420px) {
+  .hoja-resumen { grid-template-columns: 1fr; }
+  .hoja-acciones .button { flex: 1 1 100%; }
+}
+@media print {
+  .sidebar, .topbar, .hoja-acciones, .hoja-accion, .hoja-dato .text-button, .notice { display: none !important; }
+  .main-area { margin: 0 !important; }
+  .page-content { padding: 0 !important; }
+  .card { box-shadow: none; break-inside: avoid; }
+}

@@ -3,6 +3,7 @@
 from django.db.models import Q, Sum
 
 from catalogo.models import Cuenta
+from estimacion.models import EstadoVersion, VersionPresupuesto
 from libro_mayor.models import Movimiento
 
 from .models import (
@@ -35,7 +36,9 @@ class CostosRepository:
         return qs
 
     def obtener_orden(self, orden_id):
-        return (OrdenTrabajo.objects.select_related("juego")
+        return (OrdenTrabajo.objects
+                .select_related("juego", "estimacion_ref",
+                                "estimacion_ref__juego")
                 .filter(pk=orden_id).first())
 
     def orden_por_juego(self, juego):
@@ -45,6 +48,20 @@ class CostosRepository:
         return OrdenTrabajo.objects.create(
             juego=juego, fecha_inicio=fecha_inicio, creado_por=usuario,
         )
+
+    def guardar_orden(self, orden):
+        orden.save()
+        return orden
+
+    # ---- Estimación (solo lectura) ----
+    def versiones_aprobadas(self):
+        return (VersionPresupuesto.objects.select_related("juego")
+                .filter(estado__in=[EstadoVersion.APROBADO,
+                                    EstadoVersion.VIGENTE])
+                .order_by("juego__nombre", "-numero"))
+
+    def obtener_version(self, version_id):
+        return self.versiones_aprobadas().filter(pk=version_id).first()
 
     # ---- Procesos ----
     def procesos(self, *, solo_activos=False):

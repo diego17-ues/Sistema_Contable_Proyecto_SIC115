@@ -23,7 +23,9 @@ from .forms import (
     AnularForm,
     ConfiguracionCuentaForm,
     CostoForm,
+    EstimacionRefForm,
     FiltroOrdenForm,
+    LicenciasForm,
     ManoObraForm,
     OrdenForm,
     ProcesoEditForm,
@@ -112,8 +114,9 @@ def _render_orden(request, orden_id, **modal):
     servicio = crear_orden_service()
     registro_service = crear_registro_service()
     try:
-        orden = servicio.detalle(request.user, orden_id)
-        registros = servicio.registros(request.user, orden)
+        orden, secciones, resumen = servicio.hoja_costos(
+            request.user, orden_id
+        )
         configuradas = registro_service.configuraciones_disponibles(
             request.user
         )
@@ -124,7 +127,7 @@ def _render_orden(request, orden_id, **modal):
         return redirect("costos_ordenes")
     contexto = _contexto(request)
     contexto.update(
-        orden=orden, registros=registros,
+        orden=orden, secciones=secciones, resumen=resumen,
         bloqueados=[e.label for e in Elemento if e not in configuradas],
         **modal,
     )
@@ -134,6 +137,53 @@ def _render_orden(request, orden_id, **modal):
 @login_required
 def orden_detalle(request, orden_id):
     return _render_orden(request, orden_id)
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def orden_licencias(request, orden_id):
+    form = LicenciasForm(request.POST if request.method == "POST" else None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            crear_orden_service().actualizar_licencias(
+                request.user, orden_id,
+                form.cleaned_data["licencias_estimadas"],
+            )
+        except SIN_PERMISO as error:
+            _sin_permiso(error)
+        except CostosError as error:
+            _error_en_form(form, error)
+        else:
+            messages.success(request, "Licencias estimadas actualizadas.")
+            return redirect("costos_orden", orden_id=orden_id)
+    return _render_orden(request, orden_id, form_licencias=form)
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def orden_estimacion(request, orden_id):
+    servicio = crear_orden_service()
+    try:
+        versiones = servicio.versiones_aprobadas(request.user)
+    except SIN_PERMISO as error:
+        _sin_permiso(error)
+    form = EstimacionRefForm(
+        request.POST if request.method == "POST" else None,
+        versiones=versiones,
+    )
+    if request.method == "POST" and form.is_valid():
+        try:
+            servicio.vincular_estimacion(
+                request.user, orden_id, _int(form.cleaned_data["version"])
+            )
+        except SIN_PERMISO as error:
+            _sin_permiso(error)
+        except CostosError as error:
+            _error_en_form(form, error)
+        else:
+            messages.success(request, "Estimación de referencia guardada.")
+            return redirect("costos_orden", orden_id=orden_id)
+    return _render_orden(request, orden_id, form_estimacion=form)
 
 
 # ------------------------------------------------------------- registros

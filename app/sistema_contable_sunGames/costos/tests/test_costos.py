@@ -455,6 +455,95 @@ class VistasCostosTests(BaseCostos):
         self.assertEqual(RegistroCosto.objects.count(), 0)
 
 
+class HojaCostosTests(BaseCostos):
+    def setUp(self):
+        super().setUp()
+        self.ordenes = OrdenService(
+            self.repo, None, transaction.atomic,
+            total_estimacion=lambda version: D("150000.00"),
+        )
+
+    def test_resumen_por_elemento_proceso_y_total(self):
+        self.mano_obra()
+        self.costo(Elemento.DIRECTO, "500.00", proceso=self.programacion)
+        self.costo(Elemento.INDIRECTO, "300.00", proceso=self.arte)
+        anulado = self.costo(Elemento.DIRECTO, "999.00")
+        self.servicio.anular(self.actor, registro_id=anulado.pk,
+                             motivo="Error", clave="a-hoja")
+        resumen = self.ordenes.resumen_orden(self.orden.pk)
+        self.assertEqual(resumen["por_elemento"], {
+            "MANO_OBRA": D("800.00"), "DIRECTO": D("500.00"),
+            "INDIRECTO": D("300.00"),
+        })
+        self.assertEqual(resumen["por_proceso"], [
+            {"proceso": "Arte", "importe": D("300.00")},
+            {"proceso": "Programación", "importe": D("1300.00")},
+        ])
+        self.assertEqual(resumen["horas_por_proceso"],
+                         [{"proceso": "Programación", "horas": D("40.00")}])
+        self.assertEqual(resumen["total"], D("1600.00"))
+        for clave_ in ("licencias_estimadas", "costo_unitario",
+                       "estimacion_ref", "total_estimado"):
+            self.assertIn(clave_, resumen)
+
+    def test_costo_unitario_y_sin_licencias(self):
+        self.assertEqual(calculos.costo_unitario(D("120000.00"), 60000),
+                         D("2.0000"))
+        self.assertIsNone(calculos.costo_unitario(D("10"), None))
+        self.costo(Elemento.DIRECTO, "120000.00")
+        self.assertIsNone(
+            self.ordenes.resumen_orden(self.orden.pk)["costo_unitario"])
+        self.ordenes.actualizar_licencias(self.actor, self.orden.pk, 60000)
+        resumen = self.ordenes.resumen_orden(self.orden.pk)
+        self.assertEqual(resumen["licencias_estimadas"], 60000)
+        self.assertEqual(resumen["costo_unitario"], D("2.0000"))
+        with self.assertRaises(DatosInsuficientesError):
+            self.ordenes.actualizar_licencias(self.actor, self.orden.pk, 0)
+
+    def _version(self, estado):
+        from estimacion.models import Juego as JuegoEstimacion
+        from estimacion.models import VersionPresupuesto
+        juego = JuegoEstimacion.objects.create(nombre=f"Neo {estado}")
+        return VersionPresupuesto.objects.create(
+            juego=juego, numero=1, estado=estado, autor=self.actor,
+        )
+
+    def test_estimacion_aprobada_muestra_total_sin_variacion(self):
+        aprobada = self._version("APROBADO")
+        self.ordenes.vincular_estimacion(self.actor, self.orden.pk,
+                                         aprobada.pk)
+        resumen = self.ordenes.resumen_orden(self.orden.pk)
+        self.assertEqual(resumen["estimacion_ref"], aprobada)
+        self.assertEqual(resumen["total_estimado"], D("150000.00"))
+        self.assertNotIn("variacion", resumen)
+        borrador = self._version("BORRADOR")
+        with self.assertRaises(DatosInsuficientesError):
+            self.ordenes.vincular_estimacion(self.actor, self.orden.pk,
+                                             borrador.pk)
+
+
+class HojaVistaTests(VistasCostosTests):
+    def test_hoja_con_secciones_vacias_y_sin_licencias(self):
+        respuesta = self.client.get(reverse("costos_orden",
+                                            args=[self.orden.pk]))
+        for texto in ("Mano de obra directa", "Costo directo",
+                      "Costo indirecto", "Sin registros de costo directo",
+                      "Ingresa las licencias estimadas", "Imprimir"):
+            self.assertContains(respuesta, texto)
+
+    def test_hoja_muestra_total_y_costo_unitario(self):
+        self.costo(Elemento.DIRECTO, "120000.00")
+        respuesta = self.client.post(
+            reverse("costos_orden_licencias", args=[self.orden.pk]),
+            {"licencias_estimadas": "60000"},
+        )
+        self.assertRedirects(respuesta,
+                             reverse("costos_orden", args=[self.orden.pk]))
+        hoja = self.client.get(reverse("costos_orden", args=[self.orden.pk]))
+        self.assertContains(hoja, "$120,000.00")
+        self.assertContains(hoja, "$2.00")
+
+
 class ConceptosEliminadosTests(SimpleTestCase):
     PROHIBIDOS = re.compile(
         r"cortes?_?costos|CorteCostos|corte provisional|costo_gestion|"
