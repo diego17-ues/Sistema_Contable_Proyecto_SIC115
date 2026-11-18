@@ -40,7 +40,7 @@ LIZETH CARMELINE GOCHEZ DE PEÑATE
 
 En el entorno económico actual, signado por la acelerada transformación digital y el crecimiento exponencial de las industrias creativas, el desarrollo de software y entretenimiento interactivo se ha consolidado como un sector estratégico con dinámicas operativas y financieras particulares. En El Salvador, la gestión de empresas dedicadas al desarrollo de videojuegos requiere una estructuración contable y legal rigurosa que no solo cumpla con el marco regulatorio vigente, sino que también responda con precisión a la naturaleza intangible de sus activos y a los modelos de comercialización en plataformas digitales globales. 
 
-El presente documento constituye la caracterización de SunGames S.A de C.V., una entidad clasificada como pequeña empresa que cuenta con un equipo multidisciplinario de 18 colaboradores dedicado al diseño, programación y distribución de licencias de software. El propósito fundamental de este trabajo es establecer las bases organizativas, contables y normativas que rigen las operaciones financieras de la sociedad, alineando su práctica contable a las Normas Internacionales de Información Financiera para Pequeñas y Medianas Entidades (NIIF para Pymes) y a la legislación fiscal, mercantil y laboral de El Salvador. 
+El presente documento constituye la caracterización de SunGames S.A de C.V., una entidad clasificada como pequeña empresa que cuenta con un equipo multidisciplinario de 25 colaboradores dedicado al diseño, programación y distribución de licencias de software. El propósito fundamental de este trabajo es establecer las bases organizativas, contables y normativas que rigen las operaciones financieras de la sociedad, alineando su práctica contable a las Normas Internacionales de Información Financiera para Pequeñas y Medianas Entidades (NIIF para Pymes) y a la legislación fiscal, mercantil y laboral de El Salvador. 
 
 A lo largo del documento se aborda la filosofía corporativa y la caracterización de la empresa, detallando su modelo de comercialización basado en el pago único a través de la tienda digital Steam. Asimismo, se desarrolla el tratamiento contable de la capitalización de los costos de desarrollo de videojuegos y su amortización en línea recta durante cuatro años, en concordancia con el límite del 25% anual establecido en el Art. 30-A de la Ley de Impuesto sobre la Renta. De igual manera, se define el registro de las ventas con descuento y de los reembolsos, la inexistencia de inventario comercial para productos digitales, el método de costeo por órdenes de trabajo y las obligaciones laborales de la empresa. 
 
@@ -104,7 +104,7 @@ La Ley de Fomento, Protección y Desarrollo para la Micro y Pequeña Empresa (Le
 
 La ley no incluye a las medianas empresas. La Comisión Nacional de la Micro y Pequeña Empresa (CONAMYPE) agrega la categoría de mediana empresa, con ingresos de hasta $7 millones y hasta 100 trabajadores según su definición vigente hasta 2018; al no estar contemplada en la Ley MIPE, esta categoría se menciona solo como referencia. 
 
-Por tener 18 trabajadores, SunGames se ubica en la categoría de pequeña empresa según el criterio del número de trabajadores. Como la empresa es una simulación sin operaciones reales, esta clasificación es referencial y deberá sustentarse con datos de ventas cuando existan. 
+Por tener 25 trabajadores, SunGames se ubica en la categoría de pequeña empresa según el criterio del número de trabajadores. Como la empresa es una simulación sin operaciones reales, esta clasificación es referencial y deberá sustentarse con datos de ventas cuando existan. 
 
 Además de esta clasificación, el Código de Comercio, en su Art. 18, divide las sociedades en sociedades de personas y sociedades de capitales. A SunGames le interesa la sociedad anónima, definida en el Art. 191. La sociedad anónima es una sociedad de capitales cuyo capital se divide en partes alícuotas representadas por títulos valores llamados acciones (Art. 126), y en la que los accionistas limitan su responsabilidad al valor de sus acciones (Art. 127). Se constituye bajo una denominación seguida de “Sociedad Anónima” o de su abreviatura “S.A.”. 
 
@@ -128,7 +128,7 @@ Las NIIF para las PYMES establecen, en las secciones 3 a 8, la presentación de 
 
 ## _1.3.4 Aspectos laborales y de seguridad social_ 
 
-Con 18 trabajadores, SunGames cumple con las obligaciones del Código de Trabajo, de la Ley del Seguro Social y de la Ley del Sistema de Ahorro para Pensiones. De acuerdo con su tamaño, la empresa elabora su Reglamento Interno de Trabajo (RIT) y conforma su Comité de Seguridad y Salud Ocupacional (CSSO), en los términos que exija la normativa laboral vigente. 
+Con 25 trabajadores, SunGames cumple con las obligaciones del Código de Trabajo, de la Ley del Seguro Social y de la Ley del Sistema de Ahorro para Pensiones. De acuerdo con su tamaño, la empresa elabora su Reglamento Interno de Trabajo (RIT) y conforma su Comité de Seguridad y Salud Ocupacional (CSSO), en los términos que exija la normativa laboral vigente. 
 
 ## **MARCO CONTEXTUAL** 
 
@@ -161,7 +161,7 @@ La empresa tendrá su domicilio principal en Avenida La Revolución, Colonia San
 |**Tipo de Empresa:**|Sociedad Anónima de Capital Variable (S.A.<br>de C.V., por clasificación jurídica)<br>Pequeña Empresa (CONAMYPE)|
 |**Ubicación:**|Avenida La Revolución, Colonia San Benito,<br>Distrito de San Salvador, Municipio de San<br>Salvador Centro.|
 |**Representante Legal:**|Diego Edgardo González Sánchez|
-|**Cantidad de Empleados:**|18 trabajadores, 3 de junta directiva, 2<br>contadores,<br>7<br>desarrolladores,<br>2<br>administrativo, 1 recursos humanos y 3 de<br>unidad informática.|
+|**Cantidad de Empleados:**|25 plazas: 3 de junta directiva, 1 gerente general, 2 de contabilidad, 4 de informática, 11 de desarrollo, 2 de comercial, 1 de talento humano y 1 de operaciones.|
 |**NIT:**|1234567-8|
 |**NRC:**|765432-1|
 |**Fecha de Constitución:**|11 de septiembre de 2026|

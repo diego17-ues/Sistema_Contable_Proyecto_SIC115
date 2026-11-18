@@ -231,7 +231,7 @@ _Junta Directiva simulada_
 
 SunGames, S.A. de C.V. adopta una estructura orgánico-funcional de tipo jerárquico, con un órgano supremo (Junta General de Accionistas), un órgano de administración (Junta 
 
-Directiva), órganos de vigilancia y asesoría (Auditoría Externa e Interna) y una línea ejecutiva a cargo de la Gerencia General, de la cual dependen las unidades funcionales de la sociedad. La 
+Directiva), órganos de vigilancia y asesoría (Auditoría Externa) y una línea ejecutiva a cargo de la Gerencia General, de la cual dependen las unidades funcionales de la sociedad. La 
 
 Figura 1 presenta el organigrama general. 
 
@@ -241,7 +241,7 @@ _Organigrama general de SunGames, S. A. de C. V._
 
 
 
-_Nota._ Elaboración propia, 2026. El organigrama presenta la estructura de la sociedad hasta el nivel departamental y se complementa con el organigrama funcional contenido en el Manual de Organización y Funciones (SG-MOF-001); la planta de colaboradores se integra por dieciocho puestos (P-001 a P-018), descritos en el Manual de Descripción de Puestos (SG-MDP-001). 
+_Nota._ Elaboración propia, 2026. El organigrama presenta la estructura de la sociedad hasta el nivel departamental y se complementa con el organigrama funcional contenido en el Manual de Organización y Funciones (SG-MOF-001); la planta de colaboradores se integra por quince puestos (P-001 a P-015) y veinticinco plazas, descritos en el Manual de Descripción de Puestos (SG-MDP-001). 
 
 10 
 
@@ -355,7 +355,7 @@ le confieran; si no se expresan sus atribuciones, tendrá las de un factor (art.
 
 **Relaciones jerárquicas.** Depende de la Junta Directiva y se comunica directamente con 
 
-ella; a su cargo están las gerencias y unidades funcionales descritas en el Manual de Organización y Funciones. 
+ella; a su cargo están las unidades funcionales descritas en el Manual de Organización y Funciones. 
 
 # **Asesoría Legal** 
 
@@ -365,19 +365,20 @@ La sociedad podrá contar con asesoría jurídica externa permanente o ad hoc pa
 
 Las unidades funcionales ejecutan las operaciones propias del giro de la sociedad y dependen directamente de la Gerencia General. Su descripción detallada (misión del área, funciones y relaciones) se desarrolla en el Manual de Organización y Funciones (SG-MOF-001). 
 
-De manera preliminar, la estructura funcional comprende: 
+La estructura funcional comprende: 
 
-- Gerencia de Finanzas y Contabilidad. 
+- Departamento de Contabilidad General y Finanzas. 
 
-- Informática. 
+- Unidad de Contabilidad de Costos. 
 
-- Desarrollo de Videojuegos. 
+- Departamento de Informática. 
 
-- Comercial y Marketing. 
+- Departamento de Desarrollo de Videojuegos. 
 
-- Talento Humano. 
+- Unidad de Talento Humano. 
 
-- Operaciones y Servicio al Cliente. 
+- Unidad Administrativa, Comercial y de Operaciones. 
+
 
 15 
 
@@ -405,7 +406,7 @@ de Accionistas hacia la Junta Directiva, la Gerencia General y las unidades func
 
 líneas de autoridad se representan gráficamente en el organigrama general. 
 
-**Líneas de comunicación.** La comunicación formal sigue la estructura jerárquica, sin perjuicio de la comunicación funcional directa entre unidades afines (por ejemplo, entre Contabilidad y Tesorería, o entre Comercial y Soporte). Los asuntos que afecten a más de una unidad serán tramitados a través de la Gerencia General. 
+**Líneas de comunicación.** La comunicación formal sigue la estructura jerárquica, sin perjuicio de la comunicación funcional directa entre unidades afines (por ejemplo, entre Contabilidad General y Finanzas y Contabilidad de Costos, o entre Comercial y Operaciones). Los asuntos que afecten a más de una unidad serán tramitados a través de la Gerencia General. 
 
 **Principios.** La estructura se sustenta en los principios de unidad de mando (cada 
 
@@ -492,6 +493,7 @@ El presente manual se controla mediante el siguiente registro de versiones (ver 
 |---|---|---|---|---|---|
 |1.0|23/09/2026|Emisión inicial del<br>manual.|Departamento de<br>talento humano|Gerencia general|Junta directiva|
 |1.1|25/10/2026|Nota del organigrama:<br>estructura hasta el nivel<br>departamental y<br>plantilla de dieciocho<br>colaboradores (P-001 a<br>P-018).|Departamento de<br>talento humano|Gerencia general|Junta directiva|
+|1.2|18/11/2026|Actualización de la<br>estructura a quince<br>puestos (P-001 a P-015)<br>y veinticinco plazas;<br>incorporación de la<br>Gerencia General<br>(P-002), la Unidad de<br>Contabilidad de Costos<br>y la Unidad<br>Administrativa,<br>Comercial y de<br>Operaciones; ajuste de<br>las líneas de autoridad<br>y reporte.|Departamento de<br>talento humano|Gerencia general|Junta directiva|
 
 
 

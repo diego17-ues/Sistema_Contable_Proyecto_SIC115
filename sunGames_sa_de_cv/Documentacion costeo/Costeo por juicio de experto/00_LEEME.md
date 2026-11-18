@@ -59,8 +59,8 @@ Documentos de uso interno y confidencial.
 
 | Código | Experto | Perfil |
 |--------|---------|--------|
-| E1 | Carla Sofía Jiménez | Líder de Desarrollo de Videojuegos (P-007) |
-| E2 | Bruno Alberto Estrada | Desarrollador Senior (P-008) |
+| E1 | Carla Sofía Jiménez | Líder de Desarrollo de Videojuegos (P-008) |
+| E2 | Bruno Alberto Estrada | Desarrollador Senior (P-009) |
 | E3 | Diego Edgardo González Sánchez | Contador General |
 | — | Josué Nehemías Renderos Hernández | Facilitador (no estima) |
 

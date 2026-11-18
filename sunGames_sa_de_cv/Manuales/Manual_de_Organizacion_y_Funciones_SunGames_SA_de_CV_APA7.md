@@ -43,100 +43,106 @@ LIZETH CARMELINE GOCHEZ DE PEÑATE
 |**Tabla d**|**e contenido**.........................................................................................................................2|
 |---|---|
 |Introdu|cción.....................................................................................................................................6|
-|Objetiv|os del Manual.......................................................................................................................7|
-|Objet|ivo General..........................................................................................................................7|
-|Ob|jetivos Específicos..............................................................................................................7|
-|Alcance|y Usuarios del Manual.......................................................................................................8|
-|Base Le|gal y Normativa Aplicable..................................................................................................9|
-|Marco|Filosófico y Estratégico......................................................................................................10|
-|Misió|n........................................................................................................................................10|
-|Visió|n.........................................................................................................................................10|
-|Valo|res.......................................................................................................................................10|
-||Innovación.....................................................................................................................10|
-||Integridad y ética...........................................................................................................10|
-||Calidad y excelencia......................................................................................................10|
-||Trabajo en equipo..........................................................................................................10|
-||Orientación al cliente y al jugador.................................................................................11|
-||Responsabilidad y control..............................................................................................11|
-|Objet|ivos Estratégicos...............................................................................................................11|
+|Objetiv|os del Manual.......................................................................................................................8|
+|Objet|ivo General..........................................................................................................................8|
+|Ob|jetivos Específicos..............................................................................................................8|
+|Alcance|y Usuarios del Manual.......................................................................................................9|
+|Base Le|gal y Normativa Aplicable..................................................................................................10|
+|Marco|Filosófico y Estratégico......................................................................................................11|
+|Misió|n........................................................................................................................................11|
+|Visió|n.........................................................................................................................................11|
+|Valo|res.......................................................................................................................................11|
+||Innovación.....................................................................................................................11|
+||Integridad y ética...........................................................................................................11|
+||Calidad y excelencia......................................................................................................11|
+||Trabajo en equipo..........................................................................................................11|
+||Orientación al cliente y al jugador.................................................................................12|
+||Responsabilidad y control..............................................................................................12|
+|Objet|ivos Estratégicos...............................................................................................................12|
 
 
 
 3 
 
-|Antecedentes de la Empresa..........................................................................................................12|
+|Antecedentes de la Empresa..........................................................................................................13|
 |---|
-|Estructura Orgánico-Funcional......................................................................................................14|
-|Organigrama Funcional.............................................................................................................14|
-|Niveles de Organización............................................................................................................14|
-|Descripción de Unidades Organizativas y Funciones...................................................................15|
-|Gerencia General.......................................................................................................................15|
-|Dependencia..........................................................................................................................15|
-|Misión de la unidad...............................................................................................................15|
-|Funciones principales............................................................................................................15|
-|Relaciones internas................................................................................................................ 15|
-|Relaciones externas...............................................................................................................16|
-|Departamento de Finanzas y Contabilidad................................................................................16|
+|Estructura Orgánico-Funcional......................................................................................................15|
+|Organigrama Funcional.............................................................................................................15|
+|Niveles de Organización............................................................................................................15|
+|Descripción de Unidades Organizativas y Funciones...................................................................16|
+|Gerencia General.......................................................................................................................16|
 |Dependencia..........................................................................................................................16|
 |Misión de la unidad...............................................................................................................16|
 |Funciones principales............................................................................................................16|
-|Relaciones internas................................................................................................................ 17|
+|Relaciones internas................................................................................................................ 16|
 |Relaciones externas...............................................................................................................17|
-|Departamento de Informática....................................................................................................17|
+|Departamento de Contabilidad General y Finanzas................................................................................17|
 |Dependencia..........................................................................................................................17|
 |Misión de la unidad...............................................................................................................17|
+|Funciones principales............................................................................................................17|
+|Relaciones internas................................................................................................................ 18|
+|Relaciones externas...............................................................................................................18|
+|Unidad de Contabilidad de Costos........................................................................................18|
+|Dependencia..........................................................................................................................18|
+|Misión de la unidad...............................................................................................................18|
+|Funciones principales............................................................................................................18|
+|Relaciones internas................................................................................................................ 19|
+|Relaciones externas...............................................................................................................19|
+|Departamento de Informática....................................................................................................19|
+|Dependencia..........................................................................................................................19|
+|Misión de la unidad...............................................................................................................19|
 
 
 
 4 
 
-|Funciones principales............................................................................................................17|
-|---|
-|Relaciones internas................................................................................................................ 19|
-|Relaciones externas...............................................................................................................19|
-|Gerencia Comercial y Marketing...............................................................................................19|
-|Dependencia..........................................................................................................................19|
-|Misión de la unidad...............................................................................................................19|
 |Funciones principales............................................................................................................19|
+|---|
 |Relaciones internas................................................................................................................ 20|
 |Relaciones externas...............................................................................................................20|
-|Unidad de Talento Humano.......................................................................................................20|
-|Dependencia..........................................................................................................................20|
-|Misión de la unidad...............................................................................................................20|
-|Funciones principales............................................................................................................20|
-|Relaciones internas................................................................................................................ 21|
-|Relaciones externas...............................................................................................................21|
-|Unidad de Operaciones y Servicio al Cliente............................................................................21|
+|Departamento de Desarrollo de Videojuegos...................................................................................20|
+|Unidad Administrativa, Comercial y de Operaciones...............................................................................................21|
 |Dependencia..........................................................................................................................21|
 |Misión de la unidad...............................................................................................................21|
-|Funciones principales............................................................................................................21|
-|Relaciones internas................................................................................................................ 21|
+|Funciones principales............................................................................................................22|
+|Relaciones internas................................................................................................................ 22|
+|Relaciones externas...............................................................................................................22|
+|Unidad de Talento Humano.......................................................................................................22|
+|Dependencia..........................................................................................................................22|
+|Misión de la unidad...............................................................................................................22|
+|Funciones principales............................................................................................................22|
+|Relaciones internas................................................................................................................ 23|
+|Relaciones externas...............................................................................................................23|
+|Operaciones y Servicio al Cliente............................................................................23|
+|Dependencia..........................................................................................................................23|
+|Misión de la unidad...............................................................................................................23|
+|Funciones principales............................................................................................................23|
+|Relaciones internas................................................................................................................ 24|
 
 
 
 5 
 
-|Relaciones externas...............................................................................................................22|
+|Relaciones externas...............................................................................................................24|
 |---|
-|Auditoría Interna y Control (opcional y progresivo).................................................................22|
-|Dependencia..........................................................................................................................22|
-|Misión de la unidad...............................................................................................................22|
-|Funciones principales............................................................................................................22|
-|Relaciones internas................................................................................................................ 22|
-|Relaciones externas...............................................................................................................22|
-|Principios y Políticas de Organización..........................................................................................23|
-|<br>Unidad de mando...............................................................................................................23|
-|<br>Segregación de funciones..................................................................................................23|
-|<br>Firma social.......................................................................................................................23|
-|<br>Documentación..................................................................................................................23|
-|<br>Confidencialidad................................................................................................................23|
-|<br>Delegación......................................................................................................................... 23|
-|Actualización, Revisión y Control del Manual..............................................................................24|
-|Aprobación y Firmas.....................................................................................................................24|
-|Referencias....................................................................................................................................25|
-|Descripción de Puestos (Perfiles Principales)...............................................................................27|
-|Libros y Registros de Comercio de la Sociedad............................................................................29|
-|Control de Versiones y Elaboración del Documento....................................................................30|
+|Auditoría Interna y Control (opcional y progresivo).................................................................24|
+|Dependencia..........................................................................................................................24|
+|Misión de la unidad...............................................................................................................24|
+|Funciones principales............................................................................................................24|
+|Relaciones internas................................................................................................................ 25|
+|Relaciones externas...............................................................................................................25|
+|Principios y Políticas de Organización..........................................................................................26|
+|<br>Unidad de mando...............................................................................................................26|
+|<br>Segregación de funciones..................................................................................................26|
+|<br>Firma social.......................................................................................................................26|
+|<br>Documentación..................................................................................................................26|
+|<br>Confidencialidad................................................................................................................26|
+|<br>Delegación......................................................................................................................... 26|
+|Actualización, Revisión y Control del Manual..............................................................................27|
+|Aprobación y Firmas.....................................................................................................................27|
+|Referencias....................................................................................................................................28|
+|Libros y Registros de Comercio de la Sociedad............................................................................30|
+|Control de Versiones y Elaboración del Documento....................................................................31|
 
 
 
@@ -308,7 +314,7 @@ _Organigrama general de SunGames, S. A. de C. V._
 
 
 
-_Nota._ Elaboración propia, 2026. Representa los órganos sociales y las unidades funcionales de la sociedad hasta el nivel departamental; la planta de la sociedad se integra por dieciocho puestos (P-001 a P-018), descritos en el Manual de Descripción de Puestos (SG-MDP-001). 
+_Nota._ Elaboración propia, 2026. Representa los órganos sociales y las unidades funcionales de la sociedad hasta el nivel departamental; la planta de la sociedad se integra por quince puestos (P-001 a P-015) y veinticinco plazas, descritos en el Manual de Descripción de Puestos (SG-MDP-001). 
 
 # **Niveles de Organización** 
 
@@ -364,7 +370,7 @@ autoridades tributarias (Ministerio de Hacienda / DGII), Registro de Comercio, c
 
 La representación judicial y el uso de la firma social corresponden a la Junta Directiva, conforme al art. 260 del Código de Comercio. 
 
-# **Departamento de Finanzas y Contabilidad** 
+# **Departamento de Contabilidad General y Finanzas** 
 
 **Dependencia.** Reporta directamente a la Gerencia General. 
 
@@ -410,39 +416,53 @@ comprobantes) y la Gerencia General.
 
 El contador responsable debe cumplir los requisitos del art. 437 del Código de Comercio y las obligaciones del art. 139 del Código Tributario. 
 
+# **Unidad de Contabilidad de Costos** 
+
+**Dependencia.** Reporta directamente a la Gerencia General. 
+
+**Misión de la unidad.** Determinar, acumular y analizar los costos de los proyectos y títulos de la sociedad, y proporcionar información confiable para la valuación de inventarios, la fijación de precios y la toma de decisiones. 
+
+# **Funciones principales.** 
+
+- Mantener el sistema de costos por órdenes de trabajo y por proyecto, conforme a los métodos aprobados por la sociedad. 
+
+- Registrar y clasificar los costos directos e indirectos de cada proyecto o título (mano de obra, materiales y costos indirectos de fabricación). 
+
+- Calcular las variaciones, los costos unitarios y los márgenes por proyecto, y explicar sus causas. 
+
+- Coordinar con el Departamento de Desarrollo de Videojuegos y con el Departamento de Contabilidad General y Finanzas la entrega oportuna de horas, consumos y documentación de soporte. 
+
+- Preparar los informes de costos, la conciliación de inventarios y la información de apoyo para los estados financieros y la auditoría. 
+
+**Relaciones internas.** Gerencia General; Departamento de Contabilidad General y Finanzas; Departamento de Desarrollo de Videojuegos; Departamento de Informática; Unidad Administrativa, Comercial y de Operaciones. 
+
+**Relaciones externas.** Proveedores de servicios, auditores externos y entidades reguladoras, cuando corresponda. 
+
 # **Departamento de Informática** 
 
 **Dependencia.** Reporta directamente a la Gerencia General. 
 
-**Misión de la unidad.** Desarrollar, mantener y mejorar el portafolio de videojuegos y 
-
-contenidos digitales de la sociedad, así como la plataforma tecnológica de soporte (incluido el catálogo de videojuegos). 
+**Misión de la unidad.** Administrar la infraestructura tecnológica, los sistemas de información, las redes, los servidores y las plataformas de distribución de la sociedad, y brindar soporte técnico a las demás unidades. 
 
 # **Funciones principales.** 
 
-- Diseñar y desarrollar videojuegos y contenidos digitales propios y bajo licencia. 
+- Administrar la infraestructura tecnológica, las redes, los servidores y los servicios en la nube de la sociedad. 
 
-- Administrar el catálogo de videojuegos y su actualización permanente. 
+- Operar y mantener los sistemas de información, incluido el sistema contable institucional, y gestionar los respaldos y la seguridad informática. 
 
-18 
+- Planificar, desplegar y monitorear los servidores de juego y las plataformas de distribución. 
 
-- Ejecutar pruebas de calidad (QA) y probar el correcto funcionamiento de las aplicaciones antes de su lanzamiento. 
+- Brindar soporte técnico a las demás unidades y administrar los incidentes de tecnología. 
 
-- Mantener la infraestructura tecnológica, servidores y plataformas de distribución de la sociedad. 
+- Coordinar con el Departamento de Desarrollo de Videojuegos la puesta en producción de los títulos y las actualizaciones. 
 
-- Soportar técnicamente el sistema contable y los demás sistemas de información de la empresa. 
+- Gestionar los proveedores de tecnología y las licencias de software. 
 
-- Gestionar la propiedad intelectual de los títulos desarrollados (registro de marcas y derechos de autor, cuando corresponda). 
+**Relaciones internas.** Gerencia General; Departamento de Desarrollo de Videojuegos (puesta en producción); Departamento de Contabilidad General y Finanzas (control de proyectos y sistema contable); Unidad Administrativa, Comercial y de Operaciones (soporte a la operación). 
 
-**Relaciones internas.** Gerencia General; Comercial y Marketing (lanzamientos); Finanzas y 
+**Relaciones externas.** Proveedores de tecnología, servicios en la nube, plataformas digitales de distribución y entidades reguladoras de telecomunicaciones, cuando corresponda. 
 
-Contabilidad (control de proyectos). 
-
-**Relaciones externas.** Estudios de desarrollo, proveedores de tecnología y plataformas 
-
-digitales (distribución). 
-
-El área de desarrollo debe documentar los costos y tiempos de cada proyecto para alimentar la contabilidad de costos. 
+El área de tecnología debe documentar los costos y tiempos de cada proyecto para alimentar la contabilidad de costos. 
 
 # **Departamento de Desarrollo de Videojuegos** 
 
@@ -472,7 +492,7 @@ digitales propios, gestionando el ciclo de vida completo de cada título.
 
 - Coordinar con Comercial y Marketing los lanzamientos y el ciclo de vida de los títulos. 
 
-**Relaciones internas.** Gerencia General; Comercial y Marketing (lanzamientos); Finanzas y Contabilidad (control de proyectos y costos); Departamento de Informática (infraestructura y servidores de juego). 
+**Relaciones internas.** Gerencia General; Unidad Administrativa, Comercial y de Operaciones (lanzamientos); Departamento de Contabilidad General y Finanzas (control de proyectos y costos); Departamento de Informática (infraestructura y servidores de juego). 
 
 **Relaciones externas.** Estudios de desarrollo, proveedores de arte/audio, motores de juego, plataformas digitales de distribución. 
 
@@ -480,21 +500,17 @@ El área de desarrollo debe documentar los costos y tiempos de cada proyecto par
 
 la contabilidad de costos y la valoración de intangibles en desarrollo (NIIF para PYMES). 
 
-# **Gerencia Comercial y Marketing** 
+# **Unidad Administrativa, Comercial y de Operaciones** 
 
 **Dependencia.** Reporta directamente a la Gerencia General. 
 
-**Misión de la unidad.** Comercializar y promocionar los productos y servicios de la 
-
-sociedad, gestionar las ventas y las relaciones con clientes y socios comerciales. 
+**Misión de la unidad.** Comercializar y promocionar los productos y servicios de la sociedad, gestionar las ventas y las relaciones con clientes y socios comerciales, y coordinar las operaciones de logística y servicio al cliente. La unidad integra las funciones administrativas, comerciales y de operaciones; la sección de Operaciones y Servicio al Cliente describe su componente operativo. 
 
 # **Funciones principales.** 
 
 - Elaborar y ejecutar el plan de ventas y de marketing anual. 
 
 - Gestionar la venta directa, las tiendas en línea y las plataformas de distribución de videojuegos. 
-
-20 
 
 - Negociar y administrar licencias, acuerdos de distribución y contratos con socios comerciales. 
 
@@ -504,13 +520,9 @@ sociedad, gestionar las ventas y las relaciones con clientes y socios comerciale
 
 - Medir la satisfacción del cliente y proponer mejoras al portafolio. 
 
-**Relaciones internas.** Gerencia General; Unidad de Operaciones y Servicio al Cliente 
+**Relaciones internas.** Gerencia General; Operaciones y Servicio al Cliente (entregas y soporte); Departamento de Contabilidad General y Finanzas (facturación y cobros). 
 
-(entregas y soporte); Finanzas y Contabilidad (facturación y cobros). 
-
-**Relaciones externas.** Clientes finales, distribuidores, plataformas digitales, agencias de 
-
-publicidad y medios. 
+**Relaciones externas.** Clientes finales, distribuidores, plataformas digitales, agencias de publicidad y medios. 
 
 Las ventas se documentan mediante facturas u otros comprobantes autorizados conforme a la normativa del IVA. 
 
@@ -518,9 +530,7 @@ Las ventas se documentan mediante facturas u otros comprobantes autorizados conf
 
 **Dependencia.** Reporta directamente a la Gerencia General. 
 
-**Misión de la unidad.** Administrar el ciclo del personal y asegurar el cumplimiento de las 
-
-obligaciones laborales y de seguridad social. 
+**Misión de la unidad.** Administrar el ciclo del personal y asegurar el cumplimiento de las obligaciones laborales y de seguridad social. 
 
 # **Funciones principales.** 
 
@@ -532,51 +542,35 @@ obligaciones laborales y de seguridad social.
 
 - Administrar vacaciones, permisos, ausencias y el control de asistencia. 
 
-21 
-
 - Asegurar la vigencia del Reglamento Interno de Trabajo y de las políticas de conducta y seguridad. 
 
 - Coordinar la evaluación del desempeño y el clima organizacional. 
 
 **Relaciones internas.** Gerencia General y todas las unidades (asignación de personal). 
 
-**Relaciones externas.** ISSS, AFP, Ministerio de Trabajo (MTPS), proveedores de 
+**Relaciones externas.** ISSS, AFP, Ministerio de Trabajo (MTPS), proveedores de servicios de capacitación y de seguros. 
 
-servicios de capacitación y de seguros. 
+La elaboración y el pago de las planillas deben ser revisados por el Contador General (P-003), con apoyo del Departamento de Contabilidad General y Finanzas, antes de su pago. 
 
-La elaboración y el pago de las planillas deben ser revisados por la Gerencia de Finanzas 
+# **Operaciones y Servicio al Cliente** 
 
-y Contabilidad antes de su pago. 
+**Dependencia.** Reporta a la Gerencia General, dentro de la Unidad Administrativa, Comercial y de Operaciones. 
 
-# **Unidad de Operaciones y Servicio al Cliente** 
-
-**Dependencia.** Reporta directamente a la Gerencia General. 
-
-**Misión de la unidad.** Ejecutar la logística de entrega de productos y brindar soporte 
-
-técnico y atención al cliente. 
+**Misión de la unidad.** Ejecutar la logística de entrega de productos y brindar soporte técnico y atención al cliente. 
 
 # **Funciones principales.** 
 
-- Coordinar el almacenamiento y despacho de productos físicos y la disponibilidad de 
+- Coordinar el almacenamiento y despacho de productos físicos y la disponibilidad de contenidos digitales. 
 
-contenidos digitales. 
-
-- Gestionar compras y contratos de suministros, coordinando con Finanzas y Contabilidad. 
+- Gestionar compras y contratos de suministros, coordinando con el Departamento de Contabilidad General y Finanzas. 
 
 - Brindar soporte técnico y atención de consultas y reclamos de los usuarios. 
 
-- Registrar los niveles de servicio (SLA) y resolver incidencias dentro de los plazos 
-
-establecidos. 
+- Registrar los niveles de servicio (SLA) y resolver incidencias dentro de los plazos establecidos. 
 
 - Mantener inventarios físicos y reportes de existencias para el área contable. 
 
-**Relaciones internas.** Gerencia General; Comercial y Marketing (pedidos y entregas); 
-
-Finanzas y Contabilidad (inventarios y soportes). 
-
-22 
+**Relaciones internas.** Gerencia General; Unidad Administrativa, Comercial y de Operaciones (pedidos y entregas); Departamento de Contabilidad General y Finanzas (inventarios y soportes). 
 
 **Relaciones externas.** Proveedores de logística, mensajería, almacenaje y call center tercerizado (si aplica). 
 
@@ -584,11 +578,9 @@ Los despachos deben respaldarse con documentación de soporte (órdenes de salid
 
 # **Auditoría Interna y Control (opcional y progresivo)** 
 
-**Dependencia.** Reporta a la Junta General / Auditoría Externa. 
+**Dependencia.** Reporta a la Gerencia General; mantiene comunicación funcional con la Junta Directiva y la Auditoría Externa para preservar su independencia. 
 
-**Misión de la unidad.** Evaluar de manera independiente la eficacia del sistema de control 
-
-interno y el cumplimiento de las políticas de la sociedad. 
+**Misión de la unidad.** Evaluar de manera independiente la eficacia del sistema de control interno y el cumplimiento de las políticas de la sociedad. 
 
 # **Funciones principales.** 
 
@@ -600,17 +592,11 @@ interno y el cumplimiento de las políticas de la sociedad.
 
 - Coordinar, cuando corresponda, con la auditoría externa la entrega de información. 
 
-**Relaciones internas.** Todas las unidades; reporta funcionalmente a la Junta Directiva 
-
-para preservar su independencia. 
+**Relaciones internas.** Todas las unidades; reporta a la Gerencia General y mantiene comunicación funcional con la Junta Directiva para preservar su independencia. 
 
 **Relaciones externas.** Auditoría externa y, en su caso, autoridades de fiscalización. 
 
-Su creación será progresiva conforme crezca el tamaño de la organización; en tanto no 
-
-exista, el control interno será supervisado por la Gerencia General con apoyo del contador y del auditor externo. 
-
-23 
+Su creación será progresiva conforme crezca el tamaño de la organización; en tanto no exista, el control interno será supervisado por la Gerencia General con apoyo del contador y del auditor externo. 
 
 # **PRINCIPIOS Y POLÍTICAS DE ORGANIZACIÓN** 
 
@@ -745,6 +731,7 @@ El presente manual se controla mediante el siguiente registro de versiones (ver 
 |**n**||**del cambio**||||
 |1.0|23/09/2026|Emisión inicial del|Departamento de|Gerencia general|Junta directiva|
 |||manual.|talento humano|||
+|1.1|18/11/2026|Actualización de la estructura a quince puestos (P-001 a P-015) y veinticinco plazas; incorporación de la Gerencia General (P-002), la Unidad de Contabilidad de Costos y la Unidad Administrativa, Comercial y de Operaciones; actualización de las líneas de reporte a la Gerencia General.|Departamento de talento humano|Gerencia general|Junta directiva|
 
 
 
