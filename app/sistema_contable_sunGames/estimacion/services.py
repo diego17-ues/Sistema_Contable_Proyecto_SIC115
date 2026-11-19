@@ -5,6 +5,8 @@ from contextlib import nullcontext
 from datetime import date
 from decimal import Decimal
 
+from django.utils import timezone
+
 from bitacora.eventos import Accion, Resultado
 from usuarios.exceptions import RolNoAutorizadoError, UsuarioInactivoError
 from usuarios.roles import Rol as RolUsuario
@@ -14,6 +16,7 @@ from .fases import FASES_SUN_GAMES
 from .exceptions import (
     EstimacionDuplicadaError,
     EstimacionInvalidaError,
+    EstimacionNoEncontradaError,
     ParametroInvalidoError,
     RondaCerradaError,
     RondaSinAprobarError,
@@ -302,10 +305,104 @@ class EstimacionService:
         juego = self._repositorio.obtener_juego(juego_id)
         return self._repositorio.rondas_de(juego)
 
-    def estimaciones(self, actor, juego_id, ronda=None):
+    def estimaciones(self, actor, juego_id, ronda=None, *,
+                     incluir_eliminadas=False):
         self._verificar(actor)
         juego = self._repositorio.obtener_juego(juego_id)
-        return self._repositorio.estimaciones_de(juego, ronda=ronda)
+        return self._repositorio.estimaciones_de(
+            juego, ronda=ronda, incluir_eliminadas=incluir_eliminadas
+        )
+
+    def obtener_estimacion(self, actor, juego_id, estimacion_id, *,
+                           incluir_eliminada=False):
+        self._verificar(actor)
+        juego = self._repositorio.obtener_juego(juego_id)
+        estimacion = self._repositorio.obtener_estimacion(
+            estimacion_id, juego=juego,
+            incluir_eliminada=incluir_eliminada,
+        )
+        if estimacion is None:
+            raise EstimacionNoEncontradaError()
+        return estimacion
+
+    def actualizar_estimacion(self, actor, juego_id, estimacion_id, *,
+                              optimista, moda, pesimista,
+                              justificacion=""):
+        self._verificar(actor)
+        self._validar_omp(optimista, moda, pesimista)
+        estimacion = self.obtener_estimacion(
+            actor, juego_id, estimacion_id
+        )
+        ronda = self._repositorio.obtener_ronda(
+            estimacion.juego, estimacion.ronda
+        )
+        if ronda.cerrada:
+            raise RondaCerradaError()
+        with self._transaccion():
+            estimacion.optimista = optimista
+            estimacion.moda = moda
+            estimacion.pesimista = pesimista
+            estimacion.justificacion = justificacion
+            self._repositorio.guardar_estimacion(estimacion)
+            self._registrar(
+                Accion.REGISTRO_ESTIMACION, actor,
+                f"Estimación {estimacion.pk}",
+                detalle="Estimación experta modificada.",
+            )
+        return estimacion
+
+    def eliminar_estimacion(self, actor, juego_id, estimacion_id):
+        self._verificar(actor)
+        estimacion = self.obtener_estimacion(
+            actor, juego_id, estimacion_id
+        )
+        ronda = self._repositorio.obtener_ronda(
+            estimacion.juego, estimacion.ronda
+        )
+        if ronda.cerrada:
+            raise RondaCerradaError(
+                "No se puede eliminar una estimación de una ronda cerrada."
+            )
+        with self._transaccion():
+            estimacion.eliminado_en = timezone.now()
+            estimacion.eliminado_por = actor
+            self._repositorio.guardar_estimacion(estimacion)
+            self._registrar(
+                Accion.REGISTRO_ESTIMACION, actor,
+                f"Estimación {estimacion.pk}",
+                detalle="Baja lógica; se conserva el registro original.",
+            )
+        return estimacion
+
+    def restaurar_estimacion(self, actor, juego_id, estimacion_id):
+        self._verificar(actor)
+        estimacion = self.obtener_estimacion(
+            actor, juego_id, estimacion_id, incluir_eliminada=True
+        )
+        if not estimacion.eliminada:
+            return estimacion
+        ronda = self._repositorio.obtener_ronda(
+            estimacion.juego, estimacion.ronda
+        )
+        if ronda.cerrada:
+            raise RondaCerradaError(
+                "No se puede restaurar una estimación en una ronda cerrada."
+            )
+        if self._repositorio.estimacion_fase_existe(estimacion):
+            raise EstimacionDuplicadaError(
+                "Ya existe una estimación activa para esta fase, experto, "
+                "rol y ronda."
+            )
+        with self._transaccion():
+            estimacion.eliminado_en = None
+            estimacion.eliminado_por = None
+            self._repositorio.guardar_estimacion(estimacion)
+            self._registrar(
+                Accion.REGISTRO_ESTIMACION, actor,
+                f"Estimación {estimacion.pk}",
+                detalle="Restauración de estimación archivada.",
+            )
+        return estimacion
 
     # --- Consolidación ---
 
@@ -401,14 +498,56 @@ class PresupuestoService:
         self._estimaciones = estimacion_service
         self._transaccion = transaccion
 
-    def versiones(self, actor, juego_id):
+    def versiones(self, actor, juego_id, *, incluir_eliminadas=False):
         self._verificar(actor)
         juego = self._repositorio.obtener_juego(juego_id)
-        return self._repositorio.versiones_de(juego)
+        return self._repositorio.versiones_de(
+            juego, incluir_eliminadas=incluir_eliminadas
+        )
 
-    def obtener_version(self, actor, version_id):
+    def obtener_version(self, actor, version_id, *,
+                        incluir_eliminada=False):
         self._verificar(actor)
-        return self._repositorio.obtener_version(version_id)
+        return self._repositorio.obtener_version(
+            version_id, incluir_eliminada=incluir_eliminada
+        )
+
+    def eliminar_version(self, actor, version_id):
+        self._verificar(actor)
+        version = self._repositorio.obtener_version(
+            version_id, incluir_eliminada=True
+        )
+        if version.eliminada:
+            return version
+        with self._transaccion():
+            version.eliminado_en = timezone.now()
+            version.eliminado_por = actor
+            self._repositorio.guardar_version(version)
+            self._registrar(
+                Accion.GENERACION_PRESUPUESTO, actor,
+                f"Versión {version.pk}",
+                detalle=("Baja lógica; se conservan la estimación y sus "
+                         "referencias históricas."),
+            )
+        return version
+
+    def restaurar_version(self, actor, version_id):
+        self._verificar(actor)
+        version = self._repositorio.obtener_version(
+            version_id, incluir_eliminada=True
+        )
+        if not version.eliminada:
+            return version
+        with self._transaccion():
+            version.eliminado_en = None
+            version.eliminado_por = None
+            self._repositorio.guardar_version(version)
+            self._registrar(
+                Accion.GENERACION_PRESUPUESTO, actor,
+                f"Versión {version.pk}",
+                detalle="Restauración de versión archivada.",
+            )
+        return version
 
     def generar_version(self, actor, juego_id, *, fecha=None,
                         costos_directos=(), costos_indirectos=()):
@@ -437,8 +576,7 @@ class PresupuestoService:
             )
             raise
         with self._transaccion():
-            existentes = self._repositorio.versiones_de(juego)
-            numero = (existentes[0].numero + 1) if existentes else 1
+            numero = self._repositorio.siguiente_numero_version(juego)
             version = self._repositorio.guardar_version(
                 self._repositorio.nueva_version(
                     juego, numero, actor,

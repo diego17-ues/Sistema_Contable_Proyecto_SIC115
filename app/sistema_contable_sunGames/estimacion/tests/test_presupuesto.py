@@ -247,6 +247,55 @@ class PresupuestoTests(TestCase):
         )
         self.assertEqual(v2.numero, 2)
 
+    def test_baja_logica_version_preserva_datos_y_restauracion(self):
+        self.ronda_aprobada()
+        version = self.presupuestos.generar_version(
+            self.admin, self.juego.pk, fecha=FECHA
+        )
+        self.presupuestos.aprobar(self.admin, version.pk)
+        version.refresh_from_db()
+        total = self.presupuestos.total(version)
+
+        archivada = self.presupuestos.eliminar_version(
+            self.admin, version.pk
+        )
+
+        self.assertTrue(archivada.eliminada)
+        self.assertEqual(
+            archivada.estado, VersionPresupuesto.Estado.APROBADO
+        )
+        self.assertEqual(archivada.eliminado_por, self.admin)
+        self.assertEqual(self.presupuestos.total(archivada), total)
+        self.assertEqual(
+            list(self.presupuestos.versiones(self.admin, self.juego.pk)), []
+        )
+        archivadas = list(self.presupuestos.versiones(
+            self.admin, self.juego.pk, incluir_eliminadas=True
+        ))
+        self.assertEqual(len(archivadas), 1)
+
+        restaurada = self.presupuestos.restaurar_version(
+            self.admin, version.pk
+        )
+        self.assertFalse(restaurada.eliminada)
+        self.assertEqual(
+            len(list(self.presupuestos.versiones(self.admin, self.juego.pk))),
+            1,
+        )
+
+    def test_version_archivada_no_reutiliza_su_numero(self):
+        self.ronda_aprobada()
+        primera = self.presupuestos.generar_version(
+            self.admin, self.juego.pk, fecha=FECHA
+        )
+        self.presupuestos.eliminar_version(self.admin, primera.pk)
+
+        segunda = self.presupuestos.generar_version(
+            self.admin, self.juego.pk, fecha=FECHA
+        )
+
+        self.assertEqual(segunda.numero, primera.numero + 1)
+
     def test_modulo_no_consulta_el_libro_mayor(self):
         for modulo in (models, calculos, repositories, services,
                        composition):

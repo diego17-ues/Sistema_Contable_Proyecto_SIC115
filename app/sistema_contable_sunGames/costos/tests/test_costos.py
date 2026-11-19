@@ -30,20 +30,29 @@ from costos.exceptions import (
     PeriodoNoAbiertoError,
     RegistroYaAnuladoError,
 )
+from costos.forms import OrdenForm
 from costos.models import (
     AsientoCosto,
     ConfiguracionCuentaCosto,
     Elemento,
+    FuenteIndirecta,
+    OrdenTrabajo,
     Proceso,
     RegistroCosto,
 )
 from costos.repositories import CostosRepository
 from costos.services import (
+    AplicacionIndirectosService,
     CatalogoCostosService,
     OrdenService,
     RegistroCostoService,
 )
-from libro_mayor.models import EstadoPeriodo, Movimiento, PeriodoContable
+from libro_mayor.models import (
+    EstadoPeriodo,
+    Movimiento,
+    PeriodoContable,
+    TipoMovimiento,
+)
 from libro_mayor.repositories import TransaccionRepository
 from usuarios.exceptions import RolNoAutorizadoError
 from usuarios.models import Usuario
@@ -65,6 +74,30 @@ class CalculosPurosTests(SimpleTestCase):
         self.assertEqual(calculos.importe_mano_obra("1.5", "33.3333"),
                          D("50.00"))
 
+    def test_distribucion_por_horas_y_ajuste_de_centavos(self):
+        self.assertEqual(
+            calculos.distribuir_por_horas(
+                D("1000.00"), {1: D("120"), 2: D("80")}
+            ),
+            {1: D("600.00"), 2: D("400.00")},
+        )
+        self.assertEqual(
+            calculos.distribuir_por_horas(
+                D("600.00"), {1: D("160"), 2: D("140")}
+            ),
+            {1: D("320.00"), 2: D("280.00")},
+        )
+        reparto = calculos.distribuir_por_horas(
+            D("10000.00"), {
+                1: D("500"), 2: D("300"), 3: D("200"), 4: D("100"),
+            }
+        )
+        self.assertEqual(
+            list(reparto.values()),
+            [D("4545.45"), D("2727.27"), D("1818.18"), D("909.10")],
+        )
+        self.assertEqual(sum(reparto.values()), D("10000.00"))
+
     def test_lineas_cuadran_y_contrarias(self):
         lineas = calculos.lineas_registro("debe", "haber", D("83.33"))
         self.assertEqual(lineas,
@@ -73,6 +106,68 @@ class CalculosPurosTests(SimpleTestCase):
         self.assertEqual(calculos.lineas_contrarias(lineas),
                          [("debe", D("-83.33")), ("haber", D("83.33"))])
         self.assertFalse(calculos.cuadra([("debe", D("1"))]))
+
+    def test_comparacion_estimado_real_y_porcentaje(self):
+        evaluacion = calculos.comparar_estimado_real(
+            D("100.00"), D("125.00")
+        )
+        self.assertEqual(evaluacion["variacion"], D("25.00"))
+        self.assertEqual(evaluacion["porcentaje"], D("25.00"))
+        self.assertEqual(evaluacion["estado"], "POR_ENCIMA")
+        self.assertFalse(evaluacion["viable"])
+
+        evaluacion = calculos.comparar_estimado_real(
+            D("100.00"), D("75.00")
+        )
+        self.assertEqual(evaluacion["variacion"], D("-25.00"))
+        self.assertEqual(evaluacion["porcentaje"], D("-25.00"))
+        self.assertEqual(evaluacion["estado"], "POR_DEBAJO")
+        self.assertTrue(evaluacion["viable"])
+
+        evaluacion = calculos.comparar_estimado_real(
+            D("100.00"), D("100.00")
+        )
+        self.assertEqual(evaluacion["variacion"], D("0.00"))
+        self.assertEqual(evaluacion["estado"], "COINCIDE")
+        self.assertTrue(evaluacion["viable"])
+
+    def test_comparacion_no_divide_entre_estimacion_cero(self):
+        evaluacion = calculos.comparar_estimado_real(
+            D("0.00"), D("12.50")
+        )
+        self.assertIsNone(evaluacion["porcentaje"])
+        self.assertEqual(evaluacion["estado"], "POR_ENCIMA")
+
+
+class OrdenFormTests(SimpleTestCase):
+    def test_estimacion_seleccionada_completa_el_juego(self):
+        version = SimpleNamespace(
+            pk=12,
+            juego=SimpleNamespace(nombre="Neo Drift"),
+            numero=3,
+            get_estado_display=lambda: "Vigente",
+        )
+        form = OrdenForm(
+            data={
+                "nombre_juego": "",
+                "estimacion": "12",
+                "fecha_inicio": "2026-06-15",
+            },
+            estimaciones=[version],
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["nombre_juego"], "Neo Drift")
+
+    def test_sin_estimacion_requiere_nombre_del_juego(self):
+        form = OrdenForm(data={
+            "nombre_juego": "",
+            "estimacion": "",
+            "fecha_inicio": "2026-06-15",
+        })
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("nombre_juego", form.errors)
 
 
 # ------------------------------------------------------------ unitarias
@@ -352,6 +447,156 @@ class RegistroElementosTests(BaseCostos):
                                      fecha_inicio=FECHA)
 
 
+class AplicacionIndirectosTests(BaseCostos):
+    def setUp(self):
+        super().setUp()
+        self.mayor = TransaccionRepository()
+        self.catalogo = CatalogoCostosService(
+            self.repo, None, transaction.atomic
+        )
+        self.aplicacion = AplicacionIndirectosService(
+            self.repo, self.mayor, None, transaction.atomic
+        )
+
+    def crear_fuente(self, cuenta=None):
+        return self.catalogo.crear_fuente_indirecta(
+            self.actor, nombre="Servicios de desarrollo",
+            tipo=FuenteIndirecta.Tipo.SERVICIO,
+            cuenta=cuenta or self.cuenta("4205"),
+            exclusiva_desarrollo=True,
+        )
+
+    def aportar_pool(self, importe, cuenta=None):
+        transaccion = self.mayor.crear_transaccion(usuario=self.actor)
+        cuenta = cuenta or self.cuenta("4205")
+        self.mayor.crear_movimiento(
+            transaccion=transaccion, cuenta=cuenta, fecha=FECHA,
+            concepto="Servicio consumido", referencia="Gasto compartido",
+            tipo=TipoMovimiento.DIARIO, importe=D(importe),
+        )
+        self.mayor.crear_movimiento(
+            transaccion=transaccion, cuenta=self.cuenta("1103"),
+            fecha=FECHA, concepto="Pago del servicio", referencia="Pago",
+            tipo=TipoMovimiento.DIARIO, importe=-D(importe),
+        )
+
+    def agregar_orden_con_horas(self, nombre, horas, proceso=None):
+        orden = self.ordenes.crear_orden(
+            self.actor, nombre_juego=nombre, fecha_inicio=FECHA,
+        )
+        self.servicio.registrar_mano_obra(
+            self.actor, orden_id=orden.pk, fecha=FECHA,
+            proceso_id=(proceso or self.programacion).pk,
+            horas=horas, costo_hora="1.00", contrapartida_id=None,
+            clave=clave(),
+        )
+        return orden
+
+    def test_pool_se_distribuye_por_horas_y_no_se_duplica(self):
+        self.mano_obra(horas="120", costo="1.00")
+        otra = self.agregar_orden_con_horas("Otro juego", "80")
+        fuente = self.crear_fuente()
+        self.aportar_pool("1000.00", fuente.cuenta_origen)
+
+        vista = self.aplicacion.previsualizar(self.actor, self.periodo.pk)
+
+        self.assertEqual(vista["total_pool"], D("1000.00"))
+        self.assertEqual(vista["total_distribuido"], D("1000.00"))
+        self.assertEqual(
+            [linea["importe"] for linea in vista["distribucion"]],
+            [D("600.00"), D("400.00")],
+        )
+        self.aplicacion.aplicar(self.actor, self.periodo.pk)
+        registros = list(self.repo.registros_indirectos_periodo(self.periodo))
+        self.assertEqual(len(registros), 2)
+        por_orden = {r.orden_id: r.importe for r in registros}
+        self.assertEqual(por_orden[self.orden.pk], D("600.00"))
+        self.assertEqual(por_orden[otra.pk], D("400.00"))
+        for registro in registros:
+            self.assertEqual(
+                self.movimientos(registro),
+                {"4103": registro.importe,
+                 fuente.cuenta_origen.codigo: -registro.importe},
+            )
+
+        self.aplicacion.aplicar(self.actor, self.periodo.pk)
+        self.assertEqual(
+            len(list(self.repo.registros_indirectos_periodo(self.periodo))), 2
+        )
+
+    def test_fuente_sin_horas_no_aplica_y_muestra_alerta(self):
+        fuente = self.crear_fuente()
+        self.aportar_pool("600.00", fuente.cuenta_origen)
+
+        vista = self.aplicacion.aplicar(self.actor, self.periodo.pk)
+
+        self.assertEqual(vista["distribucion"], [])
+        self.assertTrue(any("ninguna orden abierta" in aviso
+                            for aviso in vista["alertas"]))
+        self.assertFalse(RegistroCosto.objects.filter(
+            fuente_indirecta=fuente
+        ).exists())
+
+    def test_orden_cerrada_no_recibe_prorrateo(self):
+        self.mano_obra(horas="40", costo="1.00")
+        cerrada = self.agregar_orden_con_horas("Juego cerrado", "60")
+        cerrada.estado = OrdenTrabajo.ESTADO_CERRADA
+        cerrada.save()
+        fuente = self.crear_fuente()
+        self.aportar_pool("100.00", fuente.cuenta_origen)
+
+        vista = self.aplicacion.previsualizar(self.actor, self.periodo.pk)
+
+        self.assertEqual(len(vista["distribucion"]), 1)
+        self.assertEqual(vista["distribucion"][0]["orden_id"], self.orden.pk)
+        self.assertEqual(vista["distribucion"][0]["horas"], D("40.00"))
+
+    def test_cuenta_excluida_no_se_distribuye(self):
+        fuente = self.crear_fuente()
+        self.catalogo.excluir_cuenta_indirecta(
+            self.actor, cuenta=fuente.cuenta_origen,
+            motivo="Cuenta compartida con administración",
+        )
+        self.mano_obra()
+        self.aportar_pool("600.00", fuente.cuenta_origen)
+
+        vista = self.aplicacion.previsualizar(self.actor, self.periodo.pk)
+
+        self.assertEqual(vista["distribucion"], [])
+        fuente.refresh_from_db()
+        self.assertFalse(fuente.activa)
+
+    def test_reversion_crea_contra_asiento_por_periodo(self):
+        self.mano_obra()
+        fuente = self.crear_fuente()
+        self.aportar_pool("100.00", fuente.cuenta_origen)
+        self.aplicacion.aplicar(self.actor, self.periodo.pk)
+        registro = RegistroCosto.objects.get(fuente_indirecta=fuente)
+
+        resultado = self.aplicacion.revertir(self.actor, self.periodo.pk)
+
+        registro.refresh_from_db()
+        self.assertEqual(registro.estado, RegistroCosto.ESTADO_ANULADO)
+        self.assertTrue(resultado["puede_revertir"] is False)
+        self.assertEqual(
+            self.movimientos(registro, AsientoCosto.TIPO_ANULACION),
+            {"4103": D("-100.00"),
+             fuente.cuenta_origen.codigo: D("100.00")},
+        )
+        movimientos_antes = Movimiento.objects.count()
+        self.aplicacion.revertir(self.actor, self.periodo.pk)
+        self.assertEqual(Movimiento.objects.count(), movimientos_antes)
+
+    def test_no_aplica_en_periodo_cerrado(self):
+        self.mano_obra()
+        fuente = self.crear_fuente()
+        self.aportar_pool("100.00", fuente.cuenta_origen)
+        self.periodo.estado = EstadoPeriodo.CIERRE_PROVISIONAL
+        self.periodo.save()
+
+        with self.assertRaises(PeriodoNoAbiertoError):
+            self.aplicacion.aplicar(self.actor, self.periodo.pk)
+
 class AnulacionTests(BaseCostos):
     def test_anular_crea_contra_asiento_y_baja_total(self):
         self.mano_obra()
@@ -523,12 +768,54 @@ class HojaCostosTests(BaseCostos):
         with self.assertRaises(DatosInsuficientesError):
             self.ordenes.actualizar_licencias(self.actor, self.orden.pk, 0)
 
-    def _version(self, estado):
+    def test_actualizar_orden_edita_datos_operativos(self):
+        nueva_fecha = date(2026, 5, 31)
+        actualizada = self.ordenes.actualizar_orden(
+            self.actor, self.orden.pk, nombre_juego="Neo Drift Remaster",
+            fecha_inicio=nueva_fecha, licencias_estimadas=700,
+        )
+        self.assertEqual(actualizada.juego.nombre, "Neo Drift Remaster")
+        self.assertEqual(actualizada.fecha_inicio, nueva_fecha)
+        self.assertEqual(actualizada.licencias_estimadas, 700)
+
+    def test_baja_logica_conserva_costos_y_permite_nueva_orden(self):
+        registro = self.costo(Elemento.DIRECTO, "150.00")
+        nombre_juego = self.orden.juego.nombre
+
+        archivada = self.ordenes.eliminar(self.actor, self.orden.pk)
+
+        self.assertTrue(archivada.eliminada)
+        self.assertIsNotNone(archivada.eliminado_por)
+        self.assertTrue(RegistroCosto.objects.filter(pk=registro.pk).exists())
+        self.assertEqual(self.ordenes.listar(self.actor), [])
+        self.assertEqual(
+            len(self.ordenes.listar(
+                self.actor, incluir_eliminadas=True
+            )),
+            1,
+        )
+        nueva = self.ordenes.crear_orden(
+            self.actor, nombre_juego=nombre_juego, fecha_inicio=FECHA,
+        )
+        self.assertNotEqual(nueva.pk, archivada.pk)
+
+        with self.assertRaises(OrdenDuplicadaError):
+            self.ordenes.restaurar(self.actor, archivada.pk)
+        self.ordenes.eliminar(self.actor, nueva.pk)
+
+        restaurada = self.ordenes.restaurar(self.actor, archivada.pk)
+        self.assertFalse(restaurada.eliminada)
+        self.assertEqual(len(self.ordenes.listar(self.actor)), 1)
+
+    def _version(self, estado, *, juego_nombre=None):
         from estimacion.models import Juego as JuegoEstimacion
         from estimacion.models import VersionPresupuesto
-        juego = JuegoEstimacion.objects.create(nombre=f"Neo {estado}")
+        juego, _ = JuegoEstimacion.objects.get_or_create(
+            nombre=juego_nombre or self.orden.juego.nombre
+        )
         return VersionPresupuesto.objects.create(
-            juego=juego, numero=1, estado=estado, autor=self.actor,
+            juego=juego, numero=juego.versiones.count() + 1,
+            estado=estado, autor=self.actor,
         )
 
     def test_estimacion_aprobada_muestra_total_sin_variacion(self):
@@ -540,9 +827,171 @@ class HojaCostosTests(BaseCostos):
         self.assertEqual(resumen["total_estimado"], D("150000.00"))
         self.assertNotIn("variacion", resumen)
         borrador = self._version("BORRADOR")
+        self.assertIn(
+            borrador.pk,
+            [version.pk for version in self.ordenes.versiones_disponibles(
+                self.actor, orden_id=self.orden.pk
+            )],
+        )
+        self.ordenes.vincular_estimacion(
+            self.actor, self.orden.pk, borrador.pk
+        )
+        self.assertEqual(self.ordenes.detalle(
+            self.actor, self.orden.pk
+        ).estimacion_ref, borrador)
+
+    def test_crear_orden_vincula_estimacion_disponible(self):
+        aprobada = self._version(
+            "APROBADO", juego_nombre="Neo Aprobado"
+        )
+
+        orden = self.ordenes.crear_orden(
+            self.actor, fecha_inicio=FECHA, estimacion_id=aprobada.pk,
+        )
+
+        self.assertEqual(orden.juego.nombre, aprobada.juego.nombre)
+        self.assertEqual(orden.estimacion_ref, aprobada)
+
+    def test_estimacion_vinculada_no_se_ofrece_para_otra_orden(self):
+        aprobada = self._version("APROBADO")
+        disponible = self._version("VIGENTE")
+        rechazada = self._version("RECHAZADO")
+        self.ordenes.vincular_estimacion(
+            self.actor, self.orden.pk, aprobada.pk
+        )
+
+        versiones = self.ordenes.versiones_disponibles(self.actor)
+
+        self.assertEqual([version.pk for version in versiones],
+                         [disponible.pk])
+        self.assertNotIn(rechazada.pk, [version.pk for version in versiones])
         with self.assertRaises(DatosInsuficientesError):
-            self.ordenes.vincular_estimacion(self.actor, self.orden.pk,
-                                             borrador.pk)
+            self.ordenes.crear_orden(
+                self.actor, nombre_juego="Otro juego", fecha_inicio=FECHA,
+                estimacion_id=aprobada.pk,
+            )
+
+    def test_version_archivada_conserva_vinculo_historico_y_no_se_ofrece(self):
+        from estimacion.composition import crear_presupuesto_service
+
+        aprobada = self._version("APROBADO")
+        self.ordenes.vincular_estimacion(
+            self.actor, self.orden.pk, aprobada.pk
+        )
+        crear_presupuesto_service().eliminar_version(
+            self.actor, aprobada.pk
+        )
+
+        self.assertEqual(
+            self.ordenes.detalle(
+                self.actor, self.orden.pk
+            ).estimacion_ref_id,
+            aprobada.pk,
+        )
+        self.assertNotIn(
+            aprobada.pk,
+            [v.pk for v in self.ordenes.versiones_disponibles(
+                self.actor
+            )],
+        )
+
+    def test_archivar_orden_libera_estimacion_sin_borrar_vinculo_historico(self):
+        aprobada = self._version("APROBADO")
+        self.ordenes.vincular_estimacion(
+            self.actor, self.orden.pk, aprobada.pk
+        )
+        self.ordenes.eliminar(self.actor, self.orden.pk)
+
+        disponibles = self.ordenes.versiones_disponibles(self.actor)
+        self.assertIn(aprobada.pk, [version.pk for version in disponibles])
+        self.assertEqual(
+            OrdenTrabajo.objects.get(pk=self.orden.pk).estimacion_ref_id,
+            aprobada.pk,
+        )
+
+    def test_estimacion_solo_puede_vincularse_a_una_orden(self):
+        aprobada = self._version("APROBADO")
+        otra_orden = self.ordenes.crear_orden(
+            self.actor, nombre_juego="Otro juego", fecha_inicio=FECHA,
+        )
+        self.ordenes.vincular_estimacion(
+            self.actor, self.orden.pk, aprobada.pk
+        )
+
+        with self.assertRaises(DatosInsuficientesError):
+            self.ordenes.vincular_estimacion(
+                self.actor, otra_orden.pk, aprobada.pk
+            )
+
+    def test_estimacion_libre_de_otro_juego_se_puede_vincular(self):
+        aprobada = self._version(
+            "APROBADO", juego_nombre="Otro videojuego"
+        )
+
+        opciones = self.ordenes.versiones_disponibles(
+            self.actor, orden_id=self.orden.pk
+        )
+        self.assertIn(aprobada.pk, [version.pk for version in opciones])
+        self.ordenes.vincular_estimacion(
+            self.actor, self.orden.pk, aprobada.pk
+        )
+        self.assertEqual(self.ordenes.detalle(
+            self.actor, self.orden.pk
+        ).estimacion_ref, aprobada)
+
+    def test_evaluacion_rendimiento_compara_costos_vigentes(self):
+        aprobada = self._version("APROBADO")
+        self.ordenes.vincular_estimacion(self.actor, self.orden.pk,
+                                         aprobada.pk)
+        self.costo(Elemento.DIRECTO, "500.00")
+        anulado = self.costo(Elemento.DIRECTO, "100.00")
+        self.servicio.anular(self.actor, registro_id=anulado.pk,
+                             motivo="Duplicado", clave="evaluacion-anulado")
+
+        evaluacion = self.ordenes.evaluar_rendimiento(
+            self.actor, self.orden.pk
+        )
+
+        self.assertEqual(evaluacion["total_estimado"], D("150000.00"))
+        self.assertEqual(evaluacion["total_real"], D("500.00"))
+        self.assertEqual(evaluacion["variacion"], D("-149500.00"))
+        self.assertEqual(evaluacion["porcentaje"], D("-99.67"))
+        self.assertEqual(evaluacion["estado"], "POR_DEBAJO")
+
+    def test_evaluacion_requiere_estimacion_vinculada(self):
+        self.costo(Elemento.DIRECTO, "500.00")
+        with self.assertRaises(DatosInsuficientesError):
+            self.ordenes.evaluar_rendimiento(self.actor, self.orden.pk)
+
+    def test_evaluacion_requiere_costos_vigentes(self):
+        aprobada = self._version("APROBADO")
+        self.ordenes.vincular_estimacion(self.actor, self.orden.pk,
+                                         aprobada.pk)
+        with self.assertRaises(DatosInsuficientesError):
+            self.ordenes.evaluar_rendimiento(self.actor, self.orden.pk)
+
+    def test_resultados_rendimiento_lista_orden_y_comparacion(self):
+        aprobada = self._version("APROBADO")
+        self.ordenes.vincular_estimacion(self.actor, self.orden.pk,
+                                         aprobada.pk)
+        self.costo(Elemento.DIRECTO, "500.00")
+
+        resultados = self.ordenes.resultados_rendimiento(self.actor)
+
+        self.assertEqual(len(resultados), 1)
+        fila = resultados[0]
+        self.assertEqual(fila["orden"], self.orden)
+        self.assertEqual(fila["total_estimado"], D("150000.00"))
+        self.assertEqual(fila["total_real"], D("500.00"))
+        self.assertEqual(fila["evaluacion"]["estado"], "POR_DEBAJO")
+
+    def test_resultados_rendimiento_indica_datos_pendientes(self):
+        resultados = self.ordenes.resultados_rendimiento(self.actor)
+
+        self.assertEqual(len(resultados), 1)
+        self.assertIsNone(resultados[0]["total_estimado"])
+        self.assertIsNone(resultados[0]["total_real"])
+        self.assertIsNone(resultados[0]["evaluacion"])
 
 
 class HojaVistaTests(VistasCostosTests):
@@ -570,8 +1019,8 @@ class HojaVistaTests(VistasCostosTests):
 class ConceptosEliminadosTests(SimpleTestCase):
     PROHIBIDOS = re.compile(
         r"cortes?_?costos|CorteCostos|corte provisional|costo_gestion|"
-        r"costo de gesti[oó]n|afecta_mayor|fondo|equipo|"
-        r"salario|sobreaplica|subaplica|reclasifica|doble conteo",
+        r"costo de gesti[oó]n|afecta_mayor|fondo|"
+        r"salario|sobreaplica|subaplica",
         re.IGNORECASE,
     )
 

@@ -3,7 +3,7 @@
 {% block server_rendered %} data-server-rendered="true"{% endblock %}
 
 {% block page_content %}
-<div class="page-heading"><div><h1>{{ juego.nombre }}</h1><p>Estimación Delphi por fases y roles; versiones de presupuesto.</p></div><div class="heading-actions"><a class="button button-secondary" href="{% url 'estimacion' %}">← Juegos</a><a class="button button-primary" href="{% url 'estimacion_registrar' juego.pk %}">＋ Registrar estimación</a></div></div>
+<div class="page-heading"><div><h1>{{ juego.nombre }}</h1><p>Estimación Delphi por fases y roles; versiones de presupuesto.</p></div><div class="heading-actions"><a class="button button-secondary" href="{% url 'estimacion' %}">← Juegos</a>{% if archivados %}<a class="button button-secondary" href="{% url 'estimacion_juego' juego.pk %}">Ver activas</a>{% else %}<a class="button button-secondary" href="{% url 'estimacion_juego' juego.pk %}?archivados=1">Ver archivadas</a>{% endif %}<a class="button button-primary" href="{% url 'estimacion_registrar' juego.pk %}">＋ Registrar estimación</a></div></div>
 
 <section class="card">
   <div class="card-header"><div><h2>Rondas Delphi</h2><p>Consolidación por fase y rol</p></div>
@@ -39,10 +39,10 @@
 </section>
 
 <section class="card">
-  <div class="card-header"><div><h2>Estimaciones{% if ronda_actual %} · ronda {{ ronda_actual }}{% endif %}</h2><p>Optimista, más probable y pesimista por experto</p></div></div>
+  <div class="card-header"><div><h2>Estimaciones{% if ronda_actual %} · ronda {{ ronda_actual }}{% endif %}</h2><p>Optimista, más probable y pesimista por experto{% if archivados %} · mostrando archivadas y activas{% endif %}</p></div></div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Fase</th><th>Rol</th><th>Experto</th><th class="num">O</th><th class="num">M</th><th class="num">P</th><th>Justificación</th></tr></thead>
+      <thead><tr><th>Fase</th><th>Rol</th><th>Experto</th><th class="num">O</th><th class="num">M</th><th class="num">P</th><th>Justificación</th><th></th></tr></thead>
       <tbody>
         {% for e in estimaciones %}{% if e.ronda == ronda_actual %}
         <tr>
@@ -53,9 +53,18 @@
           <td class="num">{{ e.moda }}</td>
           <td class="num">{{ e.pesimista }}</td>
           <td>{{ e.justificacion|default:"—"|truncatechars:60 }}</td>
+          <td class="num">
+            {% if e.eliminada %}
+            <span class="tag tag-warn">Archivada</span>
+            {% if e.puede_restaurar %}<form method="post" action="{% url 'estimacion_restaurar' juego.pk e.pk %}" class="inline-form" onsubmit="return confirm('¿Restaurar esta estimación?');">{% csrf_token %}<button class="text-button" type="submit">Restaurar</button></form>{% else %}<span class="tag tag-muted">Ronda cerrada</span>{% endif %}
+            {% elif e.puede_editar %}
+            <a class="text-button" href="{% url 'estimacion_editar' juego.pk e.pk %}">Editar</a>
+            <a class="text-button text-button-danger" href="{% url 'estimacion_eliminar' juego.pk e.pk %}">Archivar</a>
+            {% else %}<span class="tag tag-muted">Ronda cerrada</span>{% endif %}
+          </td>
         </tr>
         {% endif %}{% empty %}
-        <tr><td class="empty-cell" colspan="7">Sin estimaciones registradas.</td></tr>
+        <tr><td class="empty-cell" colspan="8">Sin estimaciones registradas.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -84,7 +93,7 @@
 </section>
 
 <section class="card">
-  <div class="card-header"><div><h2>Versiones de presupuesto</h2><p>Mano de obra estimada, costos directos e indirectos</p></div></div>
+  <div class="card-header"><div><h2>Versiones de presupuesto</h2><p>Mano de obra estimada, costos directos e indirectos{% if archivados %} · mostrando archivadas y activas{% endif %}</p></div></div>
   <div class="table-wrap">
     <table>
       <thead><tr><th>Versión</th><th>Estado</th><th>Fecha</th><th>Autor</th><th class="num">Líneas</th><th class="num">Total estimado</th><th></th></tr></thead>
@@ -92,19 +101,25 @@
         {% for version in versiones %}
         <tr>
           <td><strong>v{{ version.numero }}</strong></td>
-          <td><span class="tag {% if version.estado == 'VIGENTE' %}tag-open{% elif version.estado == 'APROBADO' %}tag-muted{% endif %}">{{ version.get_estado_display }}</span></td>
+          <td>{% if version.eliminada %}<span class="tag tag-warn">Archivada · {{ version.get_estado_display }}</span>{% else %}<span class="tag {% if version.estado == 'VIGENTE' %}tag-open{% elif version.estado == 'APROBADO' %}tag-muted{% endif %}">{{ version.get_estado_display }}</span>{% endif %}</td>
           <td>{{ version.fecha|date:"d/m/Y H:i" }}</td>
           <td>{{ version.autor.nombre_completo }}</td>
           <td class="num">{{ version.lineas.count }}</td>
           <td class="num">${{ version.total_estimado }}</td>
           <td class="num">
-            {% if version.estado == 'BORRADOR' %}
+            {% if version.eliminada %}
+            <form method="post" action="{% url 'estimacion_version_restaurar' version.pk %}" class="inline-form" onsubmit="return confirm('¿Restaurar esta versión?');">{% csrf_token %}<button class="text-button" type="submit">Restaurar</button></form>
+            {% elif version.estado == 'BORRADOR' %}
             <a class="text-button" href="{% url 'estimacion_costo_directo' version.pk %}">+ Costo directo</a>
             <a class="text-button" href="{% url 'estimacion_costo_indirecto' version.pk %}">+ Costo indirecto</a>
             <a class="text-button" href="{% url 'estimacion_version_aprobar' version.pk %}">Aprobar</a>
             <a class="text-button" href="{% url 'estimacion_version_rechazar' version.pk %}">Rechazar</a>
+            <a class="text-button text-button-danger" href="{% url 'estimacion_version_eliminar' version.pk %}">Archivar</a>
             {% elif version.estado == 'APROBADO' %}
             <a class="text-button" href="{% url 'estimacion_version_vigente' version.pk %}">Marcar vigente</a>
+            <a class="text-button text-button-danger" href="{% url 'estimacion_version_eliminar' version.pk %}">Archivar</a>
+            {% else %}
+            <a class="text-button text-button-danger" href="{% url 'estimacion_version_eliminar' version.pk %}">Archivar</a>
             {% endif %}
           </td>
         </tr>
@@ -135,7 +150,29 @@
 {% endblock %}
 
 {% block modal %}
-{% if form %}
+{% if form_edicion_estimacion %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Editar estimación">
+  <div class="modal-header"><div><h2>Editar estimación experta</h2><p>{{ estimacion_objetivo.fase.nombre }} · {{ estimacion_objetivo.rol }} · {{ estimacion_objetivo.experto.nombre }}. Solo se editan rondas abiertas.</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'estimacion_editar' juego.pk estimacion_objetivo.pk %}" novalidate>
+    {% csrf_token %}
+    {% if form_edicion_estimacion.non_field_errors %}<div class="form-error">{{ form_edicion_estimacion.non_field_errors }}</div>{% endif %}
+    <div class="modal-fields">
+      {% for campo in form_edicion_estimacion %}<div class="field{% if campo.name == 'justificacion' %} full{% endif %}"><label for="{{ campo.id_for_label }}">{{ campo.label }}{% if campo.name != 'justificacion' %} *{% endif %}</label>{{ campo }}{% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>{% endfor %}
+    </div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_juego' juego.pk %}">Cancelar</a><button class="button button-primary" type="submit">Guardar cambios</button></div>
+  </form>
+</section></div>
+{% elif form_baja_estimacion %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Archivar estimación">
+  <div class="modal-header"><div><h2>Archivar estimación</h2><p>{{ estimacion_objetivo.fase.nombre }} · {{ estimacion_objetivo.rol }} · {{ estimacion_objetivo.experto.nombre }}. Solo se permite archivar si la ronda sigue abierta; el registro queda conservado.</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'estimacion_eliminar' juego.pk estimacion_objetivo.pk %}">
+    {% csrf_token %}
+    {% if form_baja_estimacion.non_field_errors %}<div class="form-error">{{ form_baja_estimacion.non_field_errors }}</div>{% endif %}
+    <div class="field"><label for="id_confirmar">{{ form_baja_estimacion.confirmar.label }}</label>{{ form_baja_estimacion.confirmar }}{% for error in form_baja_estimacion.confirmar.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_juego' juego.pk %}">Cancelar</a><button class="button button-primary" type="submit">Archivar estimación</button></div>
+  </form>
+</section></div>
+{% elif form %}
 <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Registrar estimación">
   <div class="modal-header"><div><h2>Registrar estimación</h2><p>Ronda única · el experto estima todas las fases para el rol seleccionado.</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
   <form class="modal-form" method="post" action="{% url 'estimacion_registrar' juego.pk %}" novalidate>
@@ -225,11 +262,13 @@
 </section></div>
 {% elif resumen_version %}
 <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Confirmar versión">
-  <div class="modal-header"><div><h2>{% if accion == 'aprobar' %}Aprobar{% elif accion == 'rechazar' %}Rechazar{% else %}Marcar vigente{% endif %} v{{ resumen_version.numero }}</h2><p>{% if accion == 'aprobar' %}La versión quedará aprobada y será inmutable; cualquier corrección crea una versión nueva.{% elif accion == 'rechazar' %}La versión quedará rechazada y será inmutable; puede generar una versión nueva.{% else %}La versión pasará a vigente y la vigente anterior volverá a aprobada.{% endif %}</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
-  <form class="modal-form" method="post" action="{% if accion == 'aprobar' %}{% url 'estimacion_version_aprobar' resumen_version.pk %}{% elif accion == 'rechazar' %}{% url 'estimacion_version_rechazar' resumen_version.pk %}{% else %}{% url 'estimacion_version_vigente' resumen_version.pk %}{% endif %}">
+  <div class="modal-header"><div><h2>{% if accion == 'eliminar' %}Archivar{% elif accion == 'aprobar' %}Aprobar{% elif accion == 'rechazar' %}Rechazar{% else %}Marcar vigente{% endif %} v{{ resumen_version.numero }}</h2><p>{% if accion == 'eliminar' %}La versión dejará de aparecer entre las estimaciones disponibles. Se conservarán sus datos y los vínculos históricos de órdenes de trabajo.{% elif accion == 'aprobar' %}La versión quedará aprobada y será inmutable; cualquier corrección crea una versión nueva.{% elif accion == 'rechazar' %}La versión quedará rechazada y será inmutable; puede generar una versión nueva.{% else %}La versión pasará a vigente y la vigente anterior volverá a aprobada.{% endif %}</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% if accion == 'eliminar' %}{% url 'estimacion_version_eliminar' resumen_version.pk %}{% elif accion == 'aprobar' %}{% url 'estimacion_version_aprobar' resumen_version.pk %}{% elif accion == 'rechazar' %}{% url 'estimacion_version_rechazar' resumen_version.pk %}{% else %}{% url 'estimacion_version_vigente' resumen_version.pk %}{% endif %}">
     {% csrf_token %}
     <div class="modal-fields"><div class="field"><label>Juego</label><input value="{{ juego.nombre }}" readonly /></div><div class="field"><label>Versión</label><input value="v{{ resumen_version.numero }} · {{ resumen_version.get_estado_display }}" readonly /></div></div>
-    <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_juego' juego.pk %}">Cancelar</a><button class="button button-primary" type="submit">Confirmar</button></div>
+    {% if form_baja_version.non_field_errors %}<div class="form-error" role="alert">{{ form_baja_version.non_field_errors }}</div>{% endif %}
+    {% if accion == 'eliminar' %}<div class="field"><label for="id_confirmar">{{ form_baja_version.confirmar.label }}</label>{{ form_baja_version.confirmar }}{% for error in form_baja_version.confirmar.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>{% endif %}
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_juego' juego.pk %}">Cancelar</a><button class="button button-primary" type="submit">{% if accion == 'eliminar' %}Archivar versión{% else %}Confirmar{% endif %}</button></div>
   </form>
 </section></div>
 {% endif %}

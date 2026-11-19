@@ -22,13 +22,13 @@
   const modulos = JSON.parse($('#modulos').textContent);
   const initialPeriodStatus = JSON.parse($('#periodStatus').textContent);
   const serverRendered = $('#appContent').dataset.serverRendered === 'true';
-  const serverScreens = ['users', 'audit', 'accounts', 'ledger', 'estimacion', 'costos'];
+  const serverScreens = ['users', 'audit', 'accounts', 'ledger', 'estimacion', 'costos', 'rendimiento'];
 
   const navGroups = [
     { label: 'Inicio', items: [{ id: 'dashboard', title: 'Dashboard', icon: '⌂' }] },
     { label: 'Contabilidad', items: [{ id: 'ledger', title: 'Libro Mayor', icon: '▤' }, { id: 'accounts', title: 'Catálogo de cuentas', icon: '☷' }, { id: 'reports', title: 'Estados financieros', icon: '▥' }] },
     { label: 'Operación', items: [{ id: 'operations', title: 'Ventas', icon: '◫' }] },
-    { label: 'Costos', items: [{ id: 'costos', title: 'Costeo Videojuego', icon: '◈' }, { id: 'estimacion', title: 'Estimación', icon: '◇' }] },
+    { label: 'Costos', items: [{ id: 'costos', title: 'Costeo Videojuego', icon: '◈' }, { id: 'estimacion', title: 'Estimación', icon: '◇' }, { id: 'rendimiento', title: 'Rendimiento de videojuegos', icon: '↗' }] },
     { label: 'Administración', items: [{ id: 'users', title: 'Usuarios', icon: '♙' }, { id: 'audit', title: 'Auditoría', icon: '◷' }] },
   ];
 
@@ -134,7 +134,7 @@
       return;
     }
     renderNavigation();
-    const titles = { dashboard: 'Dashboard', ledger: 'Libro Mayor', accounts: 'Catálogo de cuentas', reports: 'Estados financieros', operations: 'Ventas', users: 'Usuarios', audit: 'Auditoría', estimacion: 'Estimación', costos: 'Costeo Videojuego' };
+    const titles = { dashboard: 'Dashboard', ledger: 'Libro Mayor', accounts: 'Catálogo de cuentas', reports: 'Estados financieros', operations: 'Ventas', users: 'Usuarios', audit: 'Auditoría', estimacion: 'Estimación', costos: 'Costeo Videojuego', rendimiento: 'Rendimiento de videojuegos' };
     $('#breadcrumb').textContent = titles[state.current] || 'Panel';
     const periodClosed = state.indicatorPeriodStatus === 'CERRADO_PROVISIONAL';
     const periodLabel = periodClosed ? 'Período cerrado provisionalmente' : 'Período abierto';

@@ -43,6 +43,12 @@ class EstimacionRepository:
         except Juego.DoesNotExist as exc:
             raise JuegoNoEncontradoError() from exc
 
+    def juego_nombre_existente(self, nombre, *, excluir_id=None):
+        qs = Juego.objects.filter(nombre__iexact=nombre)
+        if excluir_id is not None:
+            qs = qs.exclude(pk=excluir_id)
+        return qs.exists()
+
     def nuevo_juego(self, nombre):
         return Juego(nombre=nombre)
 
@@ -108,10 +114,12 @@ class EstimacionRepository:
 
     # --- Estimaciones y rondas ---
 
-    def estimaciones_de(self, juego, ronda=None):
+    def estimaciones_de(self, juego, ronda=None, *, incluir_eliminadas=False):
         estimaciones = EstimacionExperto.objects.filter(
             juego=juego
         ).select_related("fase", "rol", "experto")
+        if not incluir_eliminadas:
+            estimaciones = estimaciones.filter(eliminado_en__isnull=True)
         if ronda is not None:
             estimaciones = estimaciones.filter(ronda=ronda)
         return estimaciones.order_by(
@@ -125,10 +133,32 @@ class EstimacionRepository:
         estimacion.save()
         return estimacion
 
+    def obtener_estimacion(self, estimacion_id, *, juego=None,
+                           incluir_eliminada=False):
+        qs = EstimacionExperto.objects.select_related(
+            "juego", "fase", "rol", "experto"
+        )
+        if juego is not None:
+            qs = qs.filter(juego=juego)
+        if not incluir_eliminada:
+            qs = qs.filter(eliminado_en__isnull=True)
+        return qs.filter(pk=estimacion_id).first()
+
     def estimaciones_existen(self, juego, rol, experto, ronda):
         return EstimacionExperto.objects.filter(
-            juego=juego, rol=rol, experto=experto, ronda=ronda
+            juego=juego, rol=rol, experto=experto, ronda=ronda,
+            eliminado_en__isnull=True,
         ).exists()
+
+    def estimacion_fase_existe(self, estimacion):
+        return EstimacionExperto.objects.filter(
+            juego=estimacion.juego,
+            fase=estimacion.fase,
+            rol=estimacion.rol,
+            experto=estimacion.experto,
+            ronda=estimacion.ronda,
+            eliminado_en__isnull=True,
+        ).exclude(pk=estimacion.pk).exists()
 
     def rondas_de(self, juego):
         return RondaDelphi.objects.filter(juego=juego).order_by("numero")
@@ -213,9 +243,12 @@ class EstimacionRepository:
 
     # --- Versiones de presupuesto (E4) ---
 
-    def versiones_de(self, juego):
+    def versiones_de(self, juego, *, incluir_eliminadas=False):
+        qs = VersionPresupuesto.objects.filter(juego=juego)
+        if not incluir_eliminadas:
+            qs = qs.filter(eliminado_en__isnull=True)
         return (
-            VersionPresupuesto.objects.filter(juego=juego)
+            qs
             .select_related("autor")
             .prefetch_related(
                 "lineas__fase", "lineas__rol",
@@ -224,16 +257,25 @@ class EstimacionRepository:
             .order_by("-numero")
         )
 
-    def obtener_version(self, version_id):
+    def obtener_version(self, version_id, *, incluir_eliminada=False):
         try:
-            return VersionPresupuesto.objects.select_related(
+            qs = VersionPresupuesto.objects.select_related(
                 "juego", "autor"
             ).prefetch_related(
                 "lineas__fase", "lineas__rol",
                 "costos_directos", "costos_indirectos",
-            ).get(pk=version_id)
+            )
+            if not incluir_eliminada:
+                qs = qs.filter(eliminado_en__isnull=True)
+            return qs.get(pk=version_id)
         except VersionPresupuesto.DoesNotExist as exc:
             raise VersionNoEncontradaError() from exc
+
+    def siguiente_numero_version(self, juego):
+        numero = VersionPresupuesto.objects.filter(juego=juego).order_by(
+            "-numero"
+        ).values_list("numero", flat=True).first()
+        return (numero or 0) + 1
 
     def nueva_version(self, juego, numero, autor, snapshot):
         return VersionPresupuesto(

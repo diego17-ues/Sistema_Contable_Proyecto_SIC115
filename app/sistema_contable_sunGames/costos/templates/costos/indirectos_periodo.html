@@ -1,0 +1,106 @@
+{% extends "sic_sunGames/index.html" %}
+{% load static %}
+
+{% block server_rendered %} data-server-rendered="true"{% endblock %}
+
+{% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'costos/costos.css' %}?v=20261119-2">{% endblock %}
+
+{% block page_content %}
+<div class="page-heading">
+  <div><h1>Indirectos del período</h1><p>Distribución automática del saldo neto de las fuentes exclusivas de desarrollo, según las horas registradas en las órdenes abiertas.</p></div>
+  <div class="heading-actions"><a class="button button-secondary" href="{% url 'costos_catalogos' %}">Fuentes y exclusiones</a><a class="button button-secondary" href="{% url 'costos_ordenes' %}">← Órdenes</a></div>
+</div>
+
+<form class="filter-bar" method="get" action="{% url 'costos_indirectos_periodo' %}" novalidate data-costos-form>
+  <div class="field">
+    <label for="{{ form_periodo.periodo.id_for_label }}">{{ form_periodo.periodo.label }} *</label>
+    {{ form_periodo.periodo }}
+    {% for error in form_periodo.periodo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+  </div>
+  <button class="button button-primary" type="submit">Consultar período</button>
+</form>
+
+{% if preview %}
+<section class="hoja-resumen indirectos-resumen" aria-label="Resumen de costos indirectos">
+  <article class="card hoja-dato"><span>Período</span><strong>{{ preview.periodo.nombre }}</strong><small>{{ preview.periodo.fecha_inicio|date:"d/m/Y" }}–{{ preview.periodo.fecha_fin|date:"d/m/Y" }}</small></article>
+  <article class="card hoja-dato"><span>Pool neto elegible</span><strong>${{ preview.total_pool|floatformat:"2g" }}</strong><small>Excluye fuentes compartidas</small></article>
+  <article class="card hoja-dato"><span>Distribuido</span><strong>${{ preview.total_distribuido|floatformat:"2g" }}</strong><small>Las diferencias de centavos se ajustan en la última orden</small></article>
+  <article class="card hoja-dato"><span>Estado</span><strong><span class="tag {% if preview.estado == 'APLICADA' %}tag-open{% elif preview.estado == 'REVERTIDA' %}tag-warn{% else %}tag-muted{% endif %}">{{ preview.estado|title }}</span></strong><small>{% if preview.periodo_abierto %}Período abierto{% else %}Período cerrado{% endif %}</small></article>
+</section>
+
+{% if preview.alertas %}
+<section class="card section-gap">
+  <div class="card-header"><div><h2>Alertas</h2><p>Los importes sin horas elegibles permanecen como gasto del período.</p></div></div>
+  <ul class="indirectos-alertas">{% for alerta in preview.alertas %}<li>{{ alerta }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+<section class="card section-gap">
+  <div class="card-header"><div><h2>Fuentes y tasas</h2><p>La tasa por hora es el pool dividido entre las horas elegibles de este período.</p></div></div>
+  <div class="table-wrap">
+    <table class="indirectos-tabla">
+      <thead><tr><th>Fuente</th><th>Cuenta de origen</th><th>Proceso</th><th class="num">Pool</th><th class="num">Horas</th><th class="num">Tasa/hora</th><th class="num">Distribuido</th><th>Estado</th></tr></thead>
+      <tbody>
+        {% for fila in preview.fuentes %}
+        <tr>
+          <td data-label="Fuente"><strong>{{ fila.fuente.nombre }}</strong></td>
+          <td data-label="Cuenta">{{ fila.fuente.cuenta_origen.codigo }} · {{ fila.fuente.cuenta_origen.denominacion }}</td>
+          <td data-label="Proceso">{{ fila.fuente.proceso.nombre|default:"Pool general" }}</td>
+          <td data-label="Pool" class="num">${{ fila.pool|floatformat:"2g" }}</td>
+          <td data-label="Horas" class="num">{{ fila.horas|floatformat:"2g" }}</td>
+          <td data-label="Tasa/hora" class="num">{% if fila.tasa %}${{ fila.tasa|floatformat:"2g" }}{% else %}—{% endif %}</td>
+          <td data-label="Distribuido" class="num">${{ fila.distribuido|floatformat:"2g" }}</td>
+          <td data-label="Estado"><span class="tag {% if fila.estado == 'LISTA' or fila.estado == 'APLICADA' %}tag-open{% else %}tag-muted{% endif %}">{{ fila.estado|title }}</span></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8"><div class="empty-state"><strong>Sin fuentes elegibles en este período</strong>Configura una cuenta que contenga exclusivamente costos de desarrollo. Las cuentas compartidas quedan fuera.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card section-gap">
+  <div class="card-header"><div><h2>Distribución por orden</h2><p>Solo participan órdenes abiertas con horas vigentes de mano de obra directa dentro del período.</p></div></div>
+  <div class="table-wrap">
+    <table class="indirectos-tabla">
+      <thead><tr><th>Fuente</th><th>Orden</th><th>Juego</th><th class="num">Horas</th><th class="num">Tasa/hora</th><th class="num">Costo asignado</th></tr></thead>
+      <tbody>
+        {% for linea in preview.distribucion %}
+        <tr>
+          <td data-label="Fuente">{{ linea.fuente.nombre }}</td>
+          <td data-label="Orden">OT-{{ linea.orden_id }}</td>
+          <td data-label="Juego"><strong>{{ linea.juego }}</strong></td>
+          <td data-label="Horas" class="num">{{ linea.horas|floatformat:"2g" }}</td>
+          <td data-label="Tasa/hora" class="num">${{ linea.tasa|floatformat:"2g" }}</td>
+          <td data-label="Costo asignado" class="num"><strong>${{ linea.importe|floatformat:"2g" }}</strong></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6"><div class="empty-state"><strong>No hay costos listos para distribuir</strong>Selecciona otro período, registra horas o configura fuentes exclusivas de desarrollo.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="heading-actions indirectos-acciones">
+  {% if preview.puede_aplicar and preview.periodo_abierto %}<a class="button button-primary" href="{% url 'costos_indirectos_periodo' %}?periodo={{ preview.periodo.pk }}&accion=aplicar">Aplicar indirectos del período</a>{% endif %}
+  {% if preview.puede_revertir and preview.periodo_abierto %}<a class="button button-secondary" href="{% url 'costos_indirectos_periodo' %}?periodo={{ preview.periodo.pk }}&accion=revertir">Revertir aplicación del período</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block modal %}
+{% if form_aplicar or form_revertir %}
+<div class="modal-backdrop" data-costos-modal><section class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloIndirectos">
+  <div class="modal-header"><div><h2 id="tituloIndirectos">{% if form_aplicar %}Confirmar aplicación{% else %}Confirmar reversión{% endif %}</h2><p>{% if form_aplicar %}Se crearán asientos cuadrados por fuente y orden, usando la cuenta de costos indirectos configurada.{% else %}Se crearán contra-asientos para todas las líneas automáticas activas del período.{% endif %}</p></div><a class="modal-close" href="{% url 'costos_indirectos_periodo' %}?periodo={{ preview.periodo.pk }}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% if form_aplicar %}{% url 'costos_indirectos_aplicar' %}{% else %}{% url 'costos_indirectos_revertir' %}{% endif %}" data-costos-form>
+    {% csrf_token %}
+    {% if form_aplicar %}{% include "costos/campos.html" with form=form_aplicar %}{% else %}{% include "costos/campos.html" with form=form_revertir %}{% endif %}
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_indirectos_periodo' %}?periodo={{ preview.periodo.pk }}">Cancelar</a><button class="button button-primary" type="submit">{% if form_aplicar %}Aplicar costos{% else %}Revertir período{% endif %}</button></div>
+  </form>
+</section></div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}{{ block.super }}<script src="{% static 'costos/costos.js' %}?v=20261119-2"></script>{% endblock %}

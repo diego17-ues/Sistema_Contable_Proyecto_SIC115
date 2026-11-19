@@ -6,7 +6,7 @@ from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.shortcuts import redirect, render
 from django.urls import reverse
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 
 from estimacion.composition import (
     crear_estimacion_service,
@@ -14,8 +14,10 @@ from estimacion.composition import (
 )
 from estimacion.exceptions import EstimacionError, VersionInmutableError
 from estimacion.forms import (
+    ConfirmarBajaForm,
     CostoForm,
     CostoIndirectoForm,
+    EstimacionExpertoEdicionForm,
     EstimacionMatrizForm,
     ExpertoForm,
     JuegoForm,
@@ -62,11 +64,25 @@ def _contexto_juego(request, juego_id, servicio, **extra):
     contexto = contexto_panel(request, "estimacion")
     catalogos = servicio.catalogos(request.user)
     fases = list(juego.fases.all())
-    estimaciones = servicio.estimaciones(request.user, juego_id)
+    archivados = request.GET.get("archivados") == "1"
+    estimaciones = servicio.estimaciones(
+        request.user, juego_id, incluir_eliminadas=archivados
+    )
+    rondas = list(juego.rondas.all())
+    rondas_cerradas = {ronda.numero for ronda in rondas if ronda.cerrada}
+    for estimacion in estimaciones:
+        estimacion.puede_editar = (
+            not estimacion.eliminada
+            and estimacion.ronda not in rondas_cerradas
+        )
+        estimacion.puede_restaurar = (
+            estimacion.eliminada
+            and estimacion.ronda not in rondas_cerradas
+        )
     ronda_actual = _ronda_actual(request, juego, fases)
     consolidacion = _consolidacion(request, servicio, juego, ronda_actual)
     versiones = list(crear_presupuesto_service().versiones(
-        request.user, juego_id
+        request.user, juego_id, incluir_eliminadas=archivados,
     ))
     presupuesto_service = crear_presupuesto_service()
     for version in versiones:
@@ -83,11 +99,12 @@ def _contexto_juego(request, juego_id, servicio, **extra):
         roles=catalogos["roles"],
         expertos=catalogos["expertos"],
         estimaciones=estimaciones,
-        rondas=list(juego.rondas.all()),
+        rondas=rondas,
         ronda_actual=ronda_actual,
         consolidacion=consolidacion,
         versiones=versiones,
         costos_fabricacion=costos_fabricacion,
+        archivados=archivados,
         **extra,
     )
     return contexto
@@ -219,6 +236,110 @@ def estimacion_nueva(request, juego_id):
     )
 
 
+@login_required
+@require_http_methods(["GET", "POST"])
+def estimacion_editar(request, juego_id, estimacion_id):
+    servicio = crear_estimacion_service()
+    try:
+        estimacion = servicio.obtener_estimacion(
+            request.user, juego_id, estimacion_id
+        )
+    except UsuarioError as error:
+        raise _sin_permiso(error) from error
+    except EstimacionError as error:
+        messages.error(request, str(error))
+        return redirect("estimacion_juego", juego_id=juego_id)
+
+    initial = {
+        "optimista": estimacion.optimista,
+        "moda": estimacion.moda,
+        "pesimista": estimacion.pesimista,
+        "justificacion": estimacion.justificacion,
+    }
+    form = EstimacionExpertoEdicionForm(
+        request.POST if request.method == "POST" else None,
+        initial=initial,
+    )
+    if request.method == "POST" and form.is_valid():
+        try:
+            servicio.actualizar_estimacion(
+                request.user, juego_id, estimacion_id,
+                **form.cleaned_data,
+            )
+        except UsuarioError as error:
+            raise _sin_permiso(error) from error
+        except EstimacionError as error:
+            form.add_error(None, str(error))
+        else:
+            messages.success(request, "Estimación experta actualizada.")
+            return redirect("estimacion_juego", juego_id=juego_id)
+    return render(
+        request, JUEGO_TEMPLATE,
+        _contexto_juego(
+            request, juego_id, servicio,
+            form_edicion_estimacion=form,
+            estimacion_objetivo=estimacion,
+        ),
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def estimacion_eliminar(request, juego_id, estimacion_id):
+    servicio = crear_estimacion_service()
+    try:
+        estimacion = servicio.obtener_estimacion(
+            request.user, juego_id, estimacion_id
+        )
+    except UsuarioError as error:
+        raise _sin_permiso(error) from error
+    except EstimacionError as error:
+        messages.error(request, str(error))
+        return redirect("estimacion_juego", juego_id=juego_id)
+
+    form = ConfirmarBajaForm(
+        request.POST if request.method == "POST" else None
+    )
+    if request.method == "POST" and form.is_valid():
+        try:
+            servicio.eliminar_estimacion(
+                request.user, juego_id, estimacion_id
+            )
+        except UsuarioError as error:
+            raise _sin_permiso(error) from error
+        except EstimacionError as error:
+            form.add_error(None, str(error))
+        else:
+            messages.success(request, "Estimación archivada.")
+            return redirect("estimacion_juego", juego_id=juego_id)
+    return render(
+        request, JUEGO_TEMPLATE,
+        _contexto_juego(
+            request, juego_id, servicio,
+            form_baja_estimacion=form,
+            estimacion_objetivo=estimacion,
+        ),
+    )
+
+
+@login_required
+@require_POST
+def estimacion_restaurar(request, juego_id, estimacion_id):
+    try:
+        crear_estimacion_service().restaurar_estimacion(
+            request.user, juego_id, estimacion_id
+        )
+    except UsuarioError as error:
+        raise _sin_permiso(error) from error
+    except EstimacionError as error:
+        messages.error(request, str(error))
+    else:
+        messages.success(request, "Estimación restaurada.")
+    return redirect(
+        f"{reverse('estimacion_juego', args=[juego_id])}?archivados=1"
+    )
+
+
 def _fases_del_juego(request, servicio, juego_id):
     try:
         juego = servicio.obtener_juego(request.user, juego_id)
@@ -290,6 +411,63 @@ def version_costo_indirecto(request, version_id):
     return _version_costo(
         request, version_id, crear_presupuesto_service(),
         CostoIndirectoForm, directo=False,
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def version_eliminar(request, version_id):
+    servicio = crear_presupuesto_service()
+    try:
+        version = servicio.obtener_version(request.user, version_id)
+    except UsuarioError as error:
+        raise _sin_permiso(error) from error
+    except EstimacionError as error:
+        messages.error(request, str(error))
+        return redirect("estimacion")
+
+    form = ConfirmarBajaForm(
+        request.POST if request.method == "POST" else None
+    )
+    if request.method == "POST" and form.is_valid():
+        try:
+            servicio.eliminar_version(request.user, version_id)
+        except UsuarioError as error:
+            raise _sin_permiso(error) from error
+        except EstimacionError as error:
+            form.add_error(None, str(error))
+        else:
+            messages.success(
+                request, f"Versión {version.numero} archivada; se conservó "
+                "su historial y cualquier vínculo con órdenes."
+            )
+            return redirect("estimacion_juego", juego_id=version.juego_id)
+    return render(
+        request, JUEGO_TEMPLATE,
+        _contexto_juego(
+            request, version.juego_id, crear_estimacion_service(),
+            resumen_version=version, accion="eliminar",
+            form_baja_version=form,
+        ),
+    )
+
+
+@login_required
+@require_POST
+def version_restaurar(request, version_id):
+    try:
+        version = crear_presupuesto_service().restaurar_version(
+            request.user, version_id
+        )
+    except UsuarioError as error:
+        raise _sin_permiso(error) from error
+    except EstimacionError as error:
+        messages.error(request, str(error))
+        return redirect("estimacion")
+    messages.success(request, f"Versión {version.numero} restaurada.")
+    return redirect(
+        f"{reverse('estimacion_juego', args=[version.juego_id])}"
+        "?archivados=1"
     )
 
 

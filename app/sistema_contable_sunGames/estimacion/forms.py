@@ -78,6 +78,46 @@ class EstimacionMatrizForm(forms.Form):
         return datos
 
 
+class EstimacionExpertoEdicionForm(forms.Form):
+    optimista = forms.DecimalField(
+        label="Optimista (O)", min_value=0, max_digits=10,
+        decimal_places=4,
+    )
+    moda = forms.DecimalField(
+        label="Más probable (M)", min_value=0, max_digits=10,
+        decimal_places=4,
+    )
+    pesimista = forms.DecimalField(
+        label="Pesimista (P)", min_value=0, max_digits=10,
+        decimal_places=4,
+    )
+    justificacion = forms.CharField(
+        label="Justificación", required=False,
+        widget=forms.Textarea(attrs={"rows": 2}),
+    )
+
+    def clean(self):
+        datos = super().clean()
+        optimista = datos.get("optimista")
+        moda = datos.get("moda")
+        pesimista = datos.get("pesimista")
+        if (optimista is not None and moda is not None
+                and pesimista is not None
+                and not optimista <= moda <= pesimista):
+            self.add_error(
+                "pesimista",
+                "Debe cumplirse optimista ≤ más probable ≤ pesimista.",
+            )
+        return datos
+
+
+class ConfirmarBajaForm(forms.Form):
+    confirmar = forms.BooleanField(
+        label="Confirmo archivar este registro sin borrar su historial",
+        required=True,
+    )
+
+
 class RolForm(forms.Form):
     nombre = forms.CharField(
         label="Nombre del rol", max_length=80,

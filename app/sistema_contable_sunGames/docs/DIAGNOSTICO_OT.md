@@ -138,3 +138,59 @@ Presentes y relevantes:
 - Responsive: `styles.css` tiene breakpoints (no auditados en detalle);
   la conversión de tablas a tarjetas en móvil probablemente requiera CSS
   nuevo dentro del mismo sistema de tokens.
+
+## Diagnóstico para distribuir costos indirectos automáticamente
+
+Fecha: 2026-11-19. Revisión de solo lectura previa a implementar el
+prorrateo por horas.
+
+- **Activos y licencias**: no hay modelos de activos, compras, vidas
+  útiles ni funciones de depreciación/amortización por activo en las
+  aplicaciones del proyecto. La reconstrucción del módulo también
+  confirma que la contabilidad general no las calcula ni registra
+  automáticamente (`docs/REESTRUCTURA.md`, sección 1). El catálogo sí
+  tiene cuentas para equipo (1201/1202), depreciación acumulada (1203),
+  licencias (1204), amortización acumulada (1205), depreciación de
+  equipo (4207) y amortización de licencias (4208):
+  `catalogo/migrations/0004_catalogo_inicial.py:46-50,77-78`.
+- **Separación desarrollo/administración**: `Cuenta` solo registra
+  código, denominación, rubro, subtipo, naturaleza y estado
+  (`catalogo/models.py:70-84`). No hay categoría de uso del activo ni
+  marca de ocioso/desarrollo. Los saldos de 1201/1202 y los gastos de
+  4207/4208, por tanto, no permiten separar equipo administrativo de
+  equipo de desarrollo.
+- **Servicios consumidos**: el catálogo agrupa servicios básicos en
+  4205 y alquileres en 4204; también identifica honorarios profesionales
+  (4203), papelería (4206), depreciación (4207) y amortización de
+  licencias (4208), en
+  `catalogo/migrations/0004_catalogo_inicial.py:73-78`. No hay cuentas
+  separadas por videojuego, proyecto o centro de costo; no es posible
+  extraer de esas cuentas qué parte corresponde al desarrollo.
+- **Consulta del mayor por período**: los importes de `Movimiento` son
+  firmados (Debe positivo, Haber negativo),
+  `libro_mayor/models.py:126-154`. `EstadosFinancierosRepository.saldos`
+  suma los movimientos firmados hasta una fecha y, si recibe `desde`,
+  restringe el rango (`estados_financieros/repositories.py:38-47`). La
+  consulta devuelve saldos por cuenta, pero no clasifica el propósito de
+  cada gasto ni expone un monto de depreciación calculado por activo.
+- **Horas de proyecto**: pueden obtenerse sumando las horas de los
+  registros vigentes de mano de obra directa (`RegistroCosto.horas`,
+  `costos/models.py:162-183`). La misma entidad guarda fecha, orden y
+  proceso, así que permite filtrar por período y distribuir un pool entre
+  órdenes abiertas con horas. Actualmente el registro es manual y se
+  guarda junto con el asiento por orden (`costos/services.py:455-498`).
+- **Modo deducible**: reclasificar el gasto ya registrado evita duplicar
+  gasto y es el único modo deducible para servicios (Debe costos
+  indirectos, Haber cuenta de gasto). No hay base para aplicar el modo
+  registrar a depreciación/amortización: no existe cálculo auxiliar y
+  no se identifica un gasto calculado pero aún no contabilizado. Para
+  4207/4208, usar reclasificar solo sería válido si el saldo seleccionado
+  corresponde íntegramente a activos de desarrollo; esa condición no se
+  verifica en el modelo actual.
+- **Bloqueo de clasificación**: automatizar la distribución del saldo
+  completo de una cuenta de servicios o depreciación podría cargar a
+  órdenes gastos administrativos, servicios profesionales o activos
+  ociosos. La cuenta del mayor no permite excluir esas porciones. Se
+  requiere decisión sobre cómo identificar saldos elegibles y, si se
+  necesita una categoría/campo nuevo en contabilidad general, aprobación
+  escrita antes de modificarla.
