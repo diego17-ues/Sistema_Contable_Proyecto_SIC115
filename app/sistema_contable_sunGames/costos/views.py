@@ -14,588 +14,371 @@ from sic_sunGames.views.pages import contexto_panel
 from usuarios.exceptions import RolNoAutorizadoError, UsuarioInactivoError
 
 from .composition import (
-    crear_calculo_service,
     crear_catalogo_costos_service,
     crear_orden_service,
+    crear_registro_service,
 )
 from .exceptions import CostosError
 from .forms import (
-    CargoForm,
-    ConfirmForm,
-    CostoProcesoForm,
-    CorteForm,
-    DepreciacionForm,
-    EquipoForm,
+    AnularForm,
+    ConfiguracionCuentaForm,
+    CostoForm,
+    EstimacionRefForm,
     FiltroOrdenForm,
-    FondoForm,
-    HoraForm,
-    MapeoForm,
+    LicenciasForm,
+    ManoObraForm,
     OrdenForm,
-    ParametroForm,
+    ProcesoEditForm,
     ProcesoForm,
-    SalarioForm,
-    TasasForm,
-    UsoEquipoForm,
 )
-from .models import CONCEPTOS_CUENTA, TIPOS_USO_EQUIPO, CargoOrden
+from .models import Elemento
 
 ORDENES_TEMPLATE = "costos/ordenes.html"
 ORDEN_TEMPLATE = "costos/orden.html"
 CATALOGOS_TEMPLATE = "costos/catalogos.html"
 REGISTROS_POR_PAGINA = 50
 SIN_PERMISO = (RolNoAutorizadoError, UsuarioInactivoError)
-VISTAS_ORDEN = ("cargos", "horas", "cortes")
+ELEMENTOS_URL = {
+    "mano-obra": Elemento.MANO_OBRA,
+    "directo": Elemento.DIRECTO,
+    "indirecto": Elemento.INDIRECTO,
+}
 
 
-def _manejar_error(request, error):
-    if isinstance(error, SIN_PERMISO):
-        raise PermissionDenied(str(error)) from error
-    messages.error(request, str(error))
+def _sin_permiso(error):
+    raise PermissionDenied(str(error)) from error
+
+
+def _error_en_form(form, error):
+    campo = getattr(error, "campo", None)
+    form.add_error(campo if campo in form.fields else None, str(error))
 
 
 def _contexto(request, screen="costos"):
     return contexto_panel(request, screen)
 
 
-def _roles_disponibles(servicio_catalogo, actor):
-    return sorted({s.rol for s in servicio_catalogo.salarios(actor)})
+def _int(valor):
+    return int(valor) if valor else None
 
 
-# ---------------------------------------------------------------- listas
+# ---------------------------------------------------------------- órdenes
 
-@login_required
-def ordenes(request):
+def _render_ordenes(request, form_nueva=None):
     servicio = crear_orden_service()
     filtro = FiltroOrdenForm(request.GET or None)
     estado = filtro["estado"].value() if filtro.is_valid() else None
     try:
-        lista = servicio.listar(
-            request.user, estado=estado or None
-        )
+        lista = servicio.listar(request.user, estado=estado or None)
     except SIN_PERMISO as error:
-        raise PermissionDenied(str(error)) from error
-    pagina = Paginator(lista, REGISTROS_POR_PAGINA).get_page(
-        request.GET.get("pagina")
-    )
+        _sin_permiso(error)
     contexto = _contexto(request)
     contexto.update(
-        filtro=filtro, pagina=pagina, estado=estado or "",
+        filtro=filtro, estado=estado or "", form_nueva=form_nueva,
+        pagina=Paginator(lista, REGISTROS_POR_PAGINA).get_page(
+            request.GET.get("pagina")
+        ),
     )
     return render(request, ORDENES_TEMPLATE, contexto)
 
 
 @login_required
+def ordenes(request):
+    return _render_ordenes(request)
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
 def orden_nueva(request):
+    if request.method != "POST":
+        return _render_ordenes(request, OrdenForm())
+    form = OrdenForm(request.POST)
+    if form.is_valid():
+        try:
+            orden = crear_orden_service().crear_orden(
+                request.user,
+                nombre_juego=form.cleaned_data["nombre_juego"],
+                fecha_inicio=form.cleaned_data["fecha_inicio"],
+            )
+        except SIN_PERMISO as error:
+            _sin_permiso(error)
+        except CostosError as error:
+            _error_en_form(form, error)
+        else:
+            messages.success(request, "Orden de trabajo creada.")
+            return redirect("costos_orden", orden_id=orden.pk)
+    return _render_ordenes(request, form)
+
+
+def _render_orden(request, orden_id, **modal):
     servicio = crear_orden_service()
-    if request.method == "POST":
-        form = OrdenForm(request.POST)
-        if form.is_valid():
-            try:
-                orden = servicio.crear_orden(
-                    request.user,
-                    nombre_juego=form.cleaned_data["nombre_juego"],
-                    capitalizable_desde=form.cleaned_data[
-                        "capitalizable_desde"],
-                )
-            except (CostosError, *SIN_PERMISO) as error:
-                _manejar_error(request, error)
-                messages.error(request, str(error))
-            else:
-                messages.success(request, "Orden de trabajo creada.")
-                return redirect("costos_orden", orden_id=orden.pk)
-    else:
-        form = OrdenForm()
-    # Re-render lista con el modal abierto y errores.
-    filtro = FiltroOrdenForm()
-    lista = servicio.listar(request.user)
+    registro_service = crear_registro_service()
+    try:
+        orden, secciones, resumen = servicio.hoja_costos(
+            request.user, orden_id
+        )
+        configuradas = registro_service.configuraciones_disponibles(
+            request.user
+        )
+    except SIN_PERMISO as error:
+        _sin_permiso(error)
+    except CostosError as error:
+        messages.error(request, str(error))
+        return redirect("costos_ordenes")
     contexto = _contexto(request)
     contexto.update(
-        filtro=filtro,
-        pagina=Paginator(lista, REGISTROS_POR_PAGINA).get_page(1),
-        estado="", form_nueva=form,
+        orden=orden, secciones=secciones, resumen=resumen,
+        bloqueados=[e.label for e in Elemento if e not in configuradas],
+        **modal,
     )
-    return render(request, ORDENES_TEMPLATE, contexto)
+    return render(request, ORDEN_TEMPLATE, contexto)
 
 
 @login_required
 def orden_detalle(request, orden_id):
+    return _render_orden(request, orden_id)
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def orden_licencias(request, orden_id):
+    form = LicenciasForm(request.POST if request.method == "POST" else None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            crear_orden_service().actualizar_licencias(
+                request.user, orden_id,
+                form.cleaned_data["licencias_estimadas"],
+            )
+        except SIN_PERMISO as error:
+            _sin_permiso(error)
+        except CostosError as error:
+            _error_en_form(form, error)
+        else:
+            messages.success(request, "Licencias estimadas actualizadas.")
+            return redirect("costos_orden", orden_id=orden_id)
+    return _render_orden(request, orden_id, form_licencias=form)
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def orden_estimacion(request, orden_id):
     servicio = crear_orden_service()
-    catalogo = crear_catalogo_costos_service()
-    calculo = crear_calculo_service()
-    vista = request.GET.get("vista", "cargos")
-    if vista not in VISTAS_ORDEN:
-        vista = "cargos"
     try:
-        orden = servicio.detalle(request.user, orden_id)
-        horas = orden.horas.all()[:200]
-        cargos = orden.cargos.all()[:300]
-        cortes = [c for c in catalogo.cortes(request.user)
-                  if any(d.orden_id == orden.pk for d in c.detalles.all())]
-        roles = _roles_disponibles(catalogo, request.user)
-        procesos = catalogo.procesos(request.user)
-    except (CostosError, *SIN_PERMISO) as error:
-        _manejar_error(request, error)
-        return redirect("costos_ordenes")
-    contexto = _contexto(request)
-    contexto.update(
-        orden=orden, vista=vista, horas=horas, cargos=cargos,
-        cortes=cortes, roles=roles, procesos=procesos,
-        saldos=servicio.saldos_orden(orden),
-        conceptos_cuenta=CONCEPTOS_CUENTA,
-        origenes=CargoOrden.ORIGENES,
-    )
-    return render(request, ORDEN_TEMPLATE, contexto)
-
-
-@login_required
-@require_http_methods(["GET", "POST"])
-def hora_nueva(request, orden_id):
-    servicio = crear_orden_service()
-    catalogo = crear_catalogo_costos_service()
-    if request.method == "POST":
-        form = HoraForm(
-            request.POST,
-            procesos=catalogo.procesos(request.user),
-            roles=_roles_disponibles(catalogo, request.user),
-        )
-        if form.is_valid():
-            datos = form.cleaned_data
-            try:
-                servicio.registrar_hora(
-                    request.user, orden_id,
-                    proceso_id=int(datos["proceso"]) if datos["proceso"] else None,
-                    rol=datos["rol"], horas=datos["horas"],
-                    fecha=datos["fecha"],
-                )
-            except (CostosError, *SIN_PERMISO) as error:
-                messages.error(request, str(error))
-            else:
-                messages.success(request, "Horas registradas.")
-                return redirect("costos_orden", orden_id=orden_id)
-    else:
-        form = HoraForm(
-            procesos=catalogo.procesos(request.user),
-            roles=_roles_disponibles(catalogo, request.user),
-        )
-    return _render_orden_modal(request, orden_id, form_hora=form)
-
-
-@login_required
-@require_http_methods(["GET", "POST"])
-def cargo_nuevo(request, orden_id):
-    servicio = crear_orden_service()
-    if request.method == "POST":
-        form = CargoForm(request.POST)
-        if form.is_valid():
-            datos = form.cleaned_data
-            try:
-                servicio.registrar_cargo(
-                    request.user, orden_id,
-                    origen=datos["origen"],
-                    afecta_mayor=datos["afecta_mayor"],
-                    monto=datos["monto"], fecha=datos["fecha"],
-                    descripcion=datos["descripcion"],
-                    concepto_cuenta=datos["concepto_cuenta"],
-                )
-            except (CostosError, *SIN_PERMISO) as error:
-                messages.error(request, str(error))
-            else:
-                messages.success(request, "Cargo registrado.")
-                return redirect("costos_orden", orden_id=orden_id)
-    else:
-        form = CargoForm()
-    return _render_orden_modal(request, orden_id, form_cargo=form)
-
-
-@login_required
-@require_http_methods(["GET", "POST"])
-def orden_cerrar(request, orden_id):
-    servicio = crear_orden_service()
-    if request.method == "POST":
-        form = ConfirmForm(request.POST)
-        if form.is_valid():
-            try:
-                servicio.cerrar_orden(
-                    request.user, orden_id,
-                    confirmacion=form.cleaned_data["confirmacion"],
-                    motivo=form.cleaned_data["motivo"],
-                )
-            except (CostosError, *SIN_PERMISO) as error:
-                messages.error(request, str(error))
-            else:
-                messages.success(request, "Orden cerrada.")
-                return redirect("costos_orden", orden_id=orden_id)
-    else:
-        form = ConfirmForm()
-    return _render_orden_modal(request, orden_id, form_cierre=form)
-
-
-def _render_orden_modal(request, orden_id, **forms_ctx):
-    servicio = crear_orden_service()
-    catalogo = crear_catalogo_costos_service()
-    vista = request.GET.get("vista", "cargos")
-    if vista not in VISTAS_ORDEN:
-        vista = "cargos"
+        versiones = servicio.versiones_aprobadas(request.user)
+    except SIN_PERMISO as error:
+        _sin_permiso(error)
     try:
-        orden = servicio.detalle(request.user, orden_id)
-        horas = orden.horas.all()[:200]
-        cargos = orden.cargos.all()[:300]
-        cortes = catalogo.cortes(request.user)
-        roles = _roles_disponibles(catalogo, request.user)
-        procesos = catalogo.procesos(request.user)
-    except (CostosError, *SIN_PERMISO) as error:
-        _manejar_error(request, error)
+        actual = servicio.detalle(request.user, orden_id).estimacion_ref_id
+    except CostosError as error:
+        messages.error(request, str(error))
         return redirect("costos_ordenes")
-    contexto = _contexto(request)
-    defaults = dict(
-        orden=orden, vista=vista, horas=horas, cargos=cargos,
-        cortes=cortes, roles=roles, procesos=procesos,
-        saldos=servicio.saldos_orden(orden),
-        conceptos_cuenta=CONCEPTOS_CUENTA,
-        origenes=CargoOrden.ORIGENES,
+    form = EstimacionRefForm(
+        request.POST if request.method == "POST" else None,
+        initial={"version": actual or ""}, versiones=versiones,
     )
-    defaults.update(forms_ctx)
-    contexto.update(defaults)
-    return render(request, ORDEN_TEMPLATE, contexto)
+    if request.method == "POST" and form.is_valid():
+        try:
+            servicio.vincular_estimacion(
+                request.user, orden_id, _int(form.cleaned_data["version"])
+            )
+        except SIN_PERMISO as error:
+            _sin_permiso(error)
+        except CostosError as error:
+            _error_en_form(form, error)
+        else:
+            messages.success(request, "Estimación de referencia guardada.")
+            return redirect("costos_orden", orden_id=orden_id)
+    return _render_orden(request, orden_id, form_estimacion=form)
+
+
+# ------------------------------------------------------------- registros
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def registro_nuevo(request, orden_id, tipo):
+    elemento = ELEMENTOS_URL.get(tipo)
+    if elemento is None:
+        return redirect("costos_orden", orden_id=orden_id)
+    servicio = crear_registro_service()
+    try:
+        configuracion = servicio.configuracion(request.user, elemento)
+        procesos = servicio.procesos(request.user)
+    except SIN_PERMISO as error:
+        _sin_permiso(error)
+    except CostosError as error:
+        messages.error(request, str(error))
+        return redirect("costos_orden", orden_id=orden_id)
+    clase = ManoObraForm if elemento == Elemento.MANO_OBRA else CostoForm
+    form = clase(request.POST if request.method == "POST" else None,
+                 procesos=procesos, configuracion=configuracion)
+    if request.method == "POST" and form.is_valid():
+        try:
+            _registrar(servicio, request.user, orden_id, elemento,
+                       form.cleaned_data)
+        except SIN_PERMISO as error:
+            _sin_permiso(error)
+        except CostosError as error:
+            _error_en_form(form, error)
+        else:
+            messages.success(request, "Registro guardado y asentado en el "
+                                      "Libro Mayor.")
+            return redirect("costos_orden", orden_id=orden_id)
+    return _render_orden(
+        request, orden_id, form_registro=form, tipo_registro=tipo,
+        elemento_registro=elemento.label, configuracion=configuracion,
+    )
+
+
+def _registrar(servicio, actor, orden_id, elemento, datos):
+    comunes = dict(
+        orden_id=orden_id, fecha=datos["fecha"],
+        proceso_id=_int(datos["proceso"]),
+        contrapartida_id=_int(datos["contrapartida"]), clave=datos["clave"],
+    )
+    if elemento == Elemento.MANO_OBRA:
+        return servicio.registrar_mano_obra(
+            actor, horas=datos["horas"], costo_hora=datos["costo_hora"],
+            **comunes,
+        )
+    return servicio.registrar_costo(
+        actor, elemento=elemento, descripcion=datos["descripcion"],
+        importe=datos["importe"], **comunes,
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def registro_anular(request, orden_id, registro_id):
+    servicio = crear_registro_service()
+    try:
+        registro, lineas = servicio.vista_previa_anulacion(
+            request.user, registro_id
+        )
+    except SIN_PERMISO as error:
+        _sin_permiso(error)
+    except CostosError as error:
+        messages.error(request, str(error))
+        return redirect("costos_orden", orden_id=orden_id)
+    form = AnularForm(request.POST if request.method == "POST" else None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            servicio.anular(request.user, registro_id=registro.pk,
+                            motivo=form.cleaned_data["motivo"],
+                            clave=form.cleaned_data["clave"])
+        except SIN_PERMISO as error:
+            _sin_permiso(error)
+        except CostosError as error:
+            _error_en_form(form, error)
+        else:
+            messages.success(request, "Registro anulado con su "
+                                      "contra-asiento.")
+            return redirect("costos_orden", orden_id=registro.orden_id)
+    return _render_orden(
+        request, registro.orden_id, form_anular=form,
+        registro_anular=registro, lineas_anulacion=lineas,
+    )
 
 
 # ------------------------------------------------------------- catálogos
 
-@login_required
-def catalogos(request):
-    return _render_catalogos(request)
-
-
 def _render_catalogos(request, **extra):
-    catalogo = crear_catalogo_costos_service()
-    calculo = crear_calculo_service()
+    servicio = crear_catalogo_costos_service()
     try:
-        procesos = catalogo.procesos(request.user)
-        parametros = catalogo.parametros(request.user)
-        salarios = catalogo.salarios(request.user)
-        mapeos = catalogo.mapeos(request.user)
-        fondos = catalogo.fondos(request.user)
-        equipos = catalogo.equipos(request.user)
-        cortes = catalogo.cortes(request.user)
-        periodos = catalogo.periodos(request.user)
-        costos_proceso, periodo_cp = calculo.costos_proceso(request.user)
-        cuentas = catalogo.cuentas_posteables(request.user)
+        procesos = servicio.procesos(request.user)
+        configuraciones = servicio.configuraciones(request.user)
     except SIN_PERMISO as error:
-        raise PermissionDenied(str(error)) from error
+        _sin_permiso(error)
     contexto = _contexto(request)
     contexto.update(
-        procesos=procesos, parametros=parametros, salarios=salarios,
-        mapeos=mapeos, fondos=fondos, equipos=equipos, cortes=cortes,
-        periodos=periodos, costos_proceso=costos_proceso,
-        periodo_cp=periodo_cp,
-        conceptos_cuenta=CONCEPTOS_CUENTA,
-        tipos_uso=TIPOS_USO_EQUIPO,
-        form_tasas=TasasForm(periodos=periodos),
-        form_depreciacion=DepreciacionForm(),
+        procesos=procesos,
+        elementos=[(e.value, e.label, configuraciones.get(e.value))
+                   for e in Elemento],
         **extra,
     )
     return render(request, CATALOGOS_TEMPLATE, contexto)
 
 
 @login_required
+def catalogos(request):
+    return _render_catalogos(request)
+
+
+@login_required
 @require_http_methods(["GET", "POST"])
 def proceso_nuevo(request):
-    catalogo = crear_catalogo_costos_service()
-    if request.method == "POST":
-        form = ProcesoForm(request.POST)
-        if form.is_valid():
-            try:
-                catalogo.crear_proceso(
-                    request.user, nombre=form.cleaned_data["nombre"],
-                    descripcion=form.cleaned_data["descripcion"],
-                )
-            except (CostosError, *SIN_PERMISO) as error:
-                messages.error(request, str(error))
-            else:
-                messages.success(request, "Proceso registrado.")
-                return redirect("costos_catalogos")
-    else:
-        form = ProcesoForm()
+    form = ProcesoForm(request.POST if request.method == "POST" else None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            crear_catalogo_costos_service().crear_proceso(
+                request.user, **form.cleaned_data
+            )
+        except SIN_PERMISO as error:
+            _sin_permiso(error)
+        except CostosError as error:
+            _error_en_form(form, error)
+        else:
+            messages.success(request, "Proceso registrado.")
+            return redirect("costos_catalogos")
     return _render_catalogos(request, form_proceso=form)
 
 
 @login_required
-@require_http_methods(["GET", "POST"])
-def costo_proceso_nuevo(request):
-    calculo = crear_calculo_service()
-    catalogo = crear_catalogo_costos_service()
-    procesos = catalogo.procesos(request.user)
-    periodos = catalogo.periodos(request.user)
-    if request.method == "POST":
-        form = CostoProcesoForm(request.POST, procesos=procesos,
-                                periodos=periodos)
-        if form.is_valid():
-            datos = form.cleaned_data
-            try:
-                calculo.registrar_costo_proceso(
-                    request.user,
-                    proceso_id=int(datos["proceso"]),
-                    periodo_id=int(datos["periodo"]),
-                    costo=datos["costo"], horas_base=datos["horas_base"],
-                    tasa_presupuestada=datos["tasa_presupuestada"],
-                )
-            except (CostosError, *SIN_PERMISO) as error:
-                messages.error(request, str(error))
-            else:
-                messages.success(request, "Costo de proceso registrado.")
-                return redirect("costos_catalogos")
-    else:
-        form = CostoProcesoForm(procesos=procesos, periodos=periodos)
-    return _render_catalogos(request, form_costo_proceso=form)
-
-
-@login_required
-@require_http_methods(["GET", "POST"])
-def parametro_nuevo(request):
-    catalogo = crear_catalogo_costos_service()
-    if request.method == "POST":
-        form = ParametroForm(request.POST)
-        if form.is_valid():
-            try:
-                catalogo.crear_parametro(
-                    request.user, **form.cleaned_data
-                )
-            except (CostosError, *SIN_PERMISO) as error:
-                messages.error(request, str(error))
-            else:
-                messages.success(request, "Parámetro registrado.")
-                return redirect("costos_catalogos")
-    else:
-        form = ParametroForm()
-    return _render_catalogos(request, form_parametro=form)
-
-
-@login_required
-@require_http_methods(["GET", "POST"])
-def salario_nuevo(request):
-    catalogo = crear_catalogo_costos_service()
-    if request.method == "POST":
-        form = SalarioForm(request.POST)
-        if form.is_valid():
-            try:
-                catalogo.crear_salario(
-                    request.user, **form.cleaned_data
-                )
-            except (CostosError, *SIN_PERMISO) as error:
-                messages.error(request, str(error))
-            else:
-                messages.success(request, "Salario de referencia registrado.")
-                return redirect("costos_catalogos")
-    else:
-        form = SalarioForm()
-    return _render_catalogos(request, form_salario=form)
-
-
-@login_required
-@require_http_methods(["GET", "POST"])
-def mapeo_nuevo(request):
-    catalogo = crear_catalogo_costos_service()
-    cuentas = catalogo.cuentas_posteables(request.user)
-    if request.method == "POST":
-        form = MapeoForm(request.POST, cuentas=cuentas)
-        if form.is_valid():
-            try:
-                catalogo.crear_mapeo(
-                    request.user, concepto=form.cleaned_data["concepto"],
-                    cuenta_codigo=form.cleaned_data["cuenta"],
-                )
-            except (CostosError, *SIN_PERMISO) as error:
-                messages.error(request, str(error))
-            else:
-                messages.success(request, "Mapeo de cuenta registrado.")
-                return redirect("costos_catalogos")
-    else:
-        form = MapeoForm(cuentas=cuentas)
-    return _render_catalogos(request, form_mapeo=form)
-
-
-@login_required
-@require_http_methods(["GET", "POST"])
-def fondo_nuevo(request):
-    calculo = crear_calculo_service()
-    if request.method == "POST":
-        form = FondoForm(request.POST)
-        if form.is_valid():
-            datos = form.cleaned_data
-            try:
-                calculo.crear_fondo(
-                    request.user, nombre=datos["nombre"], monto=datos["monto"],
-                    fecha=datos["fecha"], descripcion=datos["descripcion"],
-                )
-            except (CostosError, *SIN_PERMISO) as error:
-                messages.error(request, str(error))
-            else:
-                messages.success(request, "Fondo compartido registrado.")
-                return redirect("costos_catalogos")
-    else:
-        form = FondoForm()
-    return _render_catalogos(request, form_fondo=form)
-
-
-@login_required
 @require_POST
-def fondo_distribuir(request, fondo_id):
-    calculo = crear_calculo_service()
-    try:
-        calculo.distribuir_fondo(request.user, fondo_id)
-    except (CostosError, *SIN_PERMISO) as error:
-        messages.error(request, str(error))
+def proceso_editar(request, proceso_id):
+    form = ProcesoEditForm(request.POST)
+    if form.is_valid():
+        try:
+            crear_catalogo_costos_service().actualizar_proceso(
+                request.user, proceso_id, **form.cleaned_data
+            )
+        except SIN_PERMISO as error:
+            _sin_permiso(error)
+        except CostosError as error:
+            messages.error(request, str(error))
+        else:
+            messages.success(request, "Proceso actualizado.")
     else:
-        messages.success(request, "Fondo distribuido entre las órdenes.")
+        messages.error(request, "Revisa el costo por hora del proceso.")
     return redirect("costos_catalogos")
 
 
 @login_required
 @require_http_methods(["GET", "POST"])
-def equipo_nuevo(request):
-    catalogo = crear_catalogo_costos_service()
-    ordenes = catalogo.ordenes_abiertas(request.user)
-    if request.method == "POST":
-        form = EquipoForm(request.POST, ordenes=ordenes)
-        if form.is_valid():
-            datos = form.cleaned_data
-            try:
-                catalogo.crear_equipo(
-                    request.user,
-                    nombre=datos["nombre"], costo=datos["costo"],
-                    valor_residual=datos["valor_residual"] or 0,
-                    vida_util_meses=datos["vida_util_meses"],
-                    tipo_uso=datos["tipo_uso"],
-                    orden_id=int(datos["orden"]) if datos["orden"] else None,
-                    horas_mes=datos["horas_mes"] or 0,
-                    fecha_adquisicion=datos["fecha_adquisicion"],
-                )
-            except (CostosError, *SIN_PERMISO) as error:
-                messages.error(request, str(error))
-            else:
-                messages.success(request, "Equipo registrado.")
-                return redirect("costos_catalogos")
-    else:
-        form = EquipoForm(ordenes=ordenes)
-    return _render_catalogos(request, form_equipo=form)
-
-
-@login_required
-@require_http_methods(["GET", "POST"])
-def uso_equipo_nuevo(request, equipo_id):
-    catalogo = crear_catalogo_costos_service()
-    ordenes = list(catalogo.ordenes_abiertas(request.user))
-    if request.method == "POST":
-        form = UsoEquipoForm(request.POST, ordenes=ordenes)
-        if form.is_valid():
-            datos = form.cleaned_data
-            try:
-                catalogo.crear_uso_equipo(
-                    request.user,
-                    equipo_id=equipo_id, orden_id=int(datos["orden"]),
-                    fecha=datos["fecha"], horas=datos["horas"],
-                )
-            except (CostosError, *SIN_PERMISO) as error:
-                messages.error(request, str(error))
-            else:
-                messages.success(request, "Uso de equipo registrado.")
-                return redirect("costos_catalogos")
-    else:
-        form = UsoEquipoForm(initial={"equipo": equipo_id},
-                             ordenes=ordenes)
-    return _render_catalogos(
-        request, form_uso=form, uso_equipo_id=equipo_id,
-        uso_ordenes=ordenes,
+def configuracion_editar(request, elemento):
+    if elemento not in Elemento.values:
+        return redirect("costos_catalogos")
+    servicio = crear_catalogo_costos_service()
+    try:
+        cuentas = servicio.cuentas(request.user)
+        actual = servicio.configuraciones(request.user).get(elemento)
+    except SIN_PERMISO as error:
+        _sin_permiso(error)
+    inicial = None
+    if actual is not None:
+        inicial = {
+            "cuenta_costo": str(actual.cuenta_costo_id),
+            "contrapartidas": [str(c.pk)
+                               for c in actual.contrapartidas.all()],
+            "contrapartida_defecto": str(actual.contrapartida_defecto_id),
+        }
+    form = ConfiguracionCuentaForm(
+        request.POST if request.method == "POST" else None,
+        initial=inicial, cuentas=cuentas,
     )
-
-
-@login_required
-@require_POST
-def tasas_aplicar(request):
-    calculo = crear_calculo_service()
-    form = TasasForm(request.POST, periodos=crear_catalogo_costos_service()
-                     .periodos(request.user))
-    if form.is_valid():
+    if request.method == "POST" and form.is_valid():
+        cuenta_costo, contrapartidas, defecto = form.cuentas_elegidas()
         try:
-            resultados = calculo.aplicar_tasas(
-                request.user, int(form.cleaned_data["periodo"]),
-                usar_presupuestada=form.cleaned_data["usar_presupuestada"],
+            servicio.guardar_configuracion(
+                request.user, elemento=elemento, cuenta_costo=cuenta_costo,
+                contrapartidas=contrapartidas,
+                contrapartida_defecto=defecto,
             )
-        except (CostosError, *SIN_PERMISO) as error:
-            messages.error(request, str(error))
+        except SIN_PERMISO as error:
+            _sin_permiso(error)
+        except CostosError as error:
+            _error_en_form(form, error)
         else:
-            for r in resultados:
-                messages.success(
-                    request,
-                    f"{r['proceso']}: tasa {r['tasa']} ({r['origen_tasa']}), "
-                    f"aplicado ${r['aplicado']}, ajuste ${r['diferencia']}",
-                )
-    else:
-        messages.error(request, "Revise el período seleccionado.")
-    return redirect("costos_catalogos")
-
-
-@login_required
-@require_POST
-def depreciacion_generar(request):
-    calculo = crear_calculo_service()
-    form = DepreciacionForm(request.POST)
-    if form.is_valid():
-        try:
-            generados = calculo.generar_depreciacion(
-                request.user, anio=form.cleaned_data["anio"],
-                mes=form.cleaned_data["mes"],
-            )
-        except (CostosError, *SIN_PERMISO) as error:
-            messages.error(request, str(error))
-        else:
-            if generados:
-                messages.success(
-                    request, f"{len(generados)} cargo(s) de depreciación: "
-                    + "; ".join(generados[:5])
-                )
-            else:
-                messages.info(request,
-                              "No se generaron cargos (equipo ocioso o "
-                              "sin uso registrado).")
-    else:
-        messages.error(request, "Revise el año y el mes.")
-    return redirect("costos_catalogos")
-
-
-@login_required
-@require_http_methods(["GET", "POST"])
-def corte_nuevo(request):
-    calculo = crear_calculo_service()
-    catalogo = crear_catalogo_costos_service()
-    periodos = catalogo.periodos(request.user)
-    if request.method == "POST":
-        form = CorteForm(request.POST, periodos=periodos)
-        if form.is_valid():
-            datos = form.cleaned_data
-            try:
-                calculo.crear_corte(
-                    request.user, periodo_id=int(datos["periodo"]),
-                    tipo=datos["tipo"], motivo=datos["motivo"],
-                )
-            except (CostosError, *SIN_PERMISO) as error:
-                messages.error(request, str(error))
-            else:
-                messages.success(request, "Corte de costos registrado.")
-                return redirect("costos_catalogos")
-    else:
-        form = CorteForm(periodos=periodos)
-    return _render_catalogos(request, form_corte=form)
-
-
-@login_required
-@require_POST
-def corte_revertir(request, corte_id):
-    calculo = crear_calculo_service()
-    try:
-        calculo.revertir_corte(request.user, corte_id)
-    except (CostosError, *SIN_PERMISO) as error:
-        messages.error(request, str(error))
-    else:
-        messages.success(request, "Corte provisional revertido.")
-    return redirect("costos_catalogos")
+            messages.success(request, "Configuración de cuentas guardada.")
+            return redirect("costos_catalogos")
+    return _render_catalogos(request, form_config=form,
+                             elemento_config=Elemento(elemento))

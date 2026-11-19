@@ -1,399 +1,587 @@
-"""Pruebas del subsistema de costos (órdenes de trabajo).
+"""Pruebas del subsistema de costos (Etapa 1 · Fase 1).
 
-Cubren los valores exactos exigidos: tasas por proceso, ajustes de
-diferencia, reparto de fondos con ajuste de centavos, costo por hora
-pagada, idempotencia, período/orden cerrados, capitalización por fecha,
-cortes provisionales/reversión y depreciación de equipos.
+Cubren los valores exactos exigidos por AGENTS2.md: registro de mano de
+obra directa, costos directos e indirectos con su asiento en el Libro
+Mayor, anulación con contra-asiento, idempotencia, cuadre, origen,
+período cerrado y ausencia de los conceptos eliminados.
 """
 
+import re
+import uuid
+from contextlib import nullcontext
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
+from types import SimpleNamespace
 
 from django.db import transaction
-from django.test import TestCase
+from django.db.models import Sum
+from django.test import SimpleTestCase, TestCase
+from django.urls import reverse
 
 from catalogo.models import Cuenta
 from costos import calculos
 from costos.exceptions import (
-    FondoYaDistribuidoError,
-    OrdenCerradaError,
+    AsientoDescuadradoError,
+    ConfiguracionNoEncontradaError,
+    CuentaNoValidaError,
+    DatosInsuficientesError,
+    OrdenDuplicadaError,
     PeriodoNoAbiertoError,
-    SalarioNoVigenteError,
+    RegistroYaAnuladoError,
 )
 from costos.models import (
-    CargoOrden,
-    CostoProceso,
-    CorteCostos,
-    Equipo,
-    FondoCompartido,
-    MapeoCuenta,
-    OrdenTrabajo,
+    AsientoCosto,
+    ConfiguracionCuentaCosto,
+    Elemento,
     Proceso,
-    RegistroHora,
-    SalarioReferencia,
-    UsoEquipo,
+    RegistroCosto,
 )
 from costos.repositories import CostosRepository
-from costos.services import CalculoService, OrdenService
-from libro_mayor.models import EstadoPeriodo, PeriodoContable
+from costos.services import (
+    CatalogoCostosService,
+    OrdenService,
+    RegistroCostoService,
+)
+from libro_mayor.models import EstadoPeriodo, Movimiento, PeriodoContable
+from libro_mayor.repositories import TransaccionRepository
+from usuarios.exceptions import RolNoAutorizadoError
 from usuarios.models import Usuario
 from usuarios.roles import Rol
 
 D = Decimal
 FECHA = date(2026, 6, 15)
+APP = Path(__file__).resolve().parents[1]
 
+
+def clave():
+    return uuid.uuid4().hex
+
+
+class CalculosPurosTests(SimpleTestCase):
+    def test_importe_mano_obra(self):
+        self.assertEqual(calculos.importe_mano_obra("40", "20.00"),
+                         D("800.00"))
+        self.assertEqual(calculos.importe_mano_obra("1.5", "33.3333"),
+                         D("50.00"))
+
+    def test_lineas_cuadran_y_contrarias(self):
+        lineas = calculos.lineas_registro("debe", "haber", D("83.33"))
+        self.assertEqual(lineas,
+                         [("debe", D("83.33")), ("haber", D("-83.33"))])
+        self.assertTrue(calculos.cuadra(lineas))
+        self.assertEqual(calculos.lineas_contrarias(lineas),
+                         [("debe", D("-83.33")), ("haber", D("83.33"))])
+        self.assertFalse(calculos.cuadra([("debe", D("1"))]))
+
+
+# ------------------------------------------------------------ unitarias
+
+class _RepoMemoria:
+    """Repositorio en memoria para probar el servicio sin base de datos."""
+
+    def __init__(self, config):
+        self.registros, self.asientos = {}, []
+        self.orden = SimpleNamespace(pk=1, abierta=True)
+        self.config = config
+        self.proceso = SimpleNamespace(pk=7, nombre="Programación",
+                                       activo=True)
+
+    def obtener_orden(self, orden_id):
+        return self.orden if orden_id == 1 else None
+
+    def obtener_proceso(self, proceso_id):
+        return self.proceso if proceso_id == 7 else None
+
+    def configuracion(self, elemento):
+        return self.config
+
+    def registro_por_clave(self, clave):
+        return self.registros.get(clave)
+
+    def crear_registro(self, **datos):
+        registro = SimpleNamespace(
+            pk=len(self.registros) + 1, orden_id=datos["orden"].pk,
+            get_elemento_display=lambda: "Mano de obra directa", **datos,
+        )
+        self.registros[datos["clave_idempotencia"]] = registro
+        return registro
+
+    def crear_asiento(self, **datos):
+        self.asientos.append(datos)
+        return datos
+
+
+class _MayorMemoria:
+    def __init__(self, cerrado=False):
+        self.cerrado = cerrado
+        self.movimientos = []
+
+    def periodo_de(self, fecha):
+        return SimpleNamespace(cerrado=self.cerrado)
+
+    def tiene_subcuentas(self, cuenta):
+        return False
+
+    def crear_transaccion(self, *, usuario):
+        return SimpleNamespace(pk=99)
+
+    def crear_movimiento(self, **datos):
+        self.movimientos.append(datos)
+
+
+class RegistroServiceUnitTests(SimpleTestCase):
+    def setUp(self):
+        self.debe = SimpleNamespace(pk=1, codigo="D", activa=True)
+        self.haber = SimpleNamespace(pk=2, codigo="H", activa=True)
+        config = SimpleNamespace(
+            cuenta_costo=self.debe, contrapartida_defecto_id=2,
+            contrapartidas=SimpleNamespace(all=lambda: [self.haber]),
+        )
+        self.repo = _RepoMemoria(config)
+        self.mayor = _MayorMemoria()
+        self.actor = SimpleNamespace(activo=True, rol=Rol.CONTADOR_COSTOS)
+        self.servicio = RegistroCostoService(self.repo, self.mayor, None,
+                                             nullcontext)
+
+    def _mano_obra(self, clave_="k1"):
+        return self.servicio.registrar_mano_obra(
+            self.actor, orden_id=1, fecha=FECHA, proceso_id=7, horas="40",
+            costo_hora="20.00", contrapartida_id=None, clave=clave_,
+        )
+
+    def test_asiento_cuadrado_con_auxiliar_y_clave(self):
+        registro = self._mano_obra()
+        self.assertEqual(registro.importe, D("800.00"))
+        importes = [m["importe"] for m in self.mayor.movimientos]
+        self.assertEqual(importes, [D("800.00"), D("-800.00")])
+        self.assertTrue(all("OT-1" in m["referencia"]
+                            for m in self.mayor.movimientos))
+        self.assertEqual(self.repo.asientos[0]["clave_idempotencia"], "k1")
+
+    def test_misma_clave_no_duplica(self):
+        primero = self._mano_obra()
+        segundo = self._mano_obra()
+        self.assertIs(primero, segundo)
+        self.assertEqual(len(self.mayor.movimientos), 2)
+
+    def test_periodo_cerrado_rechaza(self):
+        self.mayor.cerrado = True
+        with self.assertRaises(PeriodoNoAbiertoError):
+            self._mano_obra()
+        self.assertEqual(self.mayor.movimientos, [])
+
+    def test_sin_configuracion_bloquea(self):
+        self.repo.config = None
+        with self.assertRaises(ConfiguracionNoEncontradaError):
+            self._mano_obra()
+
+    def test_importe_redondeado_a_cero_rechaza(self):
+        with self.assertRaises(DatosInsuficientesError):
+            self.servicio.registrar_mano_obra(
+                self.actor, orden_id=1, fecha=FECHA, proceso_id=7,
+                horas="0.01", costo_hora="0.01", contrapartida_id=None,
+                clave="k3",
+            )
+        self.assertEqual(self.mayor.movimientos, [])
+
+    def test_asiento_descuadrado_no_se_registra(self):
+        registro = SimpleNamespace(pk=1, orden_id=1)
+        with self.assertRaises(AsientoDescuadradoError):
+            self.servicio._asentar(
+                self.actor, registro, [(self.debe, D("1"))], fecha=FECHA,
+                tipo="REGISTRO", tipo_movimiento="DIARIO", concepto="x",
+                clave="k",
+            )
+        self.assertEqual(self.mayor.movimientos, [])
+
+    def test_horas_en_cero_rechaza(self):
+        with self.assertRaises(DatosInsuficientesError):
+            self.servicio.registrar_mano_obra(
+                self.actor, orden_id=1, fecha=FECHA, proceso_id=7,
+                horas="0", costo_hora="20", contrapartida_id=None,
+                clave="k2",
+            )
+
+
+# ---------------------------------------------------------- integración
 
 class BaseCostos(TestCase):
     def setUp(self):
         self.actor = Usuario.objects.create(
             username="contador", nombre_completo="Contador",
-            rol=Rol.CONTADOR_GENERAL, activo=True,
+            rol=Rol.CONTADOR_COSTOS, activo=True,
         )
         self.repo = CostosRepository()
         self.ordenes = OrdenService(self.repo, None, transaction.atomic)
-        self.calculo = CalculoService(self.repo, None, transaction.atomic)
+        self.servicio = RegistroCostoService(
+            self.repo, TransaccionRepository(), None, transaction.atomic,
+            hoy=lambda: FECHA,
+        )
         self.periodo = PeriodoContable.objects.create(
             nombre="Junio 2026", fecha_inicio=date(2026, 6, 1),
             fecha_fin=date(2026, 6, 30), estado=EstadoPeriodo.ABIERTO,
         )
-        self.procesos = {
-            p.nombre: p for p in Proceso.objects.all()
-        }
-        # Asegura los 4 procesos semilla por si el test DB no los tiene.
-        for nombre in ("Programación", "Arte y animación", "Audio",
-                       "QA y accesibilidad"):
-            if nombre not in self.procesos:
-                self.procesos[nombre] = self.repo.crear_proceso(
-                    nombre=nombre,
-                )
+        self.orden = self.ordenes.crear_orden(
+            self.actor, nombre_juego="Neo Drift", fecha_inicio=FECHA,
+        )
+        self.programacion = Proceso.objects.get(nombre="Programación")
+        self.arte = Proceso.objects.get(nombre="Arte")
 
-    def orden(self, nombre="Juego A", cap=date(2026, 1, 1)):
-        return self.ordenes.crear_orden(
-            self.actor, nombre_juego=nombre, capitalizable_desde=cap,
+    def cuenta(self, codigo):
+        return Cuenta.objects.get(codigo=codigo)
+
+    def mano_obra(self, horas="40", costo="20.00", proceso=None, **extra):
+        return self.servicio.registrar_mano_obra(
+            self.actor, orden_id=self.orden.pk, fecha=FECHA,
+            proceso_id=(proceso or self.programacion).pk, horas=horas,
+            costo_hora=costo, contrapartida_id=extra.get("contrapartida"),
+            clave=extra.get("clave") or clave(),
         )
 
-    def hora(self, orden, proceso=None, horas="1", fecha=FECHA, rol="Dev"):
-        return self.repo.crear_hora(
-            orden=orden, proceso=proceso, rol=rol, horas=D(horas),
-            fecha=fecha,
+    def costo(self, elemento, importe, proceso=None, **extra):
+        return self.servicio.registrar_costo(
+            self.actor, elemento=elemento, orden_id=self.orden.pk,
+            fecha=extra.get("fecha", FECHA),
+            proceso_id=proceso.pk if proceso else None,
+            descripcion=extra.get("descripcion", "Servicio"),
+            importe=importe, contrapartida_id=extra.get("contrapartida"),
+            clave=extra.get("clave") or clave(),
         )
 
-    def costo_proceso(self, proceso, costo, horas_base,
-                      tasa_presupuestada=None):
-        return self.repo.crear_costo_proceso(
-            proceso=proceso, periodo=self.periodo, costo=D(costo),
-            horas_base=D(horas_base), tasa_presupuestada=tasa_presupuestada,
-        )
+    def movimientos(self, registro, tipo=AsientoCosto.TIPO_REGISTRO):
+        asiento = registro.asientos.get(tipo=tipo)
+        return {m.cuenta.codigo: m.importe for m in
+                Movimiento.objects.filter(transaccion=asiento.transaccion)}
 
-    def cargo(self, orden, monto="100", fecha=FECHA, afecta=True,
-              origen=CargoOrden.ORIGEN_DIRECTO, cuenta=None):
-        if cuenta is None and afecta:
-            cuenta = Cuenta.objects.get(codigo="4103")
-        return self.repo.crear_cargo(
-            orden=orden, origen=origen, afecta_mayor=afecta,
-            monto=D(monto), fecha=fecha, descripcion="Cargo de prueba",
-            cuenta=cuenta, usuario=self.actor,
-        )
+    def contrapartida_defecto(self, elemento):
+        return ConfiguracionCuentaCosto.objects.get(
+            elemento=elemento).contrapartida_defecto.codigo
+
+    def total_vigente(self):
+        return RegistroCosto.objects.filter(
+            orden=self.orden, estado=RegistroCosto.ESTADO_VIGENTE,
+        ).aggregate(t=Sum("importe"))["t"] or D("0")
 
 
-class CalculosPurosTests(TestCase):
-    def test_horas_mensuales_y_costo_hora(self):
-        horas_mes = calculos.horas_mensuales(44, 52)
-        self.assertEqual(horas_mes.quantize(D("0.0001")), D("190.6667"))
-        costo = calculos.costo_hora_pagada(1200, D("0.246"), horas_mes)
-        self.assertEqual(costo.quantize(D("0.0001")), D("7.8420"))
+class RegistroElementosTests(BaseCostos):
+    def test_mano_obra_40_horas_por_20_es_800(self):
+        registro = self.mano_obra()
+        self.assertEqual(registro.importe, D("800.00"))
+        haber = self.contrapartida_defecto(Elemento.MANO_OBRA)
+        self.assertEqual(self.movimientos(registro),
+                         {"4101": D("800.00"), haber: D("-800.00")})
 
-    def test_repartir_conserva_total(self):
-        cuotas = calculos.repartir(D("10000"),
-                                   [D("500"), D("300"), D("200"), D("100")])
-        self.assertEqual(cuotas, [
-            D("4545.45"), D("2727.27"), D("1818.18"), D("909.10"),
-        ])
-        self.assertEqual(sum(cuotas), D("10000.00"))
+    def test_costo_directo_1200(self):
+        registro = self.costo(Elemento.DIRECTO, "1200.00")
+        haber = self.contrapartida_defecto(Elemento.DIRECTO)
+        self.assertEqual(self.movimientos(registro),
+                         {"4102": D("1200.00"), haber: D("-1200.00")})
 
-    def test_tasa_y_cuota_depreciacion(self):
-        self.assertEqual(calculos.tasa_proceso(60000, 1000), D("60"))
-        self.assertEqual(calculos.tasa_proceso(30000, 600), D("50"))
-        self.assertEqual(calculos.tasa_proceso(12000, 200), D("60"))
+    def test_costo_indirecto_83_33_con_contrapartida_elegida(self):
+        config = ConfiguracionCuentaCosto.objects.get(
+            elemento=Elemento.INDIRECTO)
+        elegida = config.contrapartidas.exclude(
+            pk=config.contrapartida_defecto_id).first()
+        registro = self.costo(Elemento.INDIRECTO, "83.33",
+                              contrapartida=elegida.pk)
+        self.assertEqual(self.movimientos(registro),
+                         {"4103": D("83.33"), elegida.codigo: D("-83.33")})
+
+    def test_total_de_los_tres_registros(self):
+        self.mano_obra()
+        self.costo(Elemento.DIRECTO, "1200.00")
+        self.costo(Elemento.INDIRECTO, "83.33")
+        self.assertEqual(self.total_vigente(), D("2083.33"))
+
+    def test_asientos_cuadran_con_origen_y_clave(self):
+        registros = [self.mano_obra(clave="mo-1"),
+                     self.costo(Elemento.DIRECTO, "1200", clave="cd-1")]
+        for registro in registros:
+            asiento = registro.asientos.get()
+            movimientos = Movimiento.objects.filter(
+                transaccion=asiento.transaccion)
+            self.assertEqual(sum(m.importe for m in movimientos), 0)
+            self.assertTrue(all(f"OT-{self.orden.pk}" in m.referencia
+                                for m in movimientos))
+            self.assertEqual(asiento.orden, self.orden)
+            self.assertEqual(asiento.registro, registro)
+            self.assertEqual(asiento.clave_idempotencia,
+                             registro.clave_idempotencia)
         self.assertEqual(
-            calculos.cuota_depreciacion(12000, 0, 12), D("1000")
+            sorted(a.clave_idempotencia for a in AsientoCosto.objects.all()),
+            ["cd-1", "mo-1"],
         )
 
+    def test_doble_envio_no_duplica(self):
+        primero = self.mano_obra(clave="repetida")
+        segundo = self.mano_obra(clave="repetida")
+        self.assertEqual(primero.pk, segundo.pk)
+        self.assertEqual(RegistroCosto.objects.count(), 1)
+        self.assertEqual(AsientoCosto.objects.count(), 1)
+        self.assertEqual(Movimiento.objects.count(), 2)
 
-class TasasProcesoTests(BaseCostos):
-    def _escenario(self):
-        prog = self.procesos["Programación"]
-        arte = self.procesos["Arte y animación"]
-        audio = self.procesos["Audio"]
-        self.costo_proceso(prog, 60000, 1000)
-        self.costo_proceso(arte, 30000, 600)
-        self.costo_proceso(audio, 12000, 200)
-        a = self.orden("Juego A")
-        b = self.orden("Juego B")
-        for orden, hs in ((a, (700, 400, 150)), (b, (300, 200, 50))):
-            for proceso, horas in zip((prog, arte, audio), hs):
-                self.hora(orden, proceso=proceso, horas=str(horas))
-        return a, b
-
-    def test_tasas_exactas_sin_diferencia(self):
-        a, b = self._escenario()
-        self.calculo.aplicar_tasas(self.actor, self.periodo.pk)
-        monto_a = sum(
-            c.monto for c in CargoOrden.objects.filter(
-                orden=a, origen=CargoOrden.ORIGEN_PROCESO
-            )
-        )
-        monto_b = sum(
-            c.monto for c in CargoOrden.objects.filter(
-                orden=b, origen=CargoOrden.ORIGEN_PROCESO
-            )
-        )
-        self.assertEqual(monto_a, D("71000.00"))
-        self.assertEqual(monto_b, D("31000.00"))
-        self.assertEqual(monto_a + monto_b, D("102000.00"))
-
-    def test_subaplicacion_repartida_por_horas(self):
-        prog = self.procesos["Programación"]
-        arte = self.procesos["Arte y animación"]
-        self.costo_proceso(prog, 60000, 1000)
-        # Arte: costo real 33,000 con tasa presupuestada 50 (30,000 base).
-        self.costo_proceso(arte, 33000, 600,
-                           tasa_presupuestada=D("50"))
-        a = self.orden("Juego A")
-        b = self.orden("Juego B")
-        self.hora(a, proceso=prog, horas="700")
-        self.hora(b, proceso=prog, horas="300")
-        self.hora(a, proceso=arte, horas="400")
-        self.hora(b, proceso=arte, horas="200")
-        self.calculo.aplicar_tasas(
-            self.actor, self.periodo.pk, usar_presupuestada=True
-        )
-        ajustes = {
-            c.orden_id: c.monto for c in CargoOrden.objects.filter(
-                origen=CargoOrden.ORIGEN_AJUSTE, proceso=arte,
-            )
-        }
-        self.assertEqual(ajustes[a.pk], D("2000.00"))
-        self.assertEqual(ajustes[b.pk], D("1000.00"))
-
-    def test_aplicar_dos_veces_no_duplica(self):
-        a, _ = self._escenario()
-        self.calculo.aplicar_tasas(self.actor, self.periodo.pk)
-        total = CargoOrden.objects.count()
-        self.calculo.aplicar_tasas(self.actor, self.periodo.pk)
-        self.assertEqual(CargoOrden.objects.count(), total)
-
-
-class ManoObraTests(BaseCostos):
-    def test_registrar_hora_genera_cargo_4101(self):
-        SalarioReferencia.objects.create(
-            rol="Dev", salario_bruto=D("1200"), vigente_desde=date(2020, 1, 1),
-        )
-        orden = self.orden()
-        hora, cargo = self.ordenes.registrar_hora(
-            self.actor, orden.pk, rol="Dev", horas=D("10"), fecha=FECHA,
-        )
-        self.assertEqual(cargo.cuenta.codigo, "4101")
-        # 10 h × 7.8420… = 78.42
-        self.assertEqual(cargo.monto, D("78.42"))
-        self.assertEqual(cargo.clave_idempotencia, f"hora-{hora.pk}")
-
-    def test_sin_salario_vigente_rechaza(self):
-        orden = self.orden()
-        with self.assertRaises(SalarioNoVigenteError):
-            self.ordenes.registrar_hora(
-                self.actor, orden.pk, rol="SinRol", horas=D("5"),
-                fecha=FECHA,
-            )
-        self.assertEqual(RegistroHora.objects.count(), 0)
-
-
-class FondoTests(BaseCostos):
-    def test_reparto_10000_con_ajuste_de_centavos(self):
-        horas = {"A": "500", "B": "300", "C": "200", "D": "100"}
-        ordenes = {n: self.orden(f"Juego {n}") for n in horas}
-        for n, h in horas.items():
-            self.hora(ordenes[n], horas=h)
-        fondo = self.calculo.crear_fondo(
-            self.actor, nombre="Voces", monto=D("10000"), fecha=FECHA,
-        )
-        self.calculo.distribuir_fondo(self.actor, fondo.pk)
-        montos = {
-            c.orden.juego.nombre: c.monto
-            for c in CargoOrden.objects.filter(fondo=fondo)
-        }
-        self.assertEqual(montos["Juego A"], D("4545.45"))
-        self.assertEqual(montos["Juego B"], D("2727.27"))
-        self.assertEqual(montos["Juego C"], D("1818.18"))
-        self.assertEqual(montos["Juego D"], D("909.10"))
-        self.assertEqual(sum(montos.values()), D("10000.00"))
-        # Los cargos del fondo no afectan el mayor.
-        self.assertTrue(all(
-            not c.afecta_mayor and c.cuenta_id is None
-            for c in CargoOrden.objects.filter(fondo=fondo)
-        ))
-
-    def test_fondo_ya_distribuido_no_reparte(self):
-        orden = self.orden()
-        self.hora(orden, horas="10")
-        fondo = self.calculo.crear_fondo(
-            self.actor, nombre="Música", monto=D("500"), fecha=FECHA,
-        )
-        self.calculo.distribuir_fondo(self.actor, fondo.pk)
-        with self.assertRaises(FondoYaDistribuidoError):
-            self.calculo.distribuir_fondo(self.actor, fondo.pk)
-
-
-class CapitalizacionTests(BaseCostos):
-    def test_cargos_anteriores_a_fecha_quedan_como_gasto(self):
-        orden = self.orden(cap=date(2026, 6, 1))
-        self.cargo(orden, monto="100", fecha=date(2026, 5, 15))
-        self.cargo(orden, monto="200", fecha=date(2026, 6, 15))
-        saldos = self.ordenes.saldos_orden(orden)
-        self.assertEqual(saldos["en_41"], D("200.00"))
-        self.assertEqual(saldos["gasto_periodo"], D("100.00"))
-
-    def test_sin_fecha_capitalizable_nada_capitaliza(self):
-        orden = self.orden(cap=None)
-        self.cargo(orden, monto="100")
-        saldos = self.ordenes.saldos_orden(orden)
-        self.assertEqual(saldos["costo_contable"], D("0.00"))
-        self.assertEqual(saldos["gasto_periodo"], D("100.00"))
-
-    def test_afecta_mayor_false_no_genera_cuenta_ni_capitaliza(self):
-        orden = self.orden()
-        cargo = self.cargo(orden, monto="50", afecta=False)
-        self.assertIsNone(cargo.cuenta_id)
-        saldos = self.ordenes.saldos_orden(orden)
-        self.assertEqual(saldos["costo_contable"], D("0.00"))
-        self.assertEqual(saldos["costo_gestion"], D("50.00"))
-
-
-class CorteTests(BaseCostos):
-    def test_corte_provisional_y_reversion(self):
-        orden = self.orden()
-        self.cargo(orden, monto="300", cuenta=Cuenta.objects.get(
-            codigo="4101"))
-        self.cargo(orden, monto="200", cuenta=Cuenta.objects.get(
-            codigo="4103"))
-        corte = self.calculo.crear_corte(
-            self.actor, periodo_id=self.periodo.pk,
-            tipo=CorteCostos.TIPO_PROVISIONAL, motivo="Corte de junio",
-        )
-        # La serie 41 queda en cero para la orden; el mayor sigue abierto.
-        saldos = self.ordenes.saldos_orden(orden)
-        self.assertEqual(saldos["en_41"], D("0.00"))
-        self.assertEqual(saldos["en_corte"], D("500.00"))
-        self.assertEqual(self.periodo.estado, EstadoPeriodo.ABIERTO)
-        self.assertEqual(corte.detalles.count(), 2)
-        # Reversión: los saldos vuelven a la 41.
-        self.calculo.revertir_corte(self.actor, corte.pk)
-        saldos = self.ordenes.saldos_orden(orden)
-        self.assertEqual(saldos["en_41"], D("500.00"))
-        self.assertEqual(saldos["en_corte"], D("0.00"))
-
-    def test_corte_definitivo_traslada_sin_revertir(self):
-        orden = self.orden()
-        self.cargo(orden, monto="300")
-        corte = self.calculo.crear_corte(
-            self.actor, periodo_id=self.periodo.pk,
-            tipo=CorteCostos.TIPO_DEFINITIVO, motivo="Cierre de junio",
-        )
-        saldos = self.ordenes.saldos_orden(orden)
-        self.assertEqual(saldos["intangible"], D("300.00"))
-        self.assertEqual(saldos["en_41"], D("0.00"))
-        with self.assertRaises(Exception):
-            self.calculo.revertir_corte(self.actor, corte.pk)
-
-    def test_orden_cerrada_rechaza_cargos(self):
-        orden = self.orden()
-        self.ordenes.cerrar_orden(
-            self.actor, orden.pk, confirmacion="CONFIRMAR",
-            motivo="Lanzamiento",
-        )
-        with self.assertRaises(OrdenCerradaError):
-            self.ordenes.registrar_cargo(
-                self.actor, orden.pk, origen=CargoOrden.ORIGEN_DIRECTO,
-                afecta_mayor=True, monto=D("10"), fecha=FECHA,
-                descripcion="Cargo tardío", concepto_cuenta="indirecto",
-            )
-
-
-class ReglasPeriodoTests(BaseCostos):
-    def test_periodo_cerrado_rechaza_cargo(self):
-        cerrado = PeriodoContable.objects.create(
-            nombre="Cerrado", fecha_inicio=date(2026, 7, 1),
-            fecha_fin=date(2026, 7, 31),
-            estado=EstadoPeriodo.CIERRE_PROVISIONAL,
-        )
-        orden = self.orden()
-        with self.assertRaises(PeriodoNoAbiertoError):
-            self.ordenes.registrar_cargo(
-                self.actor, orden.pk, origen=CargoOrden.ORIGEN_DIRECTO,
-                afecta_mayor=True, monto=D("10"),
-                fecha=date(2026, 7, 10), descripcion="x",
-            )
-
-    def test_periodo_cerrado_rechaza_horas(self):
+    def test_periodo_cerrado_rechaza_registro(self):
         PeriodoContable.objects.create(
-            nombre="Julio cerrado", fecha_inicio=date(2026, 7, 1),
-            fecha_fin=date(2026, 7, 31),
+            nombre="Mayo 2026", fecha_inicio=date(2026, 5, 1),
+            fecha_fin=date(2026, 5, 31),
             estado=EstadoPeriodo.CIERRE_PROVISIONAL,
         )
-        orden = self.orden()
-        SalarioReferencia.objects.create(
-            rol="Dev", salario_bruto=D("1200"), vigente_desde=date(2020, 1, 1),
-        )
         with self.assertRaises(PeriodoNoAbiertoError):
-            self.ordenes.registrar_hora(
-                self.actor, orden.pk, rol="Dev", horas=D("1"),
-                fecha=date(2026, 7, 10),
+            self.costo(Elemento.DIRECTO, "100", fecha=date(2026, 5, 10))
+        with self.assertRaises(PeriodoNoAbiertoError):
+            self.costo(Elemento.DIRECTO, "100", fecha=date(2027, 1, 10))
+        self.assertEqual(RegistroCosto.objects.count(), 0)
+        self.assertEqual(Movimiento.objects.count(), 0)
+
+    def test_contrapartida_no_permitida_rechaza(self):
+        with self.assertRaises(CuentaNoValidaError):
+            self.costo(Elemento.DIRECTO, "100",
+                       contrapartida=self.cuenta("4104").pk)
+        self.assertEqual(Movimiento.objects.count(), 0)
+
+    def test_sin_configuracion_el_elemento_queda_bloqueado(self):
+        ConfiguracionCuentaCosto.objects.filter(
+            elemento=Elemento.INDIRECTO).delete()
+        with self.assertRaises(ConfiguracionNoEncontradaError):
+            self.costo(Elemento.INDIRECTO, "10")
+
+    def test_orden_duplicada_por_juego(self):
+        with self.assertRaises(OrdenDuplicadaError):
+            self.ordenes.crear_orden(self.actor, nombre_juego="neo drift",
+                                     fecha_inicio=FECHA)
+
+
+class AnulacionTests(BaseCostos):
+    def test_anular_crea_contra_asiento_y_baja_total(self):
+        self.mano_obra()
+        directo = self.costo(Elemento.DIRECTO, "1200.00")
+        self.assertEqual(self.total_vigente(), D("2000.00"))
+        self.servicio.anular(self.actor, registro_id=directo.pk,
+                             motivo="Duplicado", clave="anula-1")
+        directo.refresh_from_db()
+        self.assertEqual(directo.estado, RegistroCosto.ESTADO_ANULADO)
+        self.assertEqual(self.total_vigente(), D("800.00"))
+        haber = self.contrapartida_defecto(Elemento.DIRECTO)
+        self.assertEqual(
+            self.movimientos(directo, AsientoCosto.TIPO_ANULACION),
+            {"4102": D("-1200.00"), haber: D("1200.00")},
+        )
+        self.assertTrue(RegistroCosto.objects.filter(pk=directo.pk).exists())
+        saldo_4102 = Movimiento.objects.filter(
+            cuenta__codigo="4102").aggregate(t=Sum("importe"))["t"]
+        self.assertEqual(saldo_4102, D("0.00"))
+
+    def test_anular_dos_veces(self):
+        registro = self.costo(Elemento.INDIRECTO, "83.33")
+        self.servicio.anular(self.actor, registro_id=registro.pk,
+                             motivo="Error", clave="a-1")
+        self.servicio.anular(self.actor, registro_id=registro.pk,
+                             motivo="Error", clave="a-1")
+        self.assertEqual(AsientoCosto.objects.filter(
+            tipo=AsientoCosto.TIPO_ANULACION).count(), 1)
+        with self.assertRaises(RegistroYaAnuladoError):
+            self.servicio.anular(self.actor, registro_id=registro.pk,
+                                 motivo="Error", clave="a-2")
+
+    def test_anulacion_exige_motivo_y_periodo_abierto(self):
+        registro = self.costo(Elemento.DIRECTO, "10")
+        with self.assertRaises(DatosInsuficientesError):
+            self.servicio.anular(self.actor, registro_id=registro.pk,
+                                 motivo=" ", clave="a-3")
+        self.servicio._hoy = lambda: date(2027, 1, 1)
+        with self.assertRaises(PeriodoNoAbiertoError):
+            self.servicio.anular(self.actor, registro_id=registro.pk,
+                                 motivo="Error", clave="a-4")
+        registro.refresh_from_db()
+        self.assertTrue(registro.vigente)
+
+
+class CatalogoTests(BaseCostos):
+    def test_configuracion_editable_desde_catalogo(self):
+        catalogo = CatalogoCostosService(self.repo, None, transaction.atomic)
+        bancos, proveedores = self.cuenta("1103"), self.cuenta("2101")
+        catalogo.guardar_configuracion(
+            self.actor, elemento=Elemento.MANO_OBRA,
+            cuenta_costo=self.cuenta("4101"),
+            contrapartidas=[bancos, proveedores],
+            contrapartida_defecto=bancos,
+        )
+        registro = self.mano_obra()
+        self.assertIn("1103", self.movimientos(registro))
+        with self.assertRaises(CuentaNoValidaError):
+            catalogo.guardar_configuracion(
+                self.actor, elemento=Elemento.MANO_OBRA,
+                cuenta_costo=self.cuenta("4101"),
+                contrapartidas=[bancos],
+                contrapartida_defecto=proveedores,
             )
 
 
-class DepreciacionTests(BaseCostos):
-    def _equipo(self, tipo, orden=None, costo="12000", residual="0",
-                vida=12, horas_mes="200"):
-        return self.repo.crear_equipo(
-            nombre=f"EQ-{tipo}", costo=D(costo), valor_residual=D(residual),
-            vida_util_meses=vida, tipo_uso=tipo, orden=orden,
-            horas_mes=D(horas_mes), fecha_adquisicion=date(2026, 1, 1),
+class VistasCostosTests(BaseCostos):
+    def setUp(self):
+        super().setUp()
+        self.actor.set_password("clave-segura-123")
+        self.actor.save()
+        self.client.force_login(self.actor)
+
+    def test_solo_el_contador_de_costos_accede(self):
+        for rol, nombre in ((Rol.CONTADOR_GENERAL, "general"),
+                            (Rol.ADMINISTRADOR, "admin")):
+            otro = Usuario.objects.create(
+                username=nombre, nombre_completo=nombre, rol=rol,
+                activo=True,
+            )
+            with self.assertRaises(RolNoAutorizadoError):
+                self.ordenes.listar(otro)
+            self.client.force_login(otro)
+            respuesta = self.client.get(reverse("costos_ordenes"))
+            self.assertEqual(respuesta.status_code, 403)
+
+    def test_doble_envio_del_formulario_no_duplica(self):
+        url = reverse("costos_registro_nuevo",
+                      args=[self.orden.pk, "directo"])
+        datos = {"fecha": "2026-06-15", "descripcion": "Licencia motor",
+                 "importe": "1200.00", "clave": "form-1",
+                 "contrapartida": ConfiguracionCuentaCosto.objects.get(
+                     elemento=Elemento.DIRECTO).contrapartida_defecto_id}
+        for _ in range(2):
+            respuesta = self.client.post(url, datos)
+            self.assertRedirects(
+                respuesta, reverse("costos_orden", args=[self.orden.pk]))
+        self.assertEqual(RegistroCosto.objects.count(), 1)
+        self.assertEqual(Movimiento.objects.count(), 2)
+
+    def test_pantalla_y_modales(self):
+        self.mano_obra()
+        respuesta = self.client.get(reverse("costos_orden",
+                                            args=[self.orden.pk]))
+        self.assertContains(respuesta, "Mano de obra directa")
+        self.assertContains(respuesta, "$800.00")
+        for tipo in ("mano-obra", "directo", "indirecto"):
+            modal = self.client.get(reverse(
+                "costos_registro_nuevo", args=[self.orden.pk, tipo]))
+            self.assertContains(modal, 'name="clave"')
+            self.assertContains(modal, "data-costos-modal")
+
+    def test_error_de_periodo_junto_al_campo(self):
+        url = reverse("costos_registro_nuevo",
+                      args=[self.orden.pk, "indirecto"])
+        respuesta = self.client.post(url, {
+            "fecha": "2030-01-01", "descripcion": "Luz", "importe": "10",
+            "clave": "form-2",
+            "contrapartida": ConfiguracionCuentaCosto.objects.get(
+                elemento=Elemento.INDIRECTO).contrapartida_defecto_id,
+        })
+        self.assertContains(respuesta, "período contable")
+        self.assertContains(respuesta, 'value="Luz"')
+        self.assertEqual(RegistroCosto.objects.count(), 0)
+
+
+class HojaCostosTests(BaseCostos):
+    def setUp(self):
+        super().setUp()
+        self.ordenes = OrdenService(
+            self.repo, None, transaction.atomic,
+            total_estimacion=lambda version: D("150000.00"),
         )
 
-    def test_exclusivo_carga_cuota_completa(self):
-        orden = self.orden()
-        equipo = self._equipo("EXCLUSIVO", orden=orden)
-        self.calculo.generar_depreciacion(self.actor, anio=2026, mes=6)
-        cargo = CargoOrden.objects.get(equipo=equipo)
-        self.assertEqual(cargo.monto, D("1000.00"))
-        self.assertEqual(cargo.origen, CargoOrden.ORIGEN_DEPRECIACION)
+    def test_resumen_por_elemento_proceso_y_total(self):
+        self.mano_obra()
+        self.costo(Elemento.DIRECTO, "500.00", proceso=self.programacion)
+        self.costo(Elemento.INDIRECTO, "300.00", proceso=self.arte)
+        anulado = self.costo(Elemento.DIRECTO, "999.00")
+        self.servicio.anular(self.actor, registro_id=anulado.pk,
+                             motivo="Error", clave="a-hoja")
+        resumen = self.ordenes.resumen_orden(self.orden.pk)
+        self.assertEqual(resumen["por_elemento"], {
+            "MANO_OBRA": D("800.00"), "DIRECTO": D("500.00"),
+            "INDIRECTO": D("300.00"),
+        })
+        self.assertEqual(resumen["por_proceso"], [
+            {"proceso": "Arte", "importe": D("300.00")},
+            {"proceso": "Programación", "importe": D("1300.00")},
+        ])
+        self.assertEqual(resumen["horas_por_proceso"],
+                         [{"proceso": "Programación", "horas": D("40.00")}])
+        self.assertEqual(resumen["total"], D("1600.00"))
+        for clave_ in ("licencias_estimadas", "costo_unitario",
+                       "estimacion_ref", "total_estimado"):
+            self.assertIn(clave_, resumen)
 
-    def test_compartido_por_tasa_hora_maquina(self):
-        # cuota 1000/mes, 200 h/mes → 5.00/h; A 100 h, B 50 h.
-        a, b = self.orden("A"), self.orden("B")
-        equipo = self._equipo("COMPARTIDO")
-        UsoEquipo.objects.create(
-            equipo=equipo, orden=a, fecha=date(2026, 6, 10), horas=D("100"))
-        UsoEquipo.objects.create(
-            equipo=equipo, orden=b, fecha=date(2026, 6, 10), horas=D("50"))
-        self.calculo.generar_depreciacion(self.actor, anio=2026, mes=6)
-        montos = {
-            c.orden_id: c.monto
-            for c in CargoOrden.objects.filter(equipo=equipo)
-        }
-        self.assertEqual(montos[a.pk], D("500.00"))
-        self.assertEqual(montos[b.pk], D("250.00"))
+    def test_costo_unitario_y_sin_licencias(self):
+        self.assertEqual(calculos.costo_unitario(D("120000.00"), 60000),
+                         D("2.0000"))
+        self.assertIsNone(calculos.costo_unitario(D("10"), None))
+        self.costo(Elemento.DIRECTO, "120000.00")
+        self.assertIsNone(
+            self.ordenes.resumen_orden(self.orden.pk)["costo_unitario"])
+        self.ordenes.actualizar_licencias(self.actor, self.orden.pk, 60000)
+        resumen = self.ordenes.resumen_orden(self.orden.pk)
+        self.assertEqual(resumen["licencias_estimadas"], 60000)
+        self.assertEqual(resumen["costo_unitario"], D("2.0000"))
+        with self.assertRaises(DatosInsuficientesError):
+            self.ordenes.actualizar_licencias(self.actor, self.orden.pk, 0)
 
-    def test_admin_y_ocioso_no_generan_cargos(self):
-        self._equipo("ADMINISTRACION")
-        self._equipo("OCIOSO")
-        self.calculo.generar_depreciacion(self.actor, anio=2026, mes=6)
-        self.assertEqual(CargoOrden.objects.count(), 0)
+    def _version(self, estado):
+        from estimacion.models import Juego as JuegoEstimacion
+        from estimacion.models import VersionPresupuesto
+        juego = JuegoEstimacion.objects.create(nombre=f"Neo {estado}")
+        return VersionPresupuesto.objects.create(
+            juego=juego, numero=1, estado=estado, autor=self.actor,
+        )
 
-    def test_depreciacion_idempotente(self):
-        orden = self.orden()
-        self._equipo("EXCLUSIVO", orden=orden)
-        self.calculo.generar_depreciacion(self.actor, anio=2026, mes=6)
-        total = CargoOrden.objects.count()
-        self.calculo.generar_depreciacion(self.actor, anio=2026, mes=6)
-        self.assertEqual(CargoOrden.objects.count(), total)
+    def test_estimacion_aprobada_muestra_total_sin_variacion(self):
+        aprobada = self._version("APROBADO")
+        self.ordenes.vincular_estimacion(self.actor, self.orden.pk,
+                                         aprobada.pk)
+        resumen = self.ordenes.resumen_orden(self.orden.pk)
+        self.assertEqual(resumen["estimacion_ref"], aprobada)
+        self.assertEqual(resumen["total_estimado"], D("150000.00"))
+        self.assertNotIn("variacion", resumen)
+        borrador = self._version("BORRADOR")
+        with self.assertRaises(DatosInsuficientesError):
+            self.ordenes.vincular_estimacion(self.actor, self.orden.pk,
+                                             borrador.pk)
+
+
+class HojaVistaTests(VistasCostosTests):
+    def test_hoja_con_secciones_vacias_y_sin_licencias(self):
+        respuesta = self.client.get(reverse("costos_orden",
+                                            args=[self.orden.pk]))
+        for texto in ("Mano de obra directa", "Costo directo",
+                      "Costo indirecto", "Sin registros de costo directo",
+                      "Ingresa las licencias estimadas", "Imprimir"):
+            self.assertContains(respuesta, texto)
+
+    def test_hoja_muestra_total_y_costo_unitario(self):
+        self.costo(Elemento.DIRECTO, "120000.00")
+        respuesta = self.client.post(
+            reverse("costos_orden_licencias", args=[self.orden.pk]),
+            {"licencias_estimadas": "60000"},
+        )
+        self.assertRedirects(respuesta,
+                             reverse("costos_orden", args=[self.orden.pk]))
+        hoja = self.client.get(reverse("costos_orden", args=[self.orden.pk]))
+        self.assertContains(hoja, "$120,000.00")
+        self.assertContains(hoja, "$2.00")
+
+
+class ConceptosEliminadosTests(SimpleTestCase):
+    PROHIBIDOS = re.compile(
+        r"cortes?_?costos|CorteCostos|corte provisional|costo_gestion|"
+        r"costo de gesti[oó]n|afecta_mayor|fondo|equipo|"
+        r"salario|sobreaplica|subaplica|reclasifica|doble conteo",
+        re.IGNORECASE,
+    )
+
+    def test_modulo_sin_conceptos_eliminados(self):
+        fuentes = [p for p in APP.rglob("*")
+                   if p.suffix in {".py", ".html", ".js"}
+                   and "migrations" not in p.parts
+                   and "tests" not in p.parts]
+        hallazgos = [
+            f"{p.name}: {m.group(0)}" for p in fuentes
+            for m in self.PROHIBIDOS.finditer(p.read_text("utf-8"))
+        ]
+        self.assertEqual(hallazgos, [])

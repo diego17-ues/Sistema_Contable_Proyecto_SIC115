@@ -132,3 +132,43 @@ documenta la decisión tomada para poder revertirla.
     el costeo real (fase posterior) necesitará la fecha de corte por
     juego/título. ¿Dónde se registrará esa fecha (¿catálogo del juego,
     hito del proyecto)?
+
+## Etapa 1 · Fase 1 (AGENTS2.md) — decisiones tomadas por defecto
+
+14. **Contrapartidas sembradas**: la migración `costos/0005_semilla_etapa1`
+    carga una configuración inicial editable desde *Costos · Catálogos*:
+    mano de obra 4101 / haber 2106 Sueldos y prestaciones por pagar;
+    costo directo 4102 / haber 1103 Bancos, 2101 Proveedores (defecto),
+    2102 Acreedores varios; costo indirecto 4103 / haber 1103, 2101,
+    2102 (defecto), 1203 Depreciación acumulada. Si alguna cuenta no
+    existe, el elemento queda sin configurar (bloqueado). ¿Son las
+    contrapartidas y los valores por defecto correctos?
+
+15. **Fecha del contra-asiento**: la anulación se asienta con la fecha
+    del día (debe estar en período abierto), no con la fecha del
+    registro original, para no tocar períodos cerrados. ¿Correcto?
+
+16. **Tipo de movimiento**: los registros se asientan como `DIARIO` y
+    las anulaciones como `AJUSTE`. ¿Se prefiere otro tipo?
+
+17. **Auxiliar por orden**: el mayor no tiene campo de auxiliar; la orden
+    viaja en `referencia` (`OT-<id> · R<registro>`) y en el concepto, y el
+    origen completo (tipo, orden, registro, clave) en
+    `costos.AsientoCosto`. ¿Basta o se requiere un auxiliar en el mayor
+    (cambio al módulo de contabilidad general, no autorizado)?
+
+18. **Costo por hora propuesto**: se configura por proceso en Catálogos
+    (sin valor sembrado; no se inventan tarifas). Si el proceso no tiene
+    costo configurado, el usuario lo escribe en el modal.
+
+19. **Procesos**: se sembraron Diseño, Programación, Arte, Audio y QA. Los
+    procesos anteriores «Arte y animación» y «QA y accesibilidad» quedan
+    inactivos (no se borran). ¿Correcto?
+
+20. **Rama**: AGENTS2.md pide la rama `costos/ordenes-trabajo`; por
+    instrucción del usuario se trabaja en `devin-branch`.
+
+21. **Datos anteriores del módulo**: la migración `costos/0004` elimina
+    las tablas de cortes, fondos, equipos, salarios, parámetros, tasas
+    por proceso, mapeos, horas y cargos del modelo anterior (nunca
+    generaron asientos). Revertir la migración recrea las tablas vacías.

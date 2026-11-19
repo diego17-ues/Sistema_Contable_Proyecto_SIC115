@@ -184,8 +184,7 @@ class AccesoService:
         Rol.ADMINISTRADOR: "users",
     }
     MODULOS_CONTADOR_GENERAL = frozenset(
-        {"dashboard", "ledger", "accounts", "reports", "operations",
-         "costos"}
+        {"dashboard", "ledger", "accounts", "reports", "operations"}
     )
     MODULOS_COSTOS = frozenset({"estimacion", "costos"})
     MODULOS = {
