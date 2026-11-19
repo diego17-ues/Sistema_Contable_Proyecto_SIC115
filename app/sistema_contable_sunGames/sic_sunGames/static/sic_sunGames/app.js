@@ -67,18 +67,74 @@
   let sales = [];
 
   const state = {
-    current: initialScreen, report: initialParams.get('report') || 'results', operation: initialParams.get('operation') || 'verify', period: 'month',
+    current: initialScreen, report: initialParams.get('report') || (initialScreen === 'closed' ? 'worksheet' : 'results'), operation: initialParams.get('operation') || 'verify', period: 'month',
     currentUser: savedUser, ledgerMode: initialParams.get('mode') || 'ledger', trialBalanceTo: today(),
-    ledgerFilter: { account: '5101', from: '', to: '' }, salesQuery: '', salesFrom: '', salesTo: '', salesLoaded: false, canPostSales: false, provisional: null, cuentas: [],
+    ledgerFilter: { account: '5101', from: '', to: '' }, salesQuery: '', salesFrom: '', salesTo: '', salesLoaded: false, salesLoading: false, salesError: null, canPostSales: false, provisional: null, cuentas: [],
     periodStatus: initialPeriodStatus || 'ABIERTO',
     indicatorPeriodStatus: initialPeriodStatus || 'ABIERTO',
     closedRange: null, worksheet: null, provisionalFrom: '2026-10-01', provisionalTo: '2026-10-31',
     provisionalRequestId: 0,
     steamStatus: 'En espera', steamContact: null, steamError: null,
     reconciliationPreview: null, reconciliationResult: null,
+    dashboardCostos: null, dashboardCostosLoading: false,
+    dashboardCostosError: null,
+    closedPeriod: null, closedPeriodLoaded: false, closedPeriodLoading: false,
+    closedPeriodError: null, closedStatements: null,
     nextLedgerId: 9,
-    salesTotal: 0,
   };
+
+  const SESSION_IDLE_LIMIT = 10 * 60 * 1000;
+  const SESSION_HEARTBEAT_INTERVAL = 4 * 60 * 1000;
+  let lastSessionActivity = Date.now();
+  let lastSessionHeartbeat = Date.now();
+  let sessionHeartbeatPending = false;
+
+  function registerSessionActivity() {
+    lastSessionActivity = Date.now();
+  }
+
+  async function checkSessionActivity() {
+    if (!state.currentUser || sessionHeartbeatPending) return;
+    const now = Date.now();
+    if (now - lastSessionActivity >= SESSION_IDLE_LIMIT) {
+      const form = $('#logoutForm');
+      if (form?.requestSubmit) form.requestSubmit();
+      else window.location.replace(screenUrls.login);
+      return;
+    }
+    if (now - lastSessionHeartbeat < SESSION_HEARTBEAT_INTERVAL) return;
+
+    sessionHeartbeatPending = true;
+    lastSessionHeartbeat = now;
+    try {
+      const response = await fetch(screenUrls.api_session_activity, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          Accept: 'application/json',
+          'X-CSRFToken': csrfToken(),
+        },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.active !== true) {
+        window.location.replace(screenUrls.login);
+      }
+    } catch (error) {
+      window.location.replace(screenUrls.login);
+    } finally {
+      sessionHeartbeatPending = false;
+    }
+  }
+
+  ['click', 'keydown', 'input', 'pointerdown', 'pointermove', 'scroll', 'touchstart', 'wheel']
+    .forEach(eventName => window.addEventListener(
+      eventName, registerSessionActivity, { passive: true }
+    ));
+  window.addEventListener('focus', checkSessionActivity);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) checkSessionActivity();
+  });
+  window.setInterval(checkSessionActivity, 30 * 1000);
 
   function renderNavigation() {
     const visibleGroups = navGroups.map(group => ({ ...group, items: group.items.filter(item => modulos.includes(item.id)) })).filter(group => group.items.length);
@@ -86,15 +142,25 @@
   }
 
   function canView(view) {
-    return modulos.includes(view);
+    return view === 'closed' || modulos.includes(view);
   }
 
   function canReopenPeriod() {
     return state.currentUser?.role === 'Administrador';
   }
 
+  function canReadCostDashboard() {
+    return ['Administrador', 'Contador General', 'Contador de Costos']
+      .includes(state.currentUser?.role);
+  }
+
   function setScreen(view, params = {}, replace = false) {
     if (serverScreens.includes(view) || serverRendered) { window.location.assign(screenUrls[view]); return; }
+    if (view === 'closed') state.report = 'worksheet';
+    if (view === 'reports'
+        && state.indicatorPeriodStatus === 'CERRADO_PROVISIONAL') {
+      state.report = 'results';
+    }
     const target = new URL(screenUrls[view], window.location.origin);
     Object.entries(params).forEach(([key, value]) => {
       if (value) target.searchParams.set(key, value);
@@ -125,7 +191,8 @@
   }
 
   function heading(title, subtitle, actions = '') {
-    return `<div class="page-heading"><div><h1>${title}</h1><p>${subtitle}</p></div><div class="heading-actions">${actions}</div></div>`;
+    const description = subtitle ? `<p>${subtitle}</p>` : '';
+    return `<div class="page-heading"><div><h1>${title}</h1>${description}</div><div class="heading-actions">${actions}</div></div>`;
   }
 
   function page() {
@@ -134,39 +201,273 @@
       return;
     }
     renderNavigation();
-    const titles = { dashboard: 'Dashboard', ledger: 'Libro Mayor', accounts: 'Catálogo de cuentas', reports: 'Estados financieros', operations: 'Ventas', users: 'Usuarios', audit: 'Auditoría', estimacion: 'Estimación', costos: 'Costeo Videojuego', rendimiento: 'Rendimiento de videojuegos' };
+    const titles = { dashboard: 'Dashboard', ledger: 'Libro Mayor', accounts: 'Catálogo de cuentas', reports: 'Estados financieros', operations: 'Ventas', users: 'Usuarios', audit: 'Auditoría', estimacion: 'Estimación', costos: 'Costeo Videojuego', rendimiento: 'Rendimiento de videojuegos', closed: 'Período cerrado' };
     $('#breadcrumb').textContent = titles[state.current] || 'Panel';
     const periodClosed = state.indicatorPeriodStatus === 'CERRADO_PROVISIONAL';
     const periodLabel = periodClosed ? 'Período cerrado provisionalmente' : 'Período abierto';
-    $('.sidebar-period span:last-child').textContent = periodLabel;
-    $('.sidebar-period .status-dot').classList.toggle('is-closed', periodClosed);
-    $('.topbar-period').innerHTML = `<span class="status-dot ${periodClosed ? 'is-closed' : ''}"></span>${periodLabel}`;
+    const sidebarPeriod = $('.sidebar-period');
+    if (sidebarPeriod) {
+      sidebarPeriod.querySelector('span:last-child').textContent = periodLabel;
+      sidebarPeriod.querySelector('.status-dot').classList.toggle('is-closed', periodClosed);
+    }
+    const topbarPeriod = $('.topbar-period');
+    if (topbarPeriod) {
+      topbarPeriod.innerHTML = `<span class="status-dot ${periodClosed ? 'is-closed' : ''}"></span>${periodClosed ? `${periodLabel} · Ver documentos` : periodLabel}`;
+    }
     if (serverRendered) return;
-    if (['dashboard', 'operations'].includes(state.current) && !state.salesLoaded) loadSales();
-    const renderers = { dashboard: dashboardPage, reports: reportsPage, operations: operationsPage };
+    if (['dashboard', 'reports', 'closed'].includes(state.current)
+        && !state.closedPeriodLoaded && !state.closedPeriodLoading) {
+      loadClosedPeriod();
+    }
+    if (state.current === 'dashboard' && canReadCostDashboard()
+        && !state.dashboardCostos
+        && !state.dashboardCostosLoading && !state.dashboardCostosError) {
+      state.dashboardCostosLoading = true;
+      loadDashboardCostos();
+    }
+    if (state.current === 'dashboard' && state.currentUser?.role !== 'Contador de Costos'
+        && (state.salesQuery || state.salesFrom || state.salesTo)) {
+      state.salesQuery = '';
+      state.salesFrom = '';
+      state.salesTo = '';
+      state.salesLoaded = false;
+      sales = [];
+    }
+    if (['dashboard', 'operations'].includes(state.current)
+        && state.currentUser?.role !== 'Contador de Costos'
+        && !state.salesLoaded && !state.salesLoading) loadSales();
+    const renderers = { dashboard: dashboardPage, reports: reportsPage, operations: operationsPage, closed: closedPeriodPage };
     $('#appContent').innerHTML = (renderers[state.current] || dashboardPage)();
     if ($('#provisionalFrom') && state.provisionalFrom) $('#provisionalFrom').value = state.provisionalFrom;
     syncScreenUrl();
   }
 
+  async function loadDashboardCostos() {
+    try {
+      state.dashboardCostos = await api(screenUrls.api_cost_dashboard);
+      state.dashboardCostosError = null;
+    } catch (error) {
+      state.dashboardCostosError = error.message;
+    } finally {
+      state.dashboardCostosLoading = false;
+      if (state.current === 'dashboard') page();
+    }
+  }
+
+  async function loadClosedPeriod(force = false) {
+    if (state.closedPeriodLoading || (state.closedPeriodLoaded && !force)) return;
+    state.closedPeriodLoading = true;
+    state.closedPeriodError = null;
+    try {
+      const data = await api(screenUrls.api_cierre_activo);
+      state.closedPeriod = data.cerrado ? data : null;
+      state.closedStatements = data.cerrado ? data.estados : null;
+      state.indicatorPeriodStatus = data.estado || 'ABIERTO';
+      state.periodStatus = state.indicatorPeriodStatus;
+      if (data.cerrado) {
+        state.provisionalFrom = data.periodo.desde;
+        state.provisionalTo = data.periodo.hasta;
+        state.worksheet = normalizeWorksheet(data);
+        if (state.current === 'reports'
+            && ['provisional', 'closing'].includes(state.report)) {
+          state.report = 'results';
+        }
+      } else {
+        state.closedStatements = null;
+      }
+    } catch (error) {
+      state.closedPeriodError = error.message;
+    } finally {
+      state.closedPeriodLoading = false;
+      state.closedPeriodLoaded = true;
+      if (['dashboard', 'reports', 'closed'].includes(state.current)) page();
+    }
+  }
+
+  function dashboardClosedPeriod() {
+    if (state.indicatorPeriodStatus !== 'CERRADO_PROVISIONAL') return '';
+    const detalle = state.closedPeriod
+      ? `${safe(state.closedPeriod.periodo.nombre)} · ${safe(state.closedPeriod.periodo.desde)} al ${safe(state.closedPeriod.periodo.hasta)}`
+      : state.closedPeriodLoading ? 'Consultando el período…' : 'Cierre provisional activo';
+    return `<section class="card section-gap"><div class="card-header"><div><h2>Período cerrado provisionalmente</h2><p>${detalle}</p></div><span class="tag tag-warn">Cerrado</span></div><div class="card-body"><button class="button button-secondary" type="button" data-view="closed">Ver Hoja de Trabajo y estados financieros</button>${state.closedPeriodError ? `<p class="form-error">${safe(state.closedPeriodError)}</p>` : ''}</div></section>`;
+  }
+
+  function closedPeriodPage() {
+    if (state.closedPeriodLoading) {
+      return `${heading('Período cerrado provisionalmente')}<section class="card"><div class="empty-state"><strong>Cargando documentos emitidos…</strong></div></section>`;
+    }
+    if (state.closedPeriodError) {
+      return `${heading('Período cerrado provisionalmente')}<section class="card"><div class="empty-state"><strong>No se pudo cargar el cierre.</strong>${safe(state.closedPeriodError)}<div class="section-gap"><button class="button button-secondary" type="button" data-action="reload-closed-period">Reintentar</button></div></div></section>`;
+    }
+    if (!state.closedPeriod) {
+      return `${heading('Período cerrado')}<section class="card"><div class="empty-state"><strong>No hay un cierre provisional activo.</strong></div></section>`;
+    }
+    const tabs = `<div class="tabs">${reportTabs.filter(([id]) => ['worksheet', 'results', 'balance', 'changes'].includes(id)).map(([id, title]) => `<button class="tab-button ${state.report === id ? 'active' : ''}" type="button" data-report="${id}">${title}</button>`).join('')}</div>`;
+    const period = state.closedPeriod.periodo;
+    const status = `<div class="demo-banner"><span><strong>${safe(period.nombre)}</strong> · ${safe(period.desde)} al ${safe(period.hasta)}</span><span class="tag tag-warn">Cerrado provisionalmente</span></div>`;
+    const content = state.report === 'results'
+      ? `${heading('Estado de Resultados')}${tabs}${incomeStatement()}`
+      : state.report === 'balance'
+        ? `${heading('Estado de Situación Financiera')}${tabs}${balanceStatement()}`
+        : state.report === 'changes'
+          ? `${heading('Estado de Cambios en el Patrimonio')}${tabs}${changesStatement()}`
+          : worksheetPage(tabs);
+    return `${status}${content}`;
+  }
+
+  function costDashboardPerformance() {
+    const data = state.dashboardCostos;
+    if (state.dashboardCostosLoading) {
+      return '<div class="empty-state"><strong>Cargando rendimiento de órdenes…</strong></div>';
+    }
+    if (state.dashboardCostosError) {
+      return `<div class="empty-state"><strong>No se pudo cargar el rendimiento.</strong><br>${safe(state.dashboardCostosError)}<br><button class="text-button" type="button" data-action="reload-cost-dashboard">Reintentar</button></div>`;
+    }
+    const ultima = data?.ultimaOrden;
+    if (!ultima) {
+      return '<div class="empty-state"><strong>Aún no hay órdenes finalizadas.</strong></div>';
+    }
+    const estado = ultima.viable === null
+      ? (ultima.estimacion ? 'Pendiente de costos' : 'Sin estimación vinculada')
+      : ultima.viable
+        ? 'Dentro del presupuesto'
+        : 'Sobre el presupuesto';
+    const estadoTag = ultima.viable === null ? 'tag-muted' : ultima.viable ? 'tag-open' : 'tag-warn';
+    const variacion = ultima.variacion === null ? '—'
+      : Number(ultima.variacion) > 0
+        ? `+${money(ultima.variacion)}` : money(ultima.variacion);
+    const porcentaje = ultima.porcentaje === null ? '—'
+      : `${Number(ultima.porcentaje) > 0 ? '+' : ''}${number(ultima.porcentaje)}%`;
+    return `<div class="card-body"><p><strong>OT-${safe(ultima.id)} · ${safe(ultima.juego)}</strong></p><dl class="close-summary"><div><dt>Estimación vinculada</dt><dd>${safe(ultima.estimacion || 'Sin vínculo')}</dd></div><div><dt>Presupuesto estimado</dt><dd>${ultima.totalEstimado === null ? '—' : money(ultima.totalEstimado)}</dd></div><div><dt>Costo real</dt><dd>${ultima.totalReal === null ? '—' : money(ultima.totalReal)}</dd></div><div><dt>Variación (real − estimado)</dt><dd>${variacion}</dd></div><div><dt>Variación porcentual</dt><dd>${porcentaje}</dd></div></dl><p><span class="tag ${estadoTag}">${safe(estado)}</span></p></div>`;
+  }
+
+  function dashboardOrdenesFinalizadas() {
+    if (!canReadCostDashboard()) return '';
+    if (state.dashboardCostosLoading) return '';
+    if (state.dashboardCostosError) return '';
+    const filas = state.dashboardCostos?.ordenesFinalizadasRecientes || [];
+    const contenido = filas.length ? filas.map(orden => {
+      const rendimiento = orden.viable === true ? 'Dentro del presupuesto'
+        : orden.viable === false ? 'Sobre el presupuesto'
+          : orden.estimacion ? 'Pendiente de comparar' : 'Sin estimación';
+      return `<tr><td><strong>OT-${safe(orden.id)}</strong><small>${safe(orden.juego)}</small></td><td class="num">${orden.totalEstimado === null ? '—' : money(orden.totalEstimado)}</td><td class="num">${orden.totalReal === null ? '—' : money(orden.totalReal)}</td><td class="num">${orden.variacion === null ? '—' : money(orden.variacion)}</td><td>${safe(rendimiento)}</td></tr>`;
+    }).join('') : '<tr><td colspan="5"><div class="empty-state"><strong>No hay órdenes finalizadas para resumir.</strong></div></td></tr>';
+    return `<section class="card section-gap"><div class="card-header"><div><h2>Órdenes finalizadas</h2></div></div><div class="table-wrap"><table><thead><tr><th>Orden y juego</th><th class="num">Estimación</th><th class="num">Costo real</th><th class="num">Variación</th><th>Rendimiento</th></tr></thead><tbody>${contenido}</tbody></table></div></section>`;
+  }
+
+  function dashboardCostosPage() {
+    const data = state.dashboardCostos;
+    return `${heading('DashBoard')}
+      <div class="kpi-grid">
+        <article class="card kpi-card" data-icon="◷"><div class="kpi-label">Pendientes de finalizar</div><div class="kpi-value">${data ? number(data.ordenesPendientes) : '—'}</div></article>
+        <article class="card kpi-card" data-icon="✓"><div class="kpi-label">Órdenes finalizadas</div><div class="kpi-value">${data ? number(data.ordenesFinalizadas) : '—'}</div></article>
+      </div>
+      ${dashboardUltimaOrdenRegistrada()}
+      <section class="card section-gap"><div class="card-header"><div><h2>Rendimiento de la última orden finalizada</h2></div></div>${costDashboardPerformance()}</section>
+      ${dashboardOrdenesFinalizadas()}
+      `;
+  }
+
+  function dashboardUltimaOrdenRegistrada() {
+    const orden = state.dashboardCostos?.ultimaOrdenRegistrada;
+    if (state.dashboardCostosLoading) {
+      return '<section class="card section-gap"><div class="card-body"><div class="empty-state"><strong>Cargando última orden registrada…</strong></div></div></section>';
+    }
+    if (state.dashboardCostosError) {
+      return `<section class="card section-gap"><div class="card-body">${costDashboardPerformance()}</div></section>`;
+    }
+    if (!orden) {
+      return '<section class="card section-gap"><div class="card-header"><div><h2>Última orden registrada</h2></div></div><div class="card-body"><div class="empty-state"><strong>Aún no hay órdenes registradas.</strong></div></div></section>';
+    }
+    const fecha = new Date(`${orden.fechaInicio}T12:00:00`).toLocaleDateString('es-SV');
+    return `<section class="card section-gap"><div class="card-header"><div><h2>Última orden registrada</h2></div><span class="tag ${orden.estado === 'Cerrada' ? 'tag-open' : 'tag-muted'}">${safe(orden.estado)}</span></div><div class="card-body"><dl class="close-summary"><div><dt>Orden y juego</dt><dd>OT-${safe(orden.id)} · ${safe(orden.juego)}</dd></div><div><dt>Fecha de inicio</dt><dd>${safe(fecha)}</dd></div><div><dt>Costo real vigente</dt><dd>${orden.totalReal === null ? '—' : money(orden.totalReal)}</dd></div><div><dt>Estimación vinculada</dt><dd>${safe(orden.estimacion || 'Sin vínculo')}</dd></div></dl></div></section>`;
+  }
+
+  function dashboardCostosSummary() {
+    if (!canReadCostDashboard()) return '';
+    const data = state.dashboardCostos;
+    return `<section class="card"><div class="card-header"><div><h2>Costeo de órdenes finalizadas</h2></div>${data ? `<span class="tag">${number(data.ordenesFinalizadas)} finalizadas</span>` : ''}</div>${costDashboardPerformance()}</section>`;
+  }
+
+  function dashboardSalesWindow() {
+    const hasta = today();
+    const end = new Date(`${hasta}T00:00:00Z`);
+    let desde;
+    if (state.period === 'year') {
+      desde = `${hasta.slice(0, 4)}-01-01`;
+    } else {
+      end.setUTCDate(end.getUTCDate() - (state.period === 'quarter' ? 89 : 29));
+      desde = end.toISOString().slice(0, 10);
+    }
+    return { desde, hasta };
+  }
+
+  function dashboardSalesInPeriod() {
+    const { desde, hasta } = dashboardSalesWindow();
+    return sales.filter(sale => sale.date >= desde && sale.date <= hasta);
+  }
+
+  function dashboardSalesChart() {
+    if (!state.salesLoaded || state.salesLoading) return '<div class="empty-state"><strong>Cargando ventas registradas…</strong></div>';
+    if (state.salesError) return `<div class="empty-state"><strong>No se pudieron cargar las ventas.</strong>${safe(state.salesError)}</div>`;
+    const { desde, hasta } = dashboardSalesWindow();
+    const days = Math.max(1, Math.round((Date.parse(`${hasta}T00:00:00Z`) - Date.parse(`${desde}T00:00:00Z`)) / 86400000) + 1);
+    const count = 8;
+    const values = Array(count).fill(0);
+    const filtered = dashboardSalesInPeriod().filter(sale => sale.status === 'Registrada');
+    filtered.forEach(sale => {
+      const offset = Math.max(0, Math.floor((Date.parse(`${sale.date}T00:00:00Z`) - Date.parse(`${desde}T00:00:00Z`)) / 86400000));
+      const bucket = Math.min(count - 1, Math.floor(offset / days * count));
+      values[bucket] += sale.amount;
+    });
+    if (!filtered.length) return '<div class="empty-state"><strong>No hay ventas registradas en este período.</strong></div>';
+    const max = Math.max(...values, 1);
+    const points = values.map((value, index) => ({
+      x: 42 + (563 * index / (count - 1)),
+      y: 170 - (value / max * 135),
+      value,
+    }));
+    const line = points.map((point, index) => `${index ? 'L' : 'M'}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ');
+    const fill = `${line} L605 175 L42 175 Z`;
+    const ticks = [1, 2, 3, 4].map(index => {
+      const y = 28 + (147 * (index - 1) / 3);
+      const label = money(max * (4 - index) / 3);
+      return `<line class="chart-grid" x1="42" y1="${y}" x2="605" y2="${y}"/><text class="chart-axis" x="2" y="${y + 3}">${safe(label)}</text>`;
+    }).join('');
+    const labels = points.map((point, index) => {
+      const date = new Date(Date.parse(`${desde}T00:00:00Z`) + Math.floor(days * index / count) * 86400000);
+      return `<text class="chart-axis" x="${point.x - 14}" y="196">${date.toISOString().slice(5, 10)}</text>`;
+    }).join('');
+    const markers = points.map(point => `<circle class="chart-point" cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="4"/>`).join('');
+    return `<div class="card-body chart-area"><svg class="sales-chart" viewBox="0 0 620 205" role="img" aria-label="Ventas registradas agrupadas por fecha"><defs><linearGradient id="salesFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#d8a628" stop-opacity=".23"/><stop offset="1" stop-color="#d8a628" stop-opacity="0"/></linearGradient></defs>${ticks}<path class="chart-area-fill" d="${fill}"/><path class="chart-line" d="${line}"/>${markers}${labels}</svg></div>`;
+  }
+
   function dashboardPage() {
+    if (state.currentUser?.role === 'Contador de Costos') return dashboardCostosPage();
+    const delPeriodo = dashboardSalesInPeriod();
+    const registradas = delPeriodo.filter(sale => sale.status === 'Registrada');
+    const ventasPeriodo = registradas.reduce((total, sale) => total + sale.amount, 0);
+    const pendientes = delPeriodo.filter(sale => sale.status !== 'Registrada').length;
+    const ultimaVenta = [...sales].sort((a, b) => b.time.localeCompare(a.time))[0];
     const periodLabel = state.period === 'year' ? 'Año actual' : state.period === 'quarter' ? 'Últimos 90 días' : 'Últimos 30 días';
-    const salesValue = state.salesTotal + (state.period === 'year' ? 34420 : state.period === 'quarter' ? 12860 : 0);
-    const lastSale = sales[0] || { amount: 0, date: '—', title: 'Sin ventas recibidas' };
-    return `${heading('Dashboard', 'Resumen de ventas y rendimiento de costos.', `<button class="button button-gold" type="button" data-action="simulate-sale">＋ Nueva venta</button>`)}
+    const latestSales = [...sales].sort((a, b) => b.time.localeCompare(a.time)).slice(0, 4);
+    const latestSalesRows = latestSales.map(sale => `<tr><td>${safe(sale.date)}</td><td><strong>${safe(sale.title)}</strong><small>${safe(sale.id)}</small></td><td>${safe(sale.channel)}</td><td><span class="tag ${sale.status === 'Registrada' ? 'tag-open' : 'tag-muted'}">${safe(sale.status)}</span></td><td class="num">${money(sale.amount)}</td></tr>`).join('')
+      || `<tr><td colspan="5" class="empty-cell">${state.salesError ? 'No se pudieron cargar las ventas.' : state.salesLoaded ? 'No hay ventas recibidas.' : 'Cargando ventas…'}</td></tr>`;
+    return `${heading('Dashboard', 'Resumen de ventas y rendimiento de órdenes finalizadas.')}
       <div class="demo-banner"><div class="dashboard-filter"><label for="dashboardPeriod">Período</label><select id="dashboardPeriod"><option value="month" ${state.period === 'month' ? 'selected' : ''}>Últimos 30 días</option><option value="quarter" ${state.period === 'quarter' ? 'selected' : ''}>Últimos 90 días</option><option value="year" ${state.period === 'year' ? 'selected' : ''}>Año actual</option></select></div></div>
       <div class="kpi-grid">
-        <article class="card kpi-card" data-icon="＄"><div class="kpi-label">Ventas registradas</div><div class="kpi-value">${money(salesValue)}</div><div class="kpi-foot"><span class="positive">${periodLabel}</span> · valores del período</div></article>
-        <article class="card kpi-card" data-icon="↗"><div class="kpi-label">Resultado bruto</div><div class="kpi-value">${money(28640 + (sales.length - 5) * 85)}</div><div class="kpi-foot">Resultado del período</div></article>
-        <article class="card kpi-card" data-icon="◷"><div class="kpi-label">Costo estimado</div><div class="kpi-value">${money(49600)}</div><div class="kpi-foot">Comparativo del período</div></article>
-        <article class="card kpi-card" data-icon="▤"><div class="kpi-label">Última venta</div><div class="kpi-value">${money(lastSale.amount)}</div><div class="kpi-foot">${safe(lastSale.date)} · ${safe(lastSale.title)}</div></article>
+        <article class="card kpi-card" data-icon="＄"><div class="kpi-label">Ventas registradas</div><div class="kpi-value">${state.salesLoaded && !state.salesError ? money(ventasPeriodo) : '—'}</div><div class="kpi-foot"><span class="positive">${periodLabel}</span></div></article>
+        <article class="card kpi-card" data-icon="◷"><div class="kpi-label">Ventas pendientes</div><div class="kpi-value">${state.salesLoaded && !state.salesError ? number(pendientes) : '—'}</div><div class="kpi-foot">Eventos recibidos sin contabilizar</div></article>
+        ${canReadCostDashboard() ? `<article class="card kpi-card" data-icon="✓"><div class="kpi-label">Órdenes finalizadas</div><div class="kpi-value">${state.dashboardCostos ? number(state.dashboardCostos.ordenesFinalizadas) : '—'}</div><div class="kpi-foot">Con rendimiento basado en costos reales</div></article>` : ''}
+        <article class="card kpi-card" data-icon="▤"><div class="kpi-label">Última venta recibida</div><div class="kpi-value">${state.salesLoaded && !state.salesError && ultimaVenta ? money(ultimaVenta.amount) : '—'}</div><div class="kpi-foot">${state.salesError ? 'No se pudieron cargar las ventas' : ultimaVenta ? `${safe(ultimaVenta.date)} · ${safe(ultimaVenta.title)}` : state.salesLoaded ? 'Sin ventas recibidas' : 'Consultando ventas…'}</div></article>
       </div>
+      ${dashboardClosedPeriod()}
       <div class="dashboard-grid">
-        <section class="card"><div class="card-header"><div><h2>Ventas recientes</h2><p>Últimas operaciones</p></div><div class="chart-legend"><span><i class="legend-mark"></i>Ventas</span></div></div>
-          <div class="card-body chart-area"><svg class="sales-chart" viewBox="0 0 620 205" role="img" aria-label="Gráfico de ventas"><defs><linearGradient id="salesFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#d8a628" stop-opacity=".23"/><stop offset="1" stop-color="#d8a628" stop-opacity="0"/></linearGradient></defs><line class="chart-grid" x1="42" y1="28" x2="605" y2="28"/><line class="chart-grid" x1="42" y1="77" x2="605" y2="77"/><line class="chart-grid" x1="42" y1="126" x2="605" y2="126"/><line class="chart-grid" x1="42" y1="175" x2="605" y2="175"/><text class="chart-axis" x="4" y="31">$4k</text><text class="chart-axis" x="4" y="80">$3k</text><text class="chart-axis" x="4" y="129">$2k</text><text class="chart-axis" x="4" y="178">$1k</text><path class="chart-area-fill" d="M42 139 L121 112 L200 123 L279 79 L358 91 L437 55 L516 74 L605 34 L605 175 L42 175 Z"/><path class="chart-line" d="M42 139 L121 112 L200 123 L279 79 L358 91 L437 55 L516 74 L605 34"/><circle class="chart-point" cx="42" cy="139" r="4"/><circle class="chart-point" cx="121" cy="112" r="4"/><circle class="chart-point" cx="200" cy="123" r="4"/><circle class="chart-point" cx="279" cy="79" r="4"/><circle class="chart-point" cx="358" cy="91" r="4"/><circle class="chart-point" cx="437" cy="55" r="4"/><circle class="chart-point" cx="516" cy="74" r="4"/><circle class="chart-point" cx="605" cy="34" r="4"/><text class="chart-axis" x="39" y="196">01</text><text class="chart-axis" x="118" y="196">05</text><text class="chart-axis" x="197" y="196">09</text><text class="chart-axis" x="276" y="196">13</text><text class="chart-axis" x="355" y="196">17</text><text class="chart-axis" x="434" y="196">21</text><text class="chart-axis" x="513" y="196">25</text><text class="chart-axis" x="597" y="196">30</text></svg></div></section>
-        <section class="card"><div class="card-header"><div><h2>Rendimiento de costeo</h2><p>Presupuesto frente a costo real</p></div></div><div class="card-body"><div class="cost-list"><div><div class="cost-item-head"><span>Título A</span><strong>${money(18400)}</strong></div><div class="progress-track"><div class="progress-fill" style="width:72%"></div></div><div class="cost-meta"><span>Presupuesto ${money(25600)}</span><span>72%</span></div></div><div><div class="cost-item-head"><span>Título B</span><strong>${money(14100)}</strong></div><div class="progress-track"><div class="progress-fill navy-fill" style="width:86%"></div></div><div class="cost-meta"><span>Presupuesto ${money(16400)}</span><span>86%</span></div></div><div><div class="cost-item-head"><span>Título C</span><strong>${money(7100)}</strong></div><div class="progress-track"><div class="progress-fill green-fill" style="width:58%"></div></div><div class="cost-meta"><span>Presupuesto ${money(12200)}</span><span>58%</span></div></div></div></div></section>
+        <section class="card"><div class="card-header"><div><h2>Ventas registradas</h2><p>Totales por fecha · ${periodLabel}</p></div><div class="chart-legend"><span><i class="legend-mark"></i>Ventas</span></div></div>${dashboardSalesChart()}</section>
+        ${dashboardCostosSummary()}
       </div>
-      <div class="dashboard-bottom"><section class="card"><div class="card-header"><div><h2>Últimas ventas</h2><p>Canal, fecha y estado de registro</p></div><button class="text-button" type="button" data-view="operations" data-operation="verify">Ver ventas →</button></div><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Producto</th><th>Canal</th><th>Estado</th><th class="num">Monto</th></tr></thead><tbody>${sales.slice(0, 4).map(sale => `<tr><td>${safe(sale.date)}</td><td><strong>${safe(sale.title)}</strong><small>${safe(sale.id)}</small></td><td>${safe(sale.channel)}</td><td><span class="tag ${sale.status === 'Registrada' ? 'tag-open' : 'tag-muted'}">${safe(sale.status)}</span></td><td class="num">${money(sale.amount)}</td></tr>`).join('')}</tbody></table></div></section><section class="card"><div class="card-header"><div><h2>Accesos rápidos</h2><p>Operaciones frecuentes</p></div></div><div class="card-body"><div class="quick-links"><button class="quick-link" type="button" data-view="ledger">Registrar movimiento <span>↗</span></button><button class="quick-link" type="button" data-view="reports">Estado de Resultados <span>↗</span></button><button class="quick-link" type="button" data-view="operations" data-operation="steam">Conexión con Steam <span>↗</span></button><button class="quick-link" type="button" data-view="accounts">Catálogo de cuentas <span>↗</span></button></div></div></section></div>`;
+      ${dashboardOrdenesFinalizadas()}
+      <div class="dashboard-bottom"><section class="card"><div class="card-header"><div><h2>Últimas ventas</h2><p>Canal, fecha y estado de registro</p></div><button class="text-button" type="button" data-view="operations" data-operation="verify">Ver ventas →</button></div><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Producto</th><th>Canal</th><th>Estado</th><th class="num">Monto</th></tr></thead><tbody>${latestSalesRows}</tbody></table></div></section><section class="card"><div class="card-header"><div><h2>Accesos rápidos</h2></div></div><div class="card-body"><div class="quick-links"><button class="quick-link" type="button" data-view="ledger">Registrar movimiento <span>↗</span></button><button class="quick-link" type="button" data-view="reports">Estados financieros <span>↗</span></button><button class="quick-link" type="button" data-view="operations" data-operation="steam">Conexión con Steam <span>↗</span></button><button class="quick-link" type="button" data-view="accounts">Catálogo de cuentas <span>↗</span></button></div></div></section></div>`;
   }
 
   function accountOptions(selected = '') {
@@ -200,7 +501,16 @@
     if (state.report === 'provisional') return provisionalPage(tabs);
     if (state.report === 'worksheet') return worksheetPage(tabs);
     if (state.report === 'closing') return closingPage(tabs);
-    if (!hasCurrentWorksheet()) return worksheetRequired(tabs);
+    if (state.indicatorPeriodStatus === 'CERRADO_PROVISIONAL'
+        && !state.closedPeriod) {
+      const status = state.closedPeriodLoading
+        ? '<strong>Cargando estados del período cerrado…</strong>'
+        : state.closedPeriodError
+          ? `<strong>No se pudieron cargar los estados del cierre.</strong><p>${safe(state.closedPeriodError)}</p><button class="button button-secondary" type="button" data-action="reload-closed-period">Reintentar</button>`
+          : '<strong>Consultando el período cerrado…</strong>';
+      return `${heading('Estados financieros')}${tabs}<section class="card"><div class="empty-state">${status}</div></section>`;
+    }
+    if (!hasCurrentWorksheet() && !state.closedPeriod) return worksheetRequired(tabs);
     if (state.report === 'results') return `${heading('Estado de Resultados', '', `<button class="button button-secondary" type="button" data-action="export" data-source="report" data-format="pdf">↓ PDF</button><button class="button button-secondary" type="button" data-action="export" data-source="report" data-format="xlsx">↓ Excel</button>`)}${tabs}${incomeStatement()}`;
     if (state.report === 'balance') return `${heading('Estado de Situación Financiera', '', `<button class="button button-secondary" type="button" data-action="export" data-source="report" data-format="pdf">↓ PDF</button><button class="button button-secondary" type="button" data-action="export" data-source="report" data-format="xlsx">↓ Excel</button>`)}${tabs}${balanceStatement()}`;
     if (state.report === 'changes') return `${heading('Estado de Cambios en el Patrimonio', '', `<button class="button button-secondary" type="button" data-action="export" data-source="report" data-format="pdf">↓ PDF</button><button class="button button-secondary" type="button" data-action="export" data-source="report" data-format="xlsx">↓ Excel</button>`)}${tabs}${changesStatement()}`;
@@ -223,7 +533,8 @@
     const loading = state.provisionalLoading && !info;
     const pending = { length: info ? info.ventasPendientes : 0 };
     const periodRows = { length: info ? info.movimientos : 0 };
-    const open = !info || info.estado !== 'CERRADO_PROVISIONAL';
+    const open = state.indicatorPeriodStatus !== 'CERRADO_PROVISIONAL'
+      && (!info || info.estado !== 'CERRADO_PROVISIONAL');
     const estadoTexto = loading ? 'Consultando…' : open ? 'Abierto' : 'Cerrado provisionalmente';
     const estadoDetalle = loading ? 'Consultando el estado del período.' : open ? 'Admite revisión' : 'No admite nuevos movimientos';
     const pendientesTexto = loading ? 'Consultando…' : pending.length ? `${pending.length} pendientes` : 'Completado';
@@ -244,6 +555,11 @@
   }
 
   function closingPage(tabs) {
+    if (state.indicatorPeriodStatus === 'CERRADO_PROVISIONAL') {
+      const adminAction = canReopenPeriod()
+        ? `<a class="button button-secondary" href="${safe(screenUrls.closing)}">Administrar período</a>` : '';
+      return `${heading('Cierre contable', '', '')}${tabs}<section class="card"><div class="card-header"><div><h2>Período cerrado provisionalmente</h2></div><span class="tag tag-warn">Cerrado</span></div><div class="card-body"><p>La Hoja de Trabajo y los estados financieros del cierre están disponibles para consulta.</p><div class="section-gap"><button class="button button-primary" type="button" data-view="closed">Ver Hoja de Trabajo y estados financieros</button>${adminAction}</div></div></section>`;
+    }
     const label = canReopenPeriod() ? 'Cerrar o reabrir períodos' : 'Cerrar períodos';
     return `${heading('Cierre contable', 'El cierre provisional se prepara con la Hoja de Trabajo del período.', '')}${tabs}<section class="card"><div class="card-header"><div><h2>Estado del período</h2><p>Flujo de revisión contable</p></div><span class="tag ${state.periodStatus === 'ABIERTO' ? 'tag-open' : 'tag-warn'}">${state.periodStatus === 'ABIERTO' ? 'Abierto' : 'Cerrado provisionalmente'}</span></div><div class="card-body"><div class="notice"><span class="notice-icon">i</span><span>El cierre provisional requiere generar y revisar la Hoja de Trabajo. Los estados financieros del período se habilitan a partir de esa hoja.</span></div><div class="section-gap"><a class="button button-primary" href="${safe(screenUrls.closing)}">${label}</a><button class="button button-secondary" type="button" data-report="provisional">${state.periodStatus === 'ABIERTO' ? 'Preparar cierre provisional' : 'Consultar período cerrado'}</button>${hasCurrentWorksheet() ? '<button class="button button-secondary" type="button" data-report="worksheet">Abrir Hoja de Trabajo</button>' : ''}</div></div></section>`;
   }
@@ -296,7 +612,8 @@
       const data = await api(`${screenUrls.api_hoja}?${new URLSearchParams({ desde: from, hasta: to })}`);
       if (requestId !== state.provisionalRequestId) return null;
       state.provisional = { ...data, from, to };
-      state.periodStatus = data.estado;
+      state.periodStatus = state.indicatorPeriodStatus === 'CERRADO_PROVISIONAL'
+        ? 'CERRADO_PROVISIONAL' : data.estado;
       state.cuentas = data.cuentas;
       if (state.worksheet && state.worksheet.from === from && state.worksheet.to === to) state.worksheet = normalizeWorksheet(data);
     } catch (error) {
@@ -364,7 +681,11 @@
         $('#modalRoot').innerHTML = '';
         state.indicatorPeriodStatus = 'CERRADO_PROVISIONAL';
         showToast(result.mensaje, 'success');
-        loadProvisional(sheet.from, sheet.to);
+        loadClosedPeriod(true).then(async () => {
+          await loadProvisional(sheet.from, sheet.to);
+          state.report = 'worksheet';
+          page();
+        });
       }).catch(error => showToast(error.message, 'error'));
       return false;
     });
@@ -387,6 +708,7 @@
         $('#modalRoot').innerHTML = '';
         state.indicatorPeriodStatus = 'CERRADO_PROVISIONAL';
         showToast(result.mensaje, 'success');
+        await loadClosedPeriod(true);
         await loadProvisional(desde, hasta);
         state.report = 'annual';
         page();
@@ -456,6 +778,8 @@
   }
 
   function incomeStatement() {
+    const emitido = state.closedStatements?.resultados;
+    if (emitido) return emittedStatement(emitido, 'Estado de Resultados');
     const sheet = state.worksheet;
     const incomeRows = sheet.rows.filter(row => row.code && row.group === 'Ingreso').map(row => ({ label: `${row.code} · ${row.name}`, amount: -row.periodNet, kind: 'detail' }));
     const expenseRows = sheet.rows.filter(row => row.code && row.group === 'Egreso').map(row => ({ label: `${row.code} · ${row.name}`, amount: row.periodNet, kind: 'detail' }));
@@ -471,6 +795,8 @@
   }
 
   function balanceStatement() {
+    const emitido = state.closedStatements?.balance;
+    if (emitido) return emittedStatement(emitido, 'Estado de Situación Financiera');
     const sheet = state.worksheet;
     const balances = sheet.rows.filter(row => row.code && ['Activo', 'Pasivo', 'Patrimonio'].includes(row.group));
     const result = sheet.rows.find(row => row.name === 'Resultado del período');
@@ -505,6 +831,22 @@
     const result = sheet.rows.find(row => row.name === 'Resultado del período');
     if (result) rows.push(`<tr><td>Resultado del período</td><td class="num">—</td><td class="num">${money(Math.max(result.balanceCredit - result.balanceDebit, 0))}</td><td class="num">${money(Math.max(result.balanceDebit - result.balanceCredit, 0))}</td><td class="num"><strong>${money(result.balanceCredit - result.balanceDebit)}</strong></td></tr>`);
     return `<section class="card statement-card">${statementHeading('Estado de Cambios en el Patrimonio', `${safe(sheet.from)} al ${safe(sheet.to)}`)}<div class="table-wrap"><table class="statement-table"><thead><tr><th>Detalle</th><th class="num">Saldo inicial</th><th class="num">Aumentos</th><th class="num">Disminuciones</th><th class="num">Saldo final</th></tr></thead><tbody>${rows.join('') || '<tr><td colspan="5" class="empty-cell">Sin movimientos patrimoniales</td></tr>'}</tbody></table></div></section>`;
+  }
+
+  function emittedStatement(emitido, fallbackTitle) {
+    const rows = (emitido.filas || []).map(row => {
+      if (row.clase === 'seccion' || row.clase === 'grupo') {
+        return { kind: 'section', label: row.texto };
+      }
+      if (row.clase === 'resultado') {
+        return { kind: 'final', label: row.texto, amount: Number(row.importe) || 0 };
+      }
+      if (['subtotal', 'total'].includes(row.clase)) {
+        return { kind: 'total', label: row.texto, amount: Number(row.importe) || 0 };
+      }
+      return { label: `${row.codigo ? `${row.codigo} · ` : ''}${row.texto}`, amount: Number(row.importe) || 0, kind: 'detail' };
+    });
+    return `<section class="card statement-card">${statementHeading(emitido.titulo || fallbackTitle, emitido.cubre || '')}<div class="table-wrap"><table class="statement-table"><thead><tr><th rowspan="2">Detalle</th><th colspan="2" class="sum-heading">Sumas</th></tr><tr><th class="num">Parcial</th><th class="num">Total</th></tr></thead><tbody>${statementRowsMarkup(rows)}</tbody></table></div></section>`;
   }
 
   const logoSvgBase64 = 'PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjAwIDQwMCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsbGVkYnk9InRpdGxlIGRlc2MiPgogIDx0aXRsZSBpZD0idGl0bGUiPlN1bkdhbWVzIGxvZ288L3RpdGxlPgogIDxkZXNjIGlkPSJkZXNjIj5BIHN0eWxpemVkIHN1biBiZWhpbmQgYSBnYW1lIGNvbnRyb2xsZXIgZm9sbG93ZWQgYnkgdGhlIFN1bkdhbWVzIHdvcmRtYXJrLjwvZGVzYz4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ic3VuIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI0ZGRDE2NiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNGRjhBM0QiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgPC9kZWZzPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQ1IDM1KSI+CiAgICA8Y2lyY2xlIGN4PSIxNjAiIGN5PSIxNTAiIHI9IjEwNiIgZmlsbD0idXJsKCNzdW4pIi8+CiAgICA8ZyBmaWxsPSJub25lIiBzdHJva2U9IiNGNEI2M0EiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLXdpZHRoPSIxNiI+CiAgICAgIDxwYXRoIGQ9Ik0xNjAgMjB2LTEyIi8+CiAgICAgIDxwYXRoIGQ9Ik0xNjAgMjkydi0xMiIvPgogICAgICA8cGF0aCBkPSJNMzAgMTUwSDE4Ii8+CiAgICAgIDxwYXRoIGQ9Ik0zMDIgMTUwaC0xMiIvPgogICAgICA8cGF0aCBkPSJtNjcgNTctOS05Ii8+CiAgICAgIDxwYXRoIGQ9Im0yNTMgMjQzLTktOSIvPgogICAgICA8cGF0aCBkPSJtNjcgMjQzLTkgOSIvPgogICAgICA8cGF0aCBkPSJtMjUzIDU3IDktOSIvPgogICAgPC9nPgogICAgPHBhdGggZD0iTTc3IDE1M2M5LTM3IDM5LTYwIDc4LTYwaDEwYzM5IDAgNjkgMjMgNzggNjBsMjEgNzZjNSAxOC05IDM2LTI4IDM2LTEwIDAtMTktNS0yNS0xNGwtMjktNDFoLTQ0bC0yOSA0MWMtNiA5LTE1IDE0LTI1IDE0LTE5IDAtMzMtMTgtMjgtMzZsMjEtNzZaIiBmaWxsPSIjMEIxRjMzIi8+CiAgICA8cGF0aCBkPSJNMTE5IDE1MHY0OE05NSAxNzRoNDgiIHN0cm9rZT0iI0Y4RjlGQSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2Utd2lkdGg9IjEzIi8+CiAgICA8Y2lyY2xlIGN4PSIyMDUiIGN5PSIxNjUiIHI9IjEwIiBmaWxsPSIjRjRCNjNBIi8+CiAgICA8Y2lyY2xlIGN4PSIyMzQiIGN5PSIxOTMiIHI9IjEwIiBmaWxsPSIjRkY2QjM1Ii8+CiAgPC9nPgogIDx0ZXh0IHg9IjM3MCIgeT0iMjA1IiBmaWxsPSIjMEIxRjMzIiBmb250LWZhbWlseT0iQXJpYWwsIEhlbHZldGljYSwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMTIiIGZvbnQtd2VpZ2h0PSI4MDAiIGxldHRlci1zcGFjaW5nPSItNCI+U3VuR2FtZXM8L3RleHQ+CiAgPHRleHQgeD0iMzc4IiB5PSIyNzAiIGZpbGw9IiNGRjZCMzUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjI3IiBmb250LXdlaWdodD0iNzAwIiBsZXR0ZXItc3BhY2luZz0iOCI+SU5URVJBQ1RJVkUgV09STERTPC90ZXh0Pgo8L3N2Zz4K';
@@ -618,7 +960,8 @@
 
   function annualReport() {
     const year = state.worksheet.from.slice(0, 4);
-    const closeAction = state.currentUser.role === 'Contador General' && state.periodStatus === 'ABIERTO'
+    const closeAction = ['Administrador', 'Contador General']
+      .includes(state.currentUser.role) && state.periodStatus === 'ABIERTO'
       ? `<div class="heading-actions section-gap"><button class="button button-primary" type="button" data-action="confirm-annual-close">Solicitar cierre anual</button></div>`
       : '';
     return `<section class="card"><div class="card-header"><div><h2>Informes relacionados con el cierre anual</h2><p>Ejercicio con Hoja de Trabajo disponible</p></div><span class="tag tag-demo">${safe(year)}</span></div><div class="card-body"><div class="quick-links"><button class="quick-link" type="button" data-report="results">Estado de Resultados <span>↗</span></button><button class="quick-link" type="button" data-report="changes">Estado de Cambios en el Patrimonio <span>↗</span></button><button class="quick-link" type="button" data-report="balance">Balance General <span>↗</span></button><button class="quick-link" type="button" data-report="worksheet">Hoja de Trabajo <span>↗</span></button></div>${closeAction}</div></section>`;
@@ -634,7 +977,7 @@
 
   function verifySalesPanel() {
     const filtered = sales.filter(item => !state.salesQuery || `${item.id} ${item.title} ${item.channel}`.toLowerCase().includes(state.salesQuery.toLowerCase()));
-    return `<div class="demo-banner"><span><strong>Resumen del período</strong> · Consulta de ventas.</span></div><div class="filter-bar"><div class="field grow"><label for="salesQuery">Buscar venta</label><input id="salesQuery" value="${safe(state.salesQuery)}" placeholder="Código, título o canal"/></div><div class="field"><label for="salesFrom">Desde</label><input id="salesFrom" type="date" value="${safe(state.salesFrom)}"/></div><div class="field"><label for="salesTo">Hasta</label><input id="salesTo" type="date" value="${safe(state.salesTo)}"/></div><button class="button button-secondary" type="button" data-action="filter-sales">Consultar</button></div><section class="card"><div class="card-header"><div><h2>Ventas</h2><p>Listado de ventas identificadas para consulta</p></div><span class="tag">${filtered.length} ventas</span></div><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Identificador</th><th>Producto</th><th>Canal</th><th>Estado</th><th class="num">Monto</th></tr></thead><tbody>${filtered.map(sale => `<tr><td>${safe(sale.date)}</td><td><strong>${safe(sale.id)}</strong><small>${safe(sale.correlativo || (sale.status === 'Pendiente' ? 'Sin correlativo hasta registrar' : ''))}</small></td><td>${safe(sale.title)}</td><td>${safe(sale.channel)}</td><td><span class="tag ${sale.status === 'Registrada' ? 'tag-open' : 'tag-muted'}">${safe(sale.status)}</span></td><td class="num">${money(sale.amount)}</td></tr>`).join('')}</tbody></table></div></section>`;
+    return `<div class="demo-banner"><span><strong>Resumen del período</strong> · Consulta de ventas.</span></div><div class="filter-bar"><div class="field grow"><label for="salesQuery">Buscar venta</label><input id="salesQuery" value="${safe(state.salesQuery)}" placeholder="Código, título o canal"/></div><div class="field"><label for="salesFrom">Desde</label><input id="salesFrom" type="date" value="${safe(state.salesFrom)}"/></div><div class="field"><label for="salesTo">Hasta</label><input id="salesTo" type="date" value="${safe(state.salesTo)}"/></div><button class="button button-secondary" type="button" data-action="filter-sales">Consultar</button></div><section class="card"><div class="card-header"><div><h2>Ventas</h2><p>Listado de ventas identificadas para consulta</p></div><span class="tag">${filtered.length} ventas</span></div><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Identificador</th><th>Producto</th><th>Canal</th><th>Origen</th><th>Estado</th><th class="num">Monto</th></tr></thead><tbody>${filtered.map(sale => `<tr><td>${safe(sale.date)}</td><td><strong>${safe(sale.id)}</strong><small>${safe(sale.correlativo || (sale.status === 'Pendiente' ? 'Sin correlativo hasta registrar' : ''))}</small></td><td>${safe(sale.title)}</td><td>${safe(sale.channel)}</td><td>${safe(sale.origin)}</td><td><span class="tag ${sale.status === 'Registrada' ? 'tag-open' : 'tag-muted'}">${safe(sale.status)}</span></td><td class="num">${money(sale.amount)}</td></tr>`).join('')}</tbody></table></div></section>`;
   }
 
   function postSalesPanel() {
@@ -647,10 +990,11 @@
   function reconcilePanel() {
     const preview = state.reconciliationPreview;
     const result = state.reconciliationResult;
-    const previewMarkup = preview ? `<div class="notice section-gap"><span class="notice-icon">i</span><span>${preview.eventos} eventos Steam · Total ${money(preview.total)} · Cuentas por cobrar (1104) ${money(preview.cuentasPorCobrar)} · Comisión (4302) ${money(preview.comision)}</span></div><div class="heading-actions section-gap"><button class="button button-primary" type="button" data-action="confirm-reconciliation">Confirmar y contabilizar</button></div>` : '';
+    const impactTable = (resumen, titulo) => `<section class="card section-gap"><div class="card-header"><div><h2>${titulo}</h2><p>${resumen.conciliadas ?? resumen.eventos} eventos · Total conciliado ${money(resumen.total)}</p></div></div><div class="table-wrap"><table><thead><tr><th>Cuenta afectada</th><th class="num">Debe</th><th class="num">Haber</th></tr></thead><tbody>${(resumen.cuentasAfectadas || []).map(cuenta => `<tr><td><strong>${safe(cuenta.codigo)}</strong><small>${safe(cuenta.denominacion)}</small></td><td class="num">${money(cuenta.debe)}</td><td class="num">${money(cuenta.haber)}</td></tr>`).join('') || '<tr><td colspan="3"><div class="empty-state"><strong>No hay movimientos para este período.</strong></div></td></tr>'}</tbody><tfoot><tr><th>Total de movimientos</th><th class="num">${money((resumen.cuentasAfectadas || []).reduce((sum, cuenta) => sum + Number(cuenta.debe), 0))}</th><th class="num">${money((resumen.cuentasAfectadas || []).reduce((sum, cuenta) => sum + Number(cuenta.haber), 0))}</th></tr></tfoot></table></div></section>`;
+    const previewMarkup = preview ? `<div class="notice section-gap"><span class="notice-icon">i</span><span>${preview.eventos} eventos Steam · Vista previa de su afectación en el Libro Mayor.</span></div>${impactTable(preview, 'Cuentas que afectaría') }<div class="heading-actions section-gap"><button class="button button-primary" type="button" data-action="confirm-reconciliation">Confirmar y contabilizar</button></div>` : '';
     const errors = result?.errores?.length ? `<ul class="form-errors">${result.errores.map(error => `<li>${safe(error.id)}: ${safe(error.mensaje)}</li>`).join('')}</ul>` : '<p class="help">Sin errores.</p>';
-    const resultMarkup = result ? `<section class="card section-gap"><div class="card-header"><div><h2>Resultado de la conciliación</h2><p>${result.conciliadas} eventos conciliados</p></div></div><div class="card-body"><dl class="close-summary"><div><dt>Total</dt><dd>${money(result.total)}</dd></div><div><dt>Cuentas por cobrar (1104)</dt><dd>${money(result.cuentasPorCobrar)}</dd></div><div><dt>Comisión (4302)</dt><dd>${money(result.comision)}</dd></div></dl>${errors}</div></section>` : '';
-    return `<div class="demo-banner"><span><strong>Conciliación Steam</strong> · Se contabilizan los eventos recibidos en el período seleccionado.</span></div><section class="card"><div class="card-header"><div><h2>Conciliar ventas</h2><p>Calcula importes por período antes de confirmar el registro en el Libro Mayor.</p></div></div><div class="card-body"><div class="filter-bar" style="margin:0"><div class="field"><label for="reconcileFrom">Desde</label><input id="reconcileFrom" type="date" value="${safe(state.reconcileFrom || '2026-10-01')}"/></div><div class="field"><label for="reconcileTo">Hasta</label><input id="reconcileTo" type="date" value="${safe(state.reconcileTo || '2026-10-31')}"/></div><button class="button button-secondary" type="button" data-action="preview-reconciliation">Calcular período</button></div>${previewMarkup}${resultMarkup}</div></section>`;
+    const resultMarkup = result ? `${impactTable(result, 'Resultado de la conciliación')}<section class="card section-gap"><div class="card-body">${errors}</div></section>` : '';
+    return `<div class="demo-banner"><span><strong>Resumen de eventos Steam</strong> · Esta pantalla muestra el efecto contable de las ventas del período. El formato de liquidación bancaria de Steam sigue pendiente de definición.</span></div><section class="card"><div class="card-header"><div><h2>Conciliar ventas</h2><p>Calcula importes por período antes de confirmar el registro en el Libro Mayor.</p></div></div><div class="card-body"><div class="filter-bar" style="margin:0"><div class="field"><label for="reconcileFrom">Desde</label><input id="reconcileFrom" type="date" value="${safe(state.reconcileFrom || '2026-10-01')}"/></div><div class="field"><label for="reconcileTo">Hasta</label><input id="reconcileTo" type="date" value="${safe(state.reconcileTo || '2026-10-31')}"/></div><button class="button button-secondary" type="button" data-action="preview-reconciliation">Calcular período</button></div>${previewMarkup}${resultMarkup}</div></section>`;
   }
 
   function steamPanel() {
@@ -658,7 +1002,7 @@
     const statusIcon = state.steamStatus === 'Conectado' ? '✓' : state.steamStatus === 'Error' ? '!' : state.steamStatus === 'Fuera de servicio' ? '×' : '…';
     const contacto = state.steamContact ? new Date(state.steamContact).toLocaleString('es-SV') : 'Sin latidos registrados';
     const error = state.steamError ? new Date(state.steamError).toLocaleString('es-SV') : 'Sin errores recientes';
-    return `<section class="card steam-card"><div class="card-header"><div><h2>Estado de Steam API</h2></div><span class="tag tag-demo">Solo lectura</span></div><div class="card-body"><div class="steam-status-panel ${statusStyle}"><span class="steam-status-icon">${statusIcon}</span><div><strong>${safe(state.steamStatus)}</strong><small>Estado de conexión</small></div></div><p class="steam-note">Último latido: ${safe(contacto)} · Último error autenticado: ${safe(error)}</p></div></section>`;
+    return `<section class="card steam-card"><div class="card-header"><div><h2>Simulador de ventas</h2><p>Genera una venta para un título con orden finalizada.</p></div><button class="button button-primary" type="button" data-action="run-simulator-cycle">Ejecutar ciclo</button></div><div class="card-body"><div class="steam-status-panel ${statusStyle}"><span class="steam-status-icon">${statusIcon}</span><div><strong>${safe(state.steamStatus)}</strong><small>Estado de conexión</small></div></div><p class="steam-note">Último latido: ${safe(contacto)} · Último error autenticado: ${safe(error)}</p></div></section>`;
   }
 
   function showToast(message, type = 'success') {
@@ -682,7 +1026,6 @@
   }
 
   function onAction(action, target) {
-    if (action === 'simulate-sale') loadSales().then(() => showToast('Las ventas llegan desde el simulador de Steam; lista actualizada.', 'success'));
     if (action === 'show-trial-balance') { state.ledgerMode = 'trial-balance'; page(); }
     if (action === 'back-ledger') { state.ledgerMode = 'ledger'; page(); }
     if (action === 'refresh-trial-balance') { state.trialBalanceTo = $('#trialBalanceTo').value || today(); page(); }
@@ -695,7 +1038,16 @@
     if (action === 'reopen-period') requestPeriodReopen();
     if (action === 'go-provisional') { state.report = 'provisional'; page(); }
     if (action === 'filter-sales') { state.salesQuery = $('#salesQuery').value; state.salesFrom = $('#salesFrom').value; state.salesTo = $('#salesTo').value; loadSales(); }
+    if (action === 'run-simulator-cycle') runSimulatorCycle(target);
     if (action === 'post-sale') postSale(target.dataset.sale);
+    if (action === 'reload-cost-dashboard') {
+      state.dashboardCostosError = null;
+      page();
+    }
+    if (action === 'reload-closed-period') {
+      state.closedPeriodLoaded = false;
+      loadClosedPeriod(true);
+    }
     if (action === 'preview-reconciliation') previewReconciliation();
     if (action === 'confirm-reconciliation') confirmReconciliation();
     if (action === 'confirm-annual-close') requestAnnualClose();
@@ -710,18 +1062,22 @@
   }
 
   async function loadSales() {
-    state.salesLoaded = true;
+    state.salesLoading = true;
+    state.salesError = null;
     try {
       const params = new URLSearchParams({ q: state.salesQuery, desde: state.salesFrom, hasta: state.salesTo });
       const data = await api(`${screenUrls.api_ventas}?${params}`);
       sales = data.ventas.map(sale => ({ ...sale, amount: Number(sale.amount) }));
-      state.salesTotal = sales.reduce((sum, sale) => sum + sale.amount, 0);
       state.steamStatus = data.conexion.estado;
       state.steamContact = data.conexion.ultimoContacto;
       state.steamError = data.conexion.ultimoError;
       state.canPostSales = data.puedeContabilizar;
     } catch (error) {
+      state.salesError = error.message;
       showToast(error.message, 'error');
+    } finally {
+      state.salesLoading = false;
+      state.salesLoaded = true;
     }
     if (['dashboard', 'operations'].includes(state.current)) page();
   }
@@ -736,6 +1092,27 @@
       showToast(error.message, 'error');
     }
     loadSales();
+  }
+
+  async function runSimulatorCycle(button) {
+    button.disabled = true;
+    button.textContent = 'Ejecutando…';
+    try {
+      const resultado = await api(screenUrls.api_simulator_cycle, {
+        method: 'POST',
+      });
+      const mensaje = resultado.estado === 'enviada'
+        ? `Venta simulada enviada: ${resultado.titulo}.`
+        : resultado.detalle || 'No se generó una venta.';
+      const tipoAviso = resultado.estado === 'error'
+        ? 'error' : resultado.estado === 'omitido' ? 'warning' : 'success';
+      showToast(mensaje, tipoAviso);
+      await loadSales();
+    } catch (error) {
+      showToast(error.message, 'error');
+      button.disabled = false;
+      button.textContent = 'Ejecutar ciclo';
+    }
   }
 
   function handleForm(event) {
@@ -775,7 +1152,16 @@
       setScreen(nextView, params);
       $('#sidebar').classList.remove('is-open'); return;
     }
-    if (reportButton) { state.report = reportButton.dataset.report; updateScreenQuery('report', state.report); page(); return; }
+    if (reportButton) {
+      const nextReport = reportButton.dataset.report;
+      state.report = (state.closedPeriod
+          || state.indicatorPeriodStatus === 'CERRADO_PROVISIONAL')
+        && ['provisional', 'closing'].includes(nextReport)
+        ? 'worksheet' : nextReport;
+      updateScreenQuery('report', state.report);
+      page();
+      return;
+    }
     if (operationButton) { state.operation = operationButton.dataset.operation; updateScreenQuery('operation', state.operation); page(); return; }
     if (actionButton) onAction(actionButton.dataset.action, actionButton);
   });

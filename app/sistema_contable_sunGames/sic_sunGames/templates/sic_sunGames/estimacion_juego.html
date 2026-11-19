@@ -3,10 +3,10 @@
 {% block server_rendered %} data-server-rendered="true"{% endblock %}
 
 {% block page_content %}
-<div class="page-heading"><div><h1>{{ juego.nombre }}</h1><p>Estimación Delphi por fases y roles; versiones de presupuesto.</p></div><div class="heading-actions"><a class="button button-secondary" href="{% url 'estimacion' %}">← Juegos</a>{% if archivados %}<a class="button button-secondary" href="{% url 'estimacion_juego' juego.pk %}">Ver activas</a>{% else %}<a class="button button-secondary" href="{% url 'estimacion_juego' juego.pk %}?archivados=1">Ver archivadas</a>{% endif %}<a class="button button-primary" href="{% url 'estimacion_registrar' juego.pk %}">＋ Registrar estimación</a></div></div>
+<div class="page-heading"><div><h1>{{ juego.nombre }}</h1></div><div class="heading-actions"><a class="button button-secondary" href="{% url 'estimacion' %}">← Juegos</a>{% if archivados %}<a class="button button-secondary" href="{% url 'estimacion_juego' juego.pk %}">Ver activas</a>{% else %}<a class="button button-secondary" href="{% url 'estimacion_juego' juego.pk %}?archivados=1">Ver archivadas</a>{% endif %}<a class="button button-primary" href="{% url 'estimacion_registrar' juego.pk %}">＋ Registrar estimación</a></div></div>
 
 <section class="card">
-  <div class="card-header"><div><h2>Rondas Delphi</h2><p>Consolidación por fase y rol</p></div>
+  <div class="card-header"><div><h2>Rondas</h2></div>
     <div class="heading-actions">
       {% for ronda in rondas %}<a class="button button-secondary" href="{% url 'estimacion_juego' juego.pk %}?ronda={{ ronda.numero }}">Ronda {{ ronda.numero }}{% if ronda.cerrada %} · cerrada{% endif %}</a>{% empty %}<span class="tag">Sin rondas</span>{% endfor %}
       {% if ronda_actual %}<a class="button button-secondary" href="{% url 'estimacion_ronda_cerrar' juego.pk ronda_actual %}">Cerrar ronda {{ ronda_actual }}</a>{% endif %}
@@ -39,7 +39,7 @@
 </section>
 
 <section class="card">
-  <div class="card-header"><div><h2>Estimaciones{% if ronda_actual %} · ronda {{ ronda_actual }}{% endif %}</h2><p>Optimista, más probable y pesimista por experto{% if archivados %} · mostrando archivadas y activas{% endif %}</p></div></div>
+  <div class="card-header"><div><h2>Estimaciones{% if ronda_actual %} · ronda {{ ronda_actual }}{% endif %}</h2></div></div>
   <div class="table-wrap">
     <table>
       <thead><tr><th>Fase</th><th>Rol</th><th>Experto</th><th class="num">O</th><th class="num">M</th><th class="num">P</th><th>Justificación</th><th></th></tr></thead>
@@ -72,7 +72,7 @@
 </section>
 
 <section class="card">
-  <div class="card-header"><div><h2>Costos de fabricación estimados</h2><p>Materiales, máquinas y equipo del juego; se copian a cada versión generada</p></div>
+  <div class="card-header"><div><h2>Costos de fabricación estimados</h2></div>
     <div class="heading-actions">
       <a class="button button-secondary" href="{% url 'estimacion_fab_directo' juego.pk %}">+ Costo directo</a>
       <a class="button button-secondary" href="{% url 'estimacion_fab_indirecto' juego.pk %}">+ Costo indirecto</a>
@@ -93,7 +93,7 @@
 </section>
 
 <section class="card">
-  <div class="card-header"><div><h2>Versiones de presupuesto</h2><p>Mano de obra estimada, costos directos e indirectos{% if archivados %} · mostrando archivadas y activas{% endif %}</p></div></div>
+  <div class="card-header"><div><h2>Versiones de presupuesto</h2></div></div>
   <div class="table-wrap">
     <table>
       <thead><tr><th>Versión</th><th>Estado</th><th>Fecha</th><th>Autor</th><th class="num">Líneas</th><th class="num">Total estimado</th><th></th></tr></thead>
@@ -152,7 +152,7 @@
 {% block modal %}
 {% if form_edicion_estimacion %}
 <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Editar estimación">
-  <div class="modal-header"><div><h2>Editar estimación experta</h2><p>{{ estimacion_objetivo.fase.nombre }} · {{ estimacion_objetivo.rol }} · {{ estimacion_objetivo.experto.nombre }}. Solo se editan rondas abiertas.</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-header"><div><h2>Editar estimación experta</h2><p>{{ estimacion_objetivo.fase.nombre }} · {{ estimacion_objetivo.rol }} · {{ estimacion_objetivo.experto.nombre }}.</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
   <form class="modal-form" method="post" action="{% url 'estimacion_editar' juego.pk estimacion_objetivo.pk %}" novalidate>
     {% csrf_token %}
     {% if form_edicion_estimacion.non_field_errors %}<div class="form-error">{{ form_edicion_estimacion.non_field_errors }}</div>{% endif %}
@@ -164,7 +164,7 @@
 </section></div>
 {% elif form_baja_estimacion %}
 <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Archivar estimación">
-  <div class="modal-header"><div><h2>Archivar estimación</h2><p>{{ estimacion_objetivo.fase.nombre }} · {{ estimacion_objetivo.rol }} · {{ estimacion_objetivo.experto.nombre }}. Solo se permite archivar si la ronda sigue abierta; el registro queda conservado.</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-header"><div><h2>Archivar estimación</h2><p>{{ estimacion_objetivo.fase.nombre }} · {{ estimacion_objetivo.rol }} · {{ estimacion_objetivo.experto.nombre }}. El registro se conservará.</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
   <form class="modal-form" method="post" action="{% url 'estimacion_eliminar' juego.pk estimacion_objetivo.pk %}">
     {% csrf_token %}
     {% if form_baja_estimacion.non_field_errors %}<div class="form-error">{{ form_baja_estimacion.non_field_errors }}</div>{% endif %}
@@ -174,7 +174,7 @@
 </section></div>
 {% elif form %}
 <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Registrar estimación">
-  <div class="modal-header"><div><h2>Registrar estimación</h2><p>Ronda única · el experto estima todas las fases para el rol seleccionado.</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-header"><div><h2>Registrar estimación</h2></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
   <form class="modal-form" method="post" action="{% url 'estimacion_registrar' juego.pk %}" novalidate>
     {% csrf_token %}
     {% if form.non_field_errors %}<div class="form-error">{{ form.non_field_errors }}</div>{% endif %}
@@ -209,7 +209,7 @@
 </section></div>
 {% elif resumen_ronda %}
 <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Cerrar ronda">
-  <div class="modal-header"><div><h2>Cerrar ronda {{ resumen_ronda.numero }}</h2><p>La ronda se consolida y queda cerrada con su aprobación registrada; no admite más estimaciones.</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-header"><div><h2>Cerrar ronda {{ resumen_ronda.numero }}</h2><p>Una ronda cerrada no admite cambios.</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
   <form class="modal-form" method="post" action="{% url 'estimacion_ronda_cerrar' juego.pk resumen_ronda.numero %}">
     {% csrf_token %}
     <div class="modal-fields"><div class="field"><label>Juego</label><input value="{{ juego.nombre }}" readonly /></div><div class="field"><label>Ronda</label><input value="{{ resumen_ronda.numero }}" readonly /></div></div>
@@ -218,7 +218,7 @@
 </section></div>
 {% elif form_version %}
 <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Generar versión">
-  <div class="modal-header"><div><h2>Generar versión de presupuesto</h2><p>Se generan las líneas desde la última ronda cerrada y aprobada, con los parámetros vigentes hoy. Si falta un salario vigente no se genera nada.</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-header"><div><h2>Generar versión de presupuesto</h2><p>Se usará la última ronda aprobada y los parámetros vigentes.</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
   <form class="modal-form" method="post" action="{% url 'estimacion_version_generar' juego.pk %}">
     {% csrf_token %}
     <div class="modal-fields"><div class="field"><label>Juego</label><input value="{{ juego.nombre }}" readonly /></div></div>
@@ -244,7 +244,7 @@
 </section></div>
 {% elif form_fab %}
 <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Costo de fabricación">
-  <div class="modal-header"><div><h2>{% if fab_tipo == 'DIRECTO' %}Costo directo{% else %}Costo indirecto{% endif %} de fabricación</h2><p>Materiales, máquinas y equipo estimados del juego; se copian a cada versión generada.</p></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-header"><div><h2>{% if fab_tipo == 'DIRECTO' %}Costo directo{% else %}Costo indirecto{% endif %} de fabricación</h2></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
   <form class="modal-form" method="post" action="{% if fab_tipo == 'DIRECTO' %}{% url 'estimacion_fab_directo' juego.pk %}{% else %}{% url 'estimacion_fab_indirecto' juego.pk %}{% endif %}" novalidate>
     {% csrf_token %}
     {% if form_fab.non_field_errors %}<div class="form-error">{{ form_fab.non_field_errors }}</div>{% endif %}

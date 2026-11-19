@@ -3,6 +3,7 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path("api/dashboard/", views.dashboard_api, name="costos_dashboard_api"),
     path("", views.ordenes, name="costos_ordenes"),
     path("indirectos/", views.indirectos_periodo,
          name="costos_indirectos_periodo"),
@@ -31,6 +32,8 @@ urlpatterns = [
     path("catalogos/cuentas/<str:elemento>/", views.configuracion_editar,
          name="costos_configuracion_editar"),
     path("<int:orden_id>/", views.orden_detalle, name="costos_orden"),
+    path("<int:orden_id>/finalizar/", views.orden_finalizar,
+         name="costos_orden_finalizar"),
     path("<int:orden_id>/editar/", views.orden_editar,
          name="costos_orden_editar"),
     path("<int:orden_id>/eliminar/", views.orden_eliminar,

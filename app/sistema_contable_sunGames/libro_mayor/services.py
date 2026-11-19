@@ -167,7 +167,7 @@ class BalanceComprobacion:
 
 
 class LibroMayorService:
-    ROLES_REGISTRO = frozenset({Rol.CONTADOR_GENERAL})
+    ROLES_REGISTRO = frozenset({Rol.CONTADOR_GENERAL, Rol.ADMINISTRADOR})
     ROLES_CONSULTA = frozenset({Rol.CONTADOR_GENERAL, Rol.ADMINISTRADOR})
 
     def __init__(self, repositorio, bitacora, configuracion=None,

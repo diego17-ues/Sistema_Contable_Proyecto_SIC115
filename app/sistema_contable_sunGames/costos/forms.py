@@ -136,14 +136,14 @@ class _RegistroForm(ClaveForm):
 class ManoObraForm(_RegistroForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, proceso_obligatorio=True, **kwargs)
+        self.fields.pop("contrapartida")
 
     horas = _decimal(10, 2, label="Horas")
     costo_hora = _decimal(
         12, 4, label="Costo por hora (USD)",
         help_text="Se propone según el proceso; puedes ajustarlo.",
     )
-    field_order = ["fecha", "proceso", "horas", "costo_hora",
-                   "contrapartida", "clave"]
+    field_order = ["fecha", "proceso", "horas", "costo_hora", "clave"]
 
 
 class CostoForm(_RegistroForm):

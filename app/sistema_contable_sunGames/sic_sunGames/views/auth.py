@@ -1,4 +1,7 @@
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout
+from django.conf import settings
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
@@ -48,6 +51,14 @@ def login_view(request):
 def logout_view(request):
     logout(request)
     return redirect("login")
+
+
+@login_required
+@require_POST
+def session_activity(request):
+    """Mantiene viva la sesión cuando hay actividad en la pantalla SPA."""
+    request.session.set_expiry(settings.SESSION_COOKIE_AGE)
+    return JsonResponse({"active": True})
 
 
 def _area_inicial(request):

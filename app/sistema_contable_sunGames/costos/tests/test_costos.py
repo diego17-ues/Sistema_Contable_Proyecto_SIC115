@@ -360,6 +360,29 @@ class BaseCostos(TestCase):
 
 
 class RegistroElementosTests(BaseCostos):
+    def test_administrador_puede_crear_orden_y_registrar_costos(self):
+        admin = Usuario.objects.create(
+            username="admin-costos", nombre_completo="Administrador",
+            rol=Rol.ADMINISTRADOR, activo=True,
+        )
+        orden = self.ordenes.crear_orden(
+            admin, nombre_juego="Orden Administrador", fecha_inicio=FECHA,
+        )
+        configuracion = ConfiguracionCuentaCosto.objects.get(
+            elemento=Elemento.DIRECTO
+        )
+
+        registro = self.servicio.registrar_costo(
+            admin, elemento=Elemento.DIRECTO, orden_id=orden.pk,
+            fecha=FECHA, proceso_id=None, descripcion="Servicio de arte",
+            importe="75.00",
+            contrapartida_id=configuracion.contrapartida_defecto_id,
+            clave=clave(),
+        )
+
+        self.assertEqual(registro.orden_id, orden.pk)
+        self.assertEqual(registro.importe, D("75.00"))
+
     def test_mano_obra_40_horas_por_20_es_800(self):
         registro = self.mano_obra()
         self.assertEqual(registro.importe, D("800.00"))
@@ -670,18 +693,72 @@ class VistasCostosTests(BaseCostos):
         self.actor.save()
         self.client.force_login(self.actor)
 
-    def test_solo_el_contador_de_costos_accede(self):
-        for rol, nombre in ((Rol.CONTADOR_GENERAL, "general"),
-                            (Rol.ADMINISTRADOR, "admin")):
-            otro = Usuario.objects.create(
-                username=nombre, nombre_completo=nombre, rol=rol,
-                activo=True,
-            )
-            with self.assertRaises(RolNoAutorizadoError):
-                self.ordenes.listar(otro)
-            self.client.force_login(otro)
-            respuesta = self.client.get(reverse("costos_ordenes"))
-            self.assertEqual(respuesta.status_code, 403)
+    def test_admin_accede_a_costos_y_contador_general_no(self):
+        general = Usuario.objects.create(
+            username="general", nombre_completo="General",
+            rol=Rol.CONTADOR_GENERAL, activo=True,
+        )
+        with self.assertRaises(RolNoAutorizadoError):
+            self.ordenes.listar(general)
+        self.client.force_login(general)
+        self.assertEqual(
+            self.client.get(reverse("costos_ordenes")).status_code, 403
+        )
+
+        admin = Usuario.objects.create(
+            username="admin", nombre_completo="Administrador",
+            rol=Rol.ADMINISTRADOR, activo=True,
+        )
+        self.assertEqual(len(self.ordenes.listar(admin)), 1)
+        self.client.force_login(admin)
+        for nombre in (
+            "costos_ordenes", "costos_catalogos",
+            "costos_indirectos_periodo", "costos_rendimiento",
+            "costos_dashboard_api",
+        ):
+            with self.subTest(pantalla=nombre):
+                self.assertEqual(
+                    self.client.get(reverse(nombre)).status_code, 200
+                )
+
+    def test_dashboard_resume_ordenes_pendientes_y_finalizadas(self):
+        self.orden.estado = OrdenTrabajo.ESTADO_CERRADA
+        self.orden.save(update_fields=["estado"])
+
+        respuesta = self.client.get(reverse("costos_dashboard_api"))
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.json()["ordenesPendientes"], 0)
+        self.assertEqual(respuesta.json()["ordenesFinalizadas"], 1)
+        self.assertEqual(
+            respuesta.json()["ultimaOrden"]["juego"], "Neo Drift"
+        )
+        self.assertEqual(
+            respuesta.json()["ultimaOrdenRegistrada"]["estado"], "Cerrada"
+        )
+        self.assertEqual(
+            respuesta.json()["ultimaOrdenRegistrada"]["id"], self.orden.pk
+        )
+        self.assertEqual(
+            respuesta.json()["ordenesFinalizadasRecientes"][0]["id"],
+            self.orden.pk,
+        )
+
+    def test_contador_general_solo_lee_el_resumen_de_costos(self):
+        general = Usuario.objects.create(
+            username="general", nombre_completo="General",
+            rol=Rol.CONTADOR_GENERAL, activo=True,
+        )
+        self.client.force_login(general)
+
+        respuesta = self.client.get(reverse("costos_dashboard_api"))
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.json()["ordenesPendientes"], 1)
+        self.assertEqual(respuesta.json()["ordenesFinalizadas"], 0)
+        self.assertEqual(
+            respuesta.json()["ultimaOrdenRegistrada"]["estado"], "Abierta"
+        )
 
     def test_doble_envio_del_formulario_no_duplica(self):
         url = reverse("costos_registro_nuevo",

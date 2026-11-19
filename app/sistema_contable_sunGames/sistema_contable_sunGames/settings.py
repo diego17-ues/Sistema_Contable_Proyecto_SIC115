@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
+from django.core.exceptions import ImproperlyConfigured
 from pathlib import Path
 from dotenv import load_dotenv
 import os
@@ -25,25 +26,62 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-rcwx3$l*xlg2z(va$*_8n(&9fvs^q(@^!l4zi!59486#&+5vxb'
+SECRET_KEY = os.getenv("SECRET_KEY", "")
+if not SECRET_KEY:
+    raise ImproperlyConfigured("Configura SECRET_KEY en el archivo .env.")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = os.getenv("DEBUG", "False").lower() in {"1", "true", "yes", "on"}
 
-ALLOWED_HOSTS = ['*']
-CSRF_TRUSTED_ORIGINS= ['https://murmuring-masculine-untimely.ngrok-free.dev']
+dominio_railway = os.getenv("RAILWAY_PUBLIC_DOMAIN", "").strip()
+hosts_predeterminados = "127.0.0.1,localhost,testserver"
+if dominio_railway:
+    hosts_predeterminados = f"{hosts_predeterminados},{dominio_railway}"
+
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv(
+        "ALLOWED_HOSTS", hosts_predeterminados
+    ).split(",")
+    if host.strip()
+]
+if dominio_railway and dominio_railway not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(dominio_railway)
+
+origenes_csrf_predeterminados = (
+    f"https://{dominio_railway}" if dominio_railway else ""
+)
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CSRF_TRUSTED_ORIGINS", origenes_csrf_predeterminados
+    ).split(",")
+    if origin.strip()
+]
+if (
+    origenes_csrf_predeterminados
+    and origenes_csrf_predeterminados not in CSRF_TRUSTED_ORIGINS
+):
+    CSRF_TRUSTED_ORIGINS.append(origenes_csrf_predeterminados)
+
+if dominio_railway:
+    # Railway termina HTTPS en su proxy y comunica el esquema original.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    # Sobrescribe runserver para invalidar sesiones antes de iniciar.
+    'sic_sunGames',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'sic_sunGames',
     'usuarios',
     'bitacora',
     'catalogo',
@@ -58,8 +96,14 @@ AUTH_USER_MODEL = 'usuarios.Usuario'
 
 LOGIN_URL = 'login'
 
+# La sesión expira tras diez minutos sin solicitudes del usuario. El cliente
+# también envía un pulso mientras detecta actividad dentro de la aplicación.
+SESSION_COOKIE_AGE = 10 * 60
+SESSION_SAVE_EVERY_REQUEST = True
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -67,7 +111,6 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
 ]
 
 ROOT_URLCONF = 'sistema_contable_sunGames.urls'
@@ -97,11 +140,11 @@ WSGI_APPLICATION = 'sistema_contable_sunGames.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME'),
-        'USER': os.getenv('DB_USER'),
-        'PASSWORD': os.getenv('DB_PASSWORD'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '5432'),
+        'NAME': os.getenv('DB_NAME') or os.getenv('PGDATABASE'),
+        'USER': os.getenv('DB_USER') or os.getenv('PGUSER'),
+        'PASSWORD': os.getenv('DB_PASSWORD') or os.getenv('PGPASSWORD'),
+        'HOST': os.getenv('DB_HOST') or os.getenv('PGHOST', 'localhost'),
+        'PORT': os.getenv('DB_PORT') or os.getenv('PGPORT', '5432'),
     }
 }
 
@@ -142,6 +185,9 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR /'staticfiles'
+STATICFILES_STORAGE = (
+    'whitenoise.storage.CompressedManifestStaticFilesStorage'
+)
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -160,6 +206,22 @@ LIBRO_MAYOR = {
 # Ventas (CU-08). Token compartido con el simulador de Steam (.env) y
 # cuentas del asiento de cada venta, configurables.
 STEAM_WEBHOOK_TOKEN = os.getenv("STEAM_WEBHOOK_TOKEN", "")
+SIMULATOR_CRON_TOKEN = os.getenv("SIMULATOR_CRON_TOKEN", "")
+SIMULATOR_ACCOUNTING_URL = os.getenv(
+    "SIMULATOR_ACCOUNTING_URL",
+    f"http://127.0.0.1:{os.getenv('PORT', '8000')}",
+)
+SIMULATOR_INTERVAL_SECONDS = int(
+    os.getenv("SIMULATOR_INTERVAL_SECONDS", "300")
+)
+SIMULATOR_REAL_SALE_WINDOW_SECONDS = int(
+    os.getenv("SIMULATOR_REAL_SALE_WINDOW_SECONDS", "300")
+)
+SIMULATOR_API_TIMEOUT_SECONDS = int(
+    os.getenv("SIMULATOR_API_TIMEOUT_SECONDS", "10")
+)
+SIMULATOR_MAX_RETRIES = int(os.getenv("SIMULATOR_MAX_RETRIES", "2"))
+SIMULATOR_WEB_BIND = os.getenv("SIMULATOR_WEB_BIND", "127.0.0.1:8000")
 VENTAS = {
     "MONEDA": "USD",
     "CUENTA_POR_COBRAR": "1104",
@@ -167,4 +229,19 @@ VENTAS = {
     "CUENTA_INGRESO_JUEGO": "5101",
     "CUENTA_INGRESO_DLC": "5102",
     "MINUTOS_CONECTADO": 5,
+}
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "simulator_console": {"class": "logging.StreamHandler"},
+    },
+    "loggers": {
+        "simulador_steam": {
+            "handlers": ["simulator_console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
 }

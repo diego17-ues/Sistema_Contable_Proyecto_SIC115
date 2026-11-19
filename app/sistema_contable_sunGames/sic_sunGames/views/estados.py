@@ -211,6 +211,40 @@ def hoja_trabajo_api(request):
 
 
 @login_required
+@require_GET
+def cierre_activo_api(request):
+    """Consulta de solo lectura del cierre activo para todos los roles."""
+    try:
+        consulta = crear_estados_financieros_service().cierre_activo(
+            request.user
+        )
+    except SIN_PERMISO as error:
+        return JsonResponse({"error": str(error)}, status=403)
+    except EstadosFinancierosError as error:
+        return JsonResponse({"error": str(error)}, status=422)
+
+    if consulta is None:
+        return JsonResponse({"cerrado": False, "estado": "ABIERTO"})
+
+    periodo = consulta.periodo
+    return JsonResponse({
+        "cerrado": True,
+        "estado": "CERRADO_PROVISIONAL",
+        "periodo": {
+            "id": periodo.pk,
+            "nombre": periodo.nombre,
+            "desde": periodo.fecha_inicio.isoformat(),
+            "hasta": periodo.fecha_fin.isoformat(),
+        },
+        "worksheet": consulta.hoja_trabajo,
+        "estados": {
+            "resultados": consulta.estados[TipoEstado.ESTADO_RESULTADOS],
+            "balance": consulta.estados[TipoEstado.BALANCE_GENERAL],
+        },
+    })
+
+
+@login_required
 @require_POST
 def ajuste_api(request):
     """Ajuste desde la Hoja de Trabajo: se registra en el Libro Mayor."""

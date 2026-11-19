@@ -191,7 +191,8 @@ class AccesoServiceTests(SimpleTestCase):
 
     def test_administrador_accede_a_todos_los_modulos(self):
         for modulo in ("users", "audit", "dashboard", "ledger", "accounts",
-                       "reports", "operations"):
+                       "reports", "operations", "estimacion", "costos",
+                       "rendimiento"):
             self.servicio.verificar_acceso(self.admin, modulo)
 
     def test_contador_general_accede_a_sus_modulos(self):
@@ -200,7 +201,9 @@ class AccesoServiceTests(SimpleTestCase):
             self.servicio.verificar_acceso(self.contador, modulo)
 
     def test_contador_general_no_accede_a_modulos_de_administrador(self):
-        for modulo in ("users", "audit", "estimacion"):
+        for modulo in (
+            "users", "audit", "estimacion", "costos", "rendimiento",
+        ):
             with self.assertRaises(RolNoAutorizadoError):
                 self.servicio.verificar_acceso(self.contador, modulo)
 
@@ -208,19 +211,21 @@ class AccesoServiceTests(SimpleTestCase):
         costos = Usuario(username="costos", rol=Rol.CONTADOR_COSTOS)
         self.servicio.verificar_acceso(self.admin, "estimacion")
         self.servicio.verificar_acceso(costos, "estimacion")
-        self.assertEqual(self.servicio.area_inicial(costos), "estimacion")
+        self.assertEqual(self.servicio.area_inicial(costos), "dashboard")
+        self.servicio.verificar_acceso(costos, "dashboard")
         with self.assertRaises(RolNoAutorizadoError):
             self.servicio.verificar_acceso(costos, "ledger")
         with self.assertRaises(RolNoAutorizadoError):
             self.servicio.verificar_acceso(costos, "users")
 
-    def test_rendimiento_solo_es_visible_para_contador_de_costos(self):
+    def test_rendimiento_es_visible_para_costos_y_administrador(self):
         costos = Usuario(username="costos", rol=Rol.CONTADOR_COSTOS)
         self.servicio.verificar_acceso(costos, "rendimiento")
         self.assertIn("rendimiento", self.servicio.modulos(costos))
-        for usuario in (self.contador, self.admin):
-            with self.assertRaises(RolNoAutorizadoError):
-                self.servicio.verificar_acceso(usuario, "rendimiento")
+        self.servicio.verificar_acceso(self.admin, "rendimiento")
+        self.assertIn("rendimiento", self.servicio.modulos(self.admin))
+        with self.assertRaises(RolNoAutorizadoError):
+            self.servicio.verificar_acceso(self.contador, "rendimiento")
 
     def test_usuario_inactivo_no_accede(self):
         self.contador.activo = False

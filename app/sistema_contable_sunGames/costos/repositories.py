@@ -1,6 +1,6 @@
 """Repositorio del subsistema de costos: encapsula el acceso al ORM."""
 
-from django.db.models import Exists, Min, OuterRef, Q, Sum
+from django.db.models import Exists, Max, Min, OuterRef, Q, Sum
 
 from catalogo.models import Cuenta
 from estimacion.models import EstadoVersion, VersionPresupuesto
@@ -13,17 +13,29 @@ from libro_mayor.models import (
 from .models import (
     AsientoCosto,
     ConfiguracionCuentaCosto,
+    ParametrosCostosManoObra,
     CuentaIndirectaExcluida,
     FuenteIndirecta,
     Juego,
     OrdenTrabajo,
     Proceso,
+    ReclasificacionCosto,
     RegistroCosto,
 )
 
 
 class CostosRepository:
     # ---- Juegos y órdenes ----
+    def titulos_ordenes_finalizadas(self):
+        return list(
+            OrdenTrabajo.objects.filter(
+                estado=OrdenTrabajo.ESTADO_CERRADA,
+                eliminado_en__isnull=True,
+            ).order_by("juego__nombre")
+            .values_list("juego__nombre", flat=True)
+            .distinct()
+        )
+
     def juego_por_nombre(self, nombre):
         return Juego.objects.filter(nombre__iexact=nombre).first()
 
@@ -54,6 +66,30 @@ class CostosRepository:
                     "estimacion_ref__costos_directos",
                     "estimacion_ref__costos_indirectos",
                 ))
+
+    def resumen_dashboard(self):
+        """Conteos, última orden registrada y finalizadas recientes."""
+        activas = OrdenTrabajo.objects.filter(eliminado_en__isnull=True)
+        ultima_registrada = (
+            self.ordenes()
+            .select_related("estimacion_ref", "estimacion_ref__juego")
+            .first()
+        )
+        finalizadas_recientes = list(
+            self.ordenes(estado=OrdenTrabajo.ESTADO_CERRADA)
+            .select_related("estimacion_ref", "estimacion_ref__juego")
+            .order_by("-fecha_creacion")[:5]
+        )
+        return {
+            "pendientes": activas.filter(
+                estado=OrdenTrabajo.ESTADO_ABIERTA
+            ).count(),
+            "finalizadas": activas.filter(
+                estado=OrdenTrabajo.ESTADO_CERRADA
+            ).count(),
+            "ultima_registrada": ultima_registrada,
+            "finalizadas_recientes": finalizadas_recientes,
+        }
 
     def obtener_orden(self, orden_id, *, incluir_eliminada=False):
         qs = (OrdenTrabajo.objects
@@ -91,6 +127,97 @@ class CostosRepository:
     def guardar_orden(self, orden):
         orden.save()
         return orden
+
+    def costos_pendientes_reclasificar(self, *, hasta, orden=None,
+                                       periodo=None):
+        registros = RegistroCosto.objects.filter(
+            estado=RegistroCosto.ESTADO_VIGENTE,
+            fecha__lte=hasta,
+            cuenta_costo__codigo__in=("4101", "4102"),
+        )
+        if periodo is not None:
+            registros = registros.filter(fecha__gte=periodo.fecha_inicio)
+        if orden is not None:
+            registros = registros.filter(orden=orden)
+        filas = list(registros.values(
+            "orden_id", "orden__estado", "cuenta_costo_id",
+            "cuenta_costo__codigo",
+        ).annotate(importe=Sum("importe")).order_by(
+            "orden_id", "cuenta_costo__codigo"
+        ))
+        pendientes = []
+        for fila in filas:
+            reclasificaciones = ReclasificacionCosto.objects.filter(
+                orden_id=fila["orden_id"],
+                cuenta_origen_id=fila["cuenta_costo_id"],
+                tipo__in=(
+                    ReclasificacionCosto.TIPO_CIERRE,
+                    ReclasificacionCosto.TIPO_FINALIZACION,
+                ),
+                revierte__isnull=True,
+                reversion__isnull=True,
+            )
+            if periodo is not None:
+                reclasificaciones = reclasificaciones.filter(
+                    periodo=periodo
+                )
+            ya_reclasificado = (
+                reclasificaciones.aggregate(total=Sum("importe"))["total"]
+                or 0
+            )
+            fila["importe"] -= ya_reclasificado
+            if fila["importe"] > 0:
+                pendientes.append(fila)
+        return pendientes
+
+    def periodo_abierto_mas_reciente(self):
+        return PeriodoContable.objects.filter(
+            estado=EstadoPeriodo.ABIERTO
+        ).order_by("-fecha_fin", "-pk").first()
+
+    def traslados_costo(self, *, periodo=None, orden=None, tipo=None,
+                        origen=None, cuenta_destino_codigo=None,
+                        solo_directos=False, solo_activos=False):
+        traslados = ReclasificacionCosto.objects.select_related(
+            "periodo", "orden", "cuenta_origen", "cuenta_destino",
+            "origen", "revierte",
+        )
+        if periodo is not None:
+            traslados = traslados.filter(periodo=periodo)
+        if orden is not None:
+            traslados = traslados.filter(orden=orden)
+        if tipo is not None:
+            traslados = traslados.filter(tipo=tipo)
+        if origen is not None:
+            traslados = traslados.filter(origen=origen)
+        if cuenta_destino_codigo is not None:
+            traslados = traslados.filter(
+                cuenta_destino__codigo=cuenta_destino_codigo
+            )
+        if solo_directos:
+            traslados = traslados.filter(origen__isnull=True)
+        if solo_activos:
+            traslados = traslados.filter(
+                revierte__isnull=True, reversion__isnull=True
+            )
+        return traslados.order_by("pk")
+
+    def tiene_finalizacion_derivada_activa(self, traslado):
+        return ReclasificacionCosto.objects.filter(
+            origen=traslado,
+            tipo=ReclasificacionCosto.TIPO_FINALIZACION,
+            revierte__isnull=True,
+            reversion__isnull=True,
+        ).exists()
+
+    def crear_reclasificacion(self, **datos):
+        return ReclasificacionCosto.objects.create(**datos)
+
+    def siguiente_ciclo_reclasificacion(self, periodo):
+        ciclo = ReclasificacionCosto.objects.filter(
+            periodo=periodo, tipo=ReclasificacionCosto.TIPO_CIERRE
+        ).aggregate(ciclo=Max("ciclo"))["ciclo"]
+        return (ciclo or 0) + 1
 
     def guardar_juego(self, juego):
         juego.save()
@@ -159,6 +286,9 @@ class CostosRepository:
         )
         config.contrapartidas.set(contrapartidas)
         return config
+
+    def parametros_mano_obra(self):
+        return ParametrosCostosManoObra.objects.order_by("pk").first()
 
     def cuentas_posteables(self):
         return (Cuenta.objects.filter(activa=True)

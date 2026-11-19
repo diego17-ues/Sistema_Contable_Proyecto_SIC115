@@ -1,17 +1,21 @@
 import json
 import secrets
-from datetime import date, datetime, timezone
+from contextlib import nullcontext
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from django.contrib.staticfiles import finders
 from django.test import SimpleTestCase, TestCase, override_settings
+from django.utils import timezone as django_timezone
 from django.urls import reverse
 
 from bitacora.eventos import Accion, Resultado
 from bitacora.models import RegistroBitacora
 from catalogo.tests.fakes import BitacoraEnMemoria
+from costos.models import Juego, OrdenTrabajo
 from estados_financieros.models import EstadoFinancieroEmitido
 from libro_mayor.models import (
     EstadoPeriodo,
@@ -30,6 +34,7 @@ from ventas.exceptions import (
     VentaDuplicadaError,
 )
 from ventas.models import EstadoVenta, Venta
+from ventas.repositories import VentaRepository
 from ventas.services import VentasService
 
 TOKEN = secrets.token_urlsafe(16)
@@ -174,6 +179,11 @@ class VentasServiceTests(SimpleTestCase):
         self.assertEqual(primero.total, Decimal("39.98"))
         self.assertEqual(primero.cuentas_por_cobrar, Decimal("27.98"))
         self.assertEqual(primero.comision, Decimal("12.00"))
+        afectadas = {fila["codigo"]: fila
+                     for fila in primero.cuentas_afectadas}
+        self.assertEqual(afectadas["1104"]["debe"], Decimal("27.98"))
+        self.assertEqual(afectadas["4302"]["debe"], Decimal("12.00"))
+        self.assertEqual(afectadas["5101"]["haber"], Decimal("39.98"))
         self.assertEqual(segundo.conciliadas, 1)
         self.assertEqual(len(mayor.movimientos), 3)
         self.assertEqual(mayor.transacciones, 1)
@@ -196,9 +206,25 @@ class VentasServiceTests(SimpleTestCase):
         self.assertEqual(mayor.transacciones, 1)
         self.assertEqual(venta.estado, EstadoVenta.REGISTRADA)
 
-    def test_solo_el_contador_general_contabiliza(self):
+    def test_administrador_tambien_puede_contabilizar(self):
+        self.recibir()
+        mayor = MayorEnMemoria()
+        servicio = VentasService(self.repo, mayor, self.bitacora,
+                                 reloj=lambda: AHORA)
+
+        venta = servicio.contabilizar(
+            crear_usuario("admin", Rol.ADMINISTRADOR), "STM-0001"
+        )
+
+        self.assertEqual(venta.estado, EstadoVenta.REGISTRADA)
+        self.assertEqual(mayor.transacciones, 1)
+        self.assertEqual(len(mayor.movimientos), 3)
+
+    def test_contador_costos_no_contabiliza_ventas(self):
         with self.assertRaises(RolNoAutorizadoError):
-            self.servicio.contabilizar(crear_usuario(), "STM-0001")
+            self.servicio.contabilizar(
+                crear_usuario("costos", Rol.CONTADOR_COSTOS), "STM-0001"
+            )
 
     def test_el_simulador_genera_eventos_validos(self):
         from ventas.forms import EventoSteamForm
@@ -206,6 +232,95 @@ class VentasServiceTests(SimpleTestCase):
         form = EventoSteamForm(generar_evento())
 
         self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.datos_servicio()["origen"], "SIMULADA")
+
+    def test_evento_sin_origen_conserva_compatibilidad_como_real(self):
+        from ventas.forms import EventoSteamForm
+
+        form = EventoSteamForm(evento())
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.datos_servicio()["origen"], "REAL")
+
+    def test_simulador_usa_titulos_recibidos_de_ordenes_finalizadas(self):
+        datos = generar_evento(titulos_finalizados=["Juego finalizado"])
+
+        self.assertEqual(datos["titulo"], "Juego finalizado")
+        self.assertEqual(datos["tipo"], "JUEGO")
+        self.assertEqual(datos["origen"], "SIMULADA")
+
+    def test_ciclo_omite_simulacion_si_hubo_venta_real_reciente(self):
+        from simulador_steam import ciclos
+
+        with override_settings(
+            STEAM_WEBHOOK_TOKEN="token-prueba",
+            SIMULATOR_ACCOUNTING_URL="http://127.0.0.1:8000",
+            SIMULATOR_API_TIMEOUT_SECONDS=1,
+            SIMULATOR_MAX_RETRIES=0,
+            SIMULATOR_REAL_SALE_WINDOW_SECONDS=300,
+        ):
+            with patch(
+                "simulador_steam.ciclos._bloqueo_ciclo",
+                return_value=nullcontext(True),
+            ), patch(
+                "simulador_steam.ciclos._post_reintentable",
+                return_value=(True, 200, ""),
+            ), patch("simulador_steam.ciclos.VentaRepository") as ventas, patch(
+                "simulador_steam.ciclos.generar_evento",
+            ) as generar:
+                ventas.return_value.hubo_venta_real.return_value = True
+
+                resultado = ciclos.ejecutar_ciclo()
+
+        self.assertEqual(resultado["estado"], "omitido")
+        self.assertEqual(resultado["enviadas"], 0)
+        ventas.return_value.hubo_venta_real.assert_called_once()
+        generar.assert_not_called()
+
+    def test_ciclo_genera_venta_sin_consultar_ordenes_de_costos(self):
+        from simulador_steam import ciclos
+
+        with override_settings(
+            STEAM_WEBHOOK_TOKEN="token-prueba",
+            SIMULATOR_ACCOUNTING_URL="http://127.0.0.1:8000",
+            SIMULATOR_API_TIMEOUT_SECONDS=1,
+            SIMULATOR_MAX_RETRIES=0,
+            SIMULATOR_REAL_SALE_WINDOW_SECONDS=300,
+        ), patch(
+            "simulador_steam.ciclos._bloqueo_ciclo",
+            return_value=nullcontext(True),
+        ), patch(
+            "simulador_steam.ciclos._post_reintentable",
+            return_value=(True, 201, ""),
+        ), patch("simulador_steam.ciclos.VentaRepository") as ventas, patch(
+            "simulador_steam.ciclos.generar_evento",
+            wraps=generar_evento,
+        ) as generar:
+            ventas.return_value.hubo_venta_real.return_value = False
+
+            resultado = ciclos.ejecutar_ciclo()
+
+        self.assertEqual(resultado["estado"], "enviada")
+        self.assertEqual(resultado["enviadas"], 1)
+        generar.assert_called_once_with()
+
+    def test_reintentos_conservan_el_identificador_externo(self):
+        from simulador_steam.ciclos import _post_reintentable
+
+        evento = {"id": "SIM-IDENTIFICADOR-UNICO"}
+        with patch(
+            "simulador_steam.ciclos.enviar",
+            side_effect=[(503, {}), (201, {})],
+        ) as enviar, patch("simulador_steam.ciclos.time.sleep"):
+            correcto, _, _ = _post_reintentable(
+                "https://contabilidad/api/steam/ventas/", "token", evento,
+                timeout=2, max_reintentos=1,
+            )
+
+        self.assertTrue(correcto)
+        self.assertEqual(enviar.call_count, 2)
+        self.assertIs(enviar.call_args_list[0].args[2], evento)
+        self.assertIs(enviar.call_args_list[1].args[2], evento)
 
 
 @override_settings(STEAM_WEBHOOK_TOKEN=TOKEN)
@@ -251,6 +366,76 @@ class VentasIntegracionTests(TestCase):
         self.assertEqual(RegistroBitacora.objects.filter(
             accion=Accion.RECEPCION_VENTA, resultado=Resultado.RECHAZADO
         ).count(), 3)
+
+    def test_webhook_guarda_el_origen_simulado(self):
+        respuesta = self.enviar(evento(origen="SIMULADA"))
+
+        self.assertEqual(respuesta.status_code, 201)
+        self.assertEqual(
+            Venta.objects.get(identificador="STM-0001").origen, "SIMULADA"
+        )
+
+    def test_ventana_de_compra_real_ignora_ventas_simuladas(self):
+        ahora = django_timezone.now()
+        desde = ahora - timedelta(minutes=5)
+        repositorio = VentaRepository()
+
+        self.enviar(evento(origen="SIMULADA"))
+        self.assertFalse(repositorio.hubo_venta_real(
+            desde, django_timezone.now()
+        ))
+
+        self.enviar(evento(id="STM-REAL", origen="REAL"))
+        self.assertTrue(repositorio.hubo_venta_real(
+            desde, django_timezone.now()
+        ))
+
+    @override_settings(
+        STEAM_WEBHOOK_TOKEN=TOKEN,
+        SIMULATOR_ACCOUNTING_URL="http://testserver",
+        SIMULATOR_API_TIMEOUT_SECONDS=2,
+        SIMULATOR_MAX_RETRIES=0,
+        SIMULATOR_REAL_SALE_WINDOW_SECONDS=300,
+    )
+    def test_ciclo_publica_venta_aunque_no_haya_ordenes_de_costos(self):
+        def enviar_a_api(url, token, datos=None, timeout=10):
+            ruta = "steam_latido" if url.endswith("/latido/") else "steam_ventas"
+            respuesta = self.client.post(
+                reverse(ruta), json.dumps(datos or {}),
+                content_type="application/json",
+                HTTP_AUTHORIZATION=f"Bearer {token}",
+            )
+            return respuesta.status_code, respuesta.json()
+
+        from simulador_steam import ciclos
+
+        with patch(
+            "simulador_steam.ciclos._bloqueo_ciclo",
+            return_value=nullcontext(True),
+        ), patch("simulador_steam.ciclos.enviar", side_effect=enviar_a_api):
+            resultado = ciclos.ejecutar_ciclo()
+
+        venta = Venta.objects.get(origen="SIMULADA")
+        self.assertEqual(resultado["estado"], "enviada")
+        self.assertEqual(resultado["enviadas"], 1)
+        self.assertTrue(venta.titulo)
+        self.assertTrue(venta.identificador.startswith("SIM-"))
+
+    @override_settings(SIMULATOR_CRON_TOKEN=TOKEN)
+    @patch("sic_sunGames.views.ventas.ejecutar_ciclo")
+    def test_cron_externo_exige_token_y_devuelve_el_ciclo(self, ejecutar):
+        ejecutar.return_value = {"estado": "omitido", "enviadas": 0}
+
+        no_autorizado = self.client.post(reverse("steam_simular_ciclo"))
+        autorizado = self.client.post(
+            reverse("steam_simular_ciclo"),
+            HTTP_AUTHORIZATION=f"Bearer {TOKEN}",
+        )
+
+        self.assertEqual(no_autorizado.status_code, 401)
+        self.assertEqual(autorizado.status_code, 200)
+        self.assertEqual(autorizado.json()["estado"], "omitido")
+        ejecutar.assert_called_once_with()
 
     def test_error_autenticado_actualiza_estado_hasta_latido(self):
         self.assertEqual(
@@ -300,13 +485,12 @@ class VentasIntegracionTests(TestCase):
         self.assertTrue(RegistroBitacora.objects.filter(
             accion=Accion.CONTABILIZACION_VENTA).exists())
 
-    def test_dlc_va_a_5102_y_administrador_no_contabiliza(self):
+    def test_administrador_tambien_contabiliza_ventas_dlc(self):
         self.enviar(evento(tipo="DLC"))
         self.client.force_login(self.admin)
-        self.assertEqual(self.contabilizar().status_code, 403)
+        respuesta = self.contabilizar()
 
-        self.client.force_login(self.contador)
-        self.contabilizar()
+        self.assertEqual(respuesta.status_code, 200)
         self.assertTrue(Movimiento.objects.filter(cuenta__codigo="5102")
                         .exists())
 
@@ -322,9 +506,20 @@ class VentasIntegracionTests(TestCase):
         self.assertEqual(vista_previa.status_code, 200)
         self.assertEqual(vista_previa.json()["cuentasPorCobrar"], "27.98")
         self.assertEqual(vista_previa.json()["comision"], "12.00")
+        afectadas = {
+            fila["codigo"]: fila
+            for fila in vista_previa.json()["cuentasAfectadas"]
+        }
+        self.assertEqual(afectadas["1104"]["debe"], "27.98")
+        self.assertEqual(afectadas["4302"]["debe"], "12.00")
+        self.assertEqual(afectadas["5101"]["haber"], "39.98")
         self.assertEqual(primera.status_code, 200, primera.content)
         self.assertEqual(primera.json()["conciliadas"], 1)
         self.assertEqual(primera.json()["total"], "39.98")
+        self.assertEqual(
+            primera.json()["cuentasAfectadas"],
+            vista_previa.json()["cuentasAfectadas"],
+        )
         self.assertEqual(segunda.status_code, 200, segunda.content)
         self.assertEqual(segunda.json()["conciliadas"], 1)
         self.assertEqual(Movimiento.objects.count(), 3)

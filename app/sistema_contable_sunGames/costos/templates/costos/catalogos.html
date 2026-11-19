@@ -6,10 +6,10 @@
 {% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'costos/costos.css' %}?v=20261119-2">{% endblock %}
 
 {% block page_content %}
-<div class="page-heading"><div><h1>Costos · Catálogos</h1><p>Procesos, cuentas de costo y fuentes indirectas dedicadas al desarrollo.</p></div><div class="heading-actions"><a class="button button-secondary" href="{% url 'costos_indirectos_periodo' %}">Indirectos del período</a><a class="button button-secondary" href="{% url 'costos_ordenes' %}">← Órdenes</a></div></div>
+<div class="page-heading"><div><h1>Costos · Catálogos</h1></div><div class="heading-actions"><a class="button button-secondary" href="{% url 'costos_indirectos_periodo' %}">Indirectos del período</a><a class="button button-secondary" href="{% url 'costos_ordenes' %}">← Órdenes</a></div></div>
 
 <section class="card">
-  <div class="card-header"><div><h2>Cuentas por elemento del costo</h2><p>Cuenta de costo (debe), contrapartidas permitidas (haber) y la contrapartida por defecto. Sin configuración el registro del elemento queda bloqueado.</p></div></div>
+  <div class="card-header"><div><h2>Cuentas por elemento del costo</h2></div></div>
   <div class="table-wrap">
     <table>
       <thead><tr><th>Elemento</th><th>Cuenta de costo</th><th>Contrapartidas</th><th>Por defecto</th><th></th></tr></thead>
@@ -33,7 +33,7 @@
 </section>
 
 <section class="card section-gap">
-  <div class="card-header"><div><h2>Fuentes de costos indirectos</h2><p>El sistema toma el saldo neto de la cuenta en el período y lo distribuye según las horas registradas. Configura solo cuentas exclusivas de desarrollo; las cuentas compartidas se excluyen.</p></div><a class="button button-secondary" href="{% url 'costos_fuente_indirecta_nueva' %}">＋ Fuente indirecta</a></div>
+  <div class="card-header"><div><h2>Fuentes de costos indirectos</h2></div><a class="button button-secondary" href="{% url 'costos_fuente_indirecta_nueva' %}">＋ Fuente indirecta</a></div>
   <div class="table-wrap">
     <table class="indirectos-tabla">
       <thead><tr><th>Fuente</th><th>Tipo</th><th>Cuenta de origen</th><th>Proceso</th><th>Estado</th></tr></thead>
@@ -55,7 +55,7 @@
 </section>
 
 <section class="card section-gap">
-  <div class="card-header"><div><h2>Cuentas excluidas</h2><p>Estas cuentas no se aceptan como origen de una distribución automática.</p></div><a class="button button-secondary" href="{% url 'costos_cuenta_indirecta_excluir' %}">＋ Excluir cuenta</a></div>
+  <div class="card-header"><div><h2>Cuentas excluidas</h2></div><a class="button button-secondary" href="{% url 'costos_cuenta_indirecta_excluir' %}">＋ Excluir cuenta</a></div>
   <div class="table-wrap">
     <table class="indirectos-tabla">
       <thead><tr><th>Cuenta</th><th>Motivo</th><th>Registrada por</th><th></th></tr></thead>
@@ -82,7 +82,7 @@
 </section>
 
 <section class="card">
-  <div class="card-header"><div><h2>Procesos de desarrollo</h2><p>El costo por hora se propone al registrar mano de obra directa y puede ajustarse en cada registro.</p></div><a class="text-button" href="{% url 'costos_proceso_nuevo' %}">＋ Proceso</a></div>
+  <div class="card-header"><div><h2>Procesos de desarrollo</h2></div><a class="text-button" href="{% url 'costos_proceso_nuevo' %}">＋ Proceso</a></div>
   <div class="table-wrap">
     <table>
       <thead><tr><th>Proceso</th><th>Descripción</th><th>Costo por hora / estado</th></tr></thead>
@@ -112,7 +112,7 @@
 {% block modal %}
 {% if form_proceso or form_config or form_fuente or form_excluir %}
 <div class="modal-backdrop" data-costos-modal><section class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloCatalogo">
-  <div class="modal-header"><div><h2 id="tituloCatalogo">{% if form_proceso %}Nuevo proceso{% elif form_config %}Cuentas · {{ elemento_config.label }}{% elif form_fuente %}Nueva fuente indirecta{% else %}Excluir cuenta{% endif %}</h2><p>{% if form_proceso %}Proceso de desarrollo para clasificar los registros.{% elif form_config %}Las cuentas salen del catálogo contable.{% elif form_fuente %}El importe se tomará del mayor y se reclasificará a costos de desarrollo.{% else %}La cuenta no participará en la distribución automática.{% endif %}</p></div><a class="modal-close" href="{% url 'costos_catalogos' %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-header"><div><h2 id="tituloCatalogo">{% if form_proceso %}Nuevo proceso{% elif form_config %}Cuentas · {{ elemento_config.label }}{% elif form_fuente %}Nueva fuente indirecta{% else %}Excluir cuenta{% endif %}</h2>{% if form_fuente %}<p>Se toma el saldo del mayor.</p>{% elif form_excluir %}<p>La cuenta no se distribuirá automáticamente.</p>{% endif %}</div><a class="modal-close" href="{% url 'costos_catalogos' %}" aria-label="Cerrar">×</a></div>
   <form class="modal-form" method="post" action="{% if form_proceso %}{% url 'costos_proceso_nuevo' %}{% elif form_config %}{% url 'costos_configuracion_editar' elemento_config.value %}{% elif form_fuente %}{% url 'costos_fuente_indirecta_nueva' %}{% else %}{% url 'costos_cuenta_indirecta_excluir' %}{% endif %}" novalidate data-costos-form>
     {% csrf_token %}
     {% if form_proceso %}{% include "costos/campos.html" with form=form_proceso %}{% elif form_config %}{% include "costos/campos.html" with form=form_config %}{% elif form_fuente %}{% include "costos/campos.html" with form=form_fuente %}{% else %}{% include "costos/campos.html" with form=form_excluir %}{% endif %}

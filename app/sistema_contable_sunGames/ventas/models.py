@@ -18,6 +18,11 @@ class EstadoVenta(models.TextChoices):
     REGISTRADA = "REGISTRADA", "Registrada"
 
 
+class OrigenVenta(models.TextChoices):
+    REAL = "REAL", "Real"
+    SIMULADA = "SIMULADA", "Simulada"
+
+
 class Venta(models.Model):
     """Evento de venta recibido del servicio Steam simulado (CU-08.4)."""
 
@@ -35,6 +40,10 @@ class Venta(models.Model):
     moneda = models.CharField("moneda", max_length=3)
     pais = models.CharField("país", max_length=2)
     fecha_hora = models.DateTimeField("fecha y hora del evento")
+    origen = models.CharField(
+        "origen", max_length=10, choices=OrigenVenta.choices,
+        default=OrigenVenta.REAL,
+    )
     comision = models.DecimalField("comisión", max_digits=14,
                                    decimal_places=2)
     impuesto = models.DecimalField("impuesto", max_digits=14,
@@ -67,6 +76,10 @@ class Venta(models.Model):
             models.CheckConstraint(
                 check=models.Q(tipo_producto__in=TipoProducto.values),
                 name="venta_tipo_producto_valido",
+            ),
+            models.CheckConstraint(
+                check=models.Q(origen__in=OrigenVenta.values),
+                name="venta_origen_valido",
             ),
         ]
 

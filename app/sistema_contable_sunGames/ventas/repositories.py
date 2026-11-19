@@ -6,7 +6,7 @@ from .exceptions import (
     VentaDuplicadaError,
     VentaNoEncontradaError,
 )
-from .models import ConexionSteam, EstadoVenta, Venta
+from .models import ConexionSteam, EstadoVenta, OrigenVenta, Venta
 
 
 def _rango_fecha_hora(desde, hasta):
@@ -53,6 +53,13 @@ class VentaRepository:
         return Venta.objects.filter(
             _rango_fecha_hora(desde, hasta), estado=EstadoVenta.PENDIENTE
         ).count()
+
+    def hubo_venta_real(self, desde, hasta):
+        return Venta.objects.filter(
+            origen=OrigenVenta.REAL,
+            fecha_recepcion__gte=desde,
+            fecha_recepcion__lte=hasta,
+        ).exists()
 
     def marcar_registrada(self, venta, transaccion_mayor):
         venta.estado = EstadoVenta.REGISTRADA

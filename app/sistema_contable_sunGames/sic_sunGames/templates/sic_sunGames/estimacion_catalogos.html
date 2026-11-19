@@ -3,10 +3,10 @@
 {% block server_rendered %} data-server-rendered="true"{% endblock %}
 
 {% block page_content %}
-<div class="page-heading"><div><h1>Parámetros y catálogos</h1><p>Roles, expertos, salarios de referencia y parámetros con vigencia del módulo de estimación.</p></div><div class="heading-actions"><a class="button button-secondary" href="{% url 'estimacion' %}">← Estimación</a></div></div>
+<div class="page-heading"><div><h1>Parámetros y catálogos</h1></div><div class="heading-actions"><a class="button button-secondary" href="{% url 'estimacion' %}">← Estimación</a></div></div>
 
 <section class="card">
-  <div class="card-header"><div><h2>Roles de estimación</h2><p>Puesto y nivel</p></div><a class="button button-primary" href="{% url 'estimacion_rol_nuevo' %}">＋ Nuevo rol</a></div>
+  <div class="card-header"><div><h2>Roles de estimación</h2></div><a class="button button-primary" href="{% url 'estimacion_rol_nuevo' %}">＋ Nuevo rol</a></div>
   <div class="table-wrap"><table>
     <thead><tr><th>Rol</th><th class="num">Nivel</th></tr></thead>
     <tbody>
@@ -16,7 +16,7 @@
 </section>
 
 <section class="card">
-  <div class="card-header"><div><h2>Expertos</h2><p>Personas que estiman por juicio</p></div><a class="button button-primary" href="{% url 'estimacion_experto_nuevo' %}">＋ Nuevo experto</a></div>
+  <div class="card-header"><div><h2>Expertos</h2></div><a class="button button-primary" href="{% url 'estimacion_experto_nuevo' %}">＋ Nuevo experto</a></div>
   <div class="table-wrap"><table>
     <thead><tr><th>Nombre</th></tr></thead>
     <tbody>
@@ -26,7 +26,7 @@
 </section>
 
 <section class="card">
-  <div class="card-header"><div><h2>Salarios de referencia</h2><p>Salario bruto mensual por rol, con vigencia</p></div><a class="button button-primary" href="{% url 'estimacion_salario_nuevo' %}">＋ Nuevo salario</a></div>
+  <div class="card-header"><div><h2>Salarios de referencia</h2></div><a class="button button-primary" href="{% url 'estimacion_salario_nuevo' %}">＋ Nuevo salario</a></div>
   <div class="table-wrap"><table>
     <thead><tr><th>Rol</th><th class="num">Salario bruto</th><th>Vigente desde</th><th>Vigente hasta</th></tr></thead>
     <tbody>
@@ -36,7 +36,7 @@
 </section>
 
 <section class="card">
-  <div class="card-header"><div><h2>Parámetros</h2><p>Valores con fecha de vigencia; nunca se fijan en el código</p></div><a class="button button-primary" href="{% url 'estimacion_parametro_nuevo' %}">＋ Nuevo parámetro</a></div>
+  <div class="card-header"><div><h2>Parámetros</h2></div><a class="button button-primary" href="{% url 'estimacion_parametro_nuevo' %}">＋ Nuevo parámetro</a></div>
   <div class="table-wrap"><table>
     <thead><tr><th>Clave</th><th class="num">Valor</th><th>Vigente desde</th><th>Vigente hasta</th><th>Verificado</th></tr></thead>
     <tbody>
@@ -50,7 +50,7 @@
 {% block modal %}
 {% if form_rol %}
 <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Nuevo rol">
-  <div class="modal-header"><div><h2>Nuevo rol</h2><p>Puesto de desarrollo con su nivel.</p></div><a class="modal-close" href="{% url 'estimacion_catalogos' %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-header"><div><h2>Nuevo rol</h2></div><a class="modal-close" href="{% url 'estimacion_catalogos' %}" aria-label="Cerrar">×</a></div>
   <form class="modal-form" method="post" action="{% url 'estimacion_rol_nuevo' %}" novalidate>
     {% csrf_token %}
     {% if form_rol.non_field_errors %}<div class="form-error">{{ form_rol.non_field_errors }}</div>{% endif %}
@@ -63,7 +63,7 @@
 </section></div>
 {% elif form_experto %}
 <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Nuevo experto">
-  <div class="modal-header"><div><h2>Nuevo experto</h2><p>Persona que participará en las rondas Delphi.</p></div><a class="modal-close" href="{% url 'estimacion_catalogos' %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-header"><div><h2>Nuevo experto</h2></div><a class="modal-close" href="{% url 'estimacion_catalogos' %}" aria-label="Cerrar">×</a></div>
   <form class="modal-form" method="post" action="{% url 'estimacion_experto_nuevo' %}" novalidate>
     {% csrf_token %}
     {% if form_experto.non_field_errors %}<div class="form-error">{{ form_experto.non_field_errors }}</div>{% endif %}
@@ -93,7 +93,7 @@
 </section></div>
 {% elif form_salario %}
 <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Nuevo salario">
-  <div class="modal-header"><div><h2>Salario de referencia</h2><p>Salario bruto mensual del rol; la vigencia no puede traslaparse.</p></div><a class="modal-close" href="{% url 'estimacion_catalogos' %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-header"><div><h2>Salario de referencia</h2><p>La vigencia no puede traslaparse.</p></div><a class="modal-close" href="{% url 'estimacion_catalogos' %}" aria-label="Cerrar">×</a></div>
   <form class="modal-form" method="post" action="{% url 'estimacion_salario_nuevo' %}" novalidate>
     {% csrf_token %}
     {% if form_salario.non_field_errors %}<div class="form-error">{{ form_salario.non_field_errors }}</div>{% endif %}

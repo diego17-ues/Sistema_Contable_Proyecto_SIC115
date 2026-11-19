@@ -7,6 +7,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
@@ -163,6 +164,23 @@ def _render_orden(request, orden_id, **modal):
 @login_required
 def orden_detalle(request, orden_id):
     return _render_orden(request, orden_id)
+
+
+@login_required
+@require_POST
+def orden_finalizar(request, orden_id):
+    try:
+        crear_orden_service().finalizar(request.user, orden_id)
+    except SIN_PERMISO as error:
+        _sin_permiso(error)
+    except CostosError as error:
+        messages.error(request, str(error))
+    else:
+        messages.success(
+            request, "Orden finalizada; sus costos pasaron a videojuegos "
+            "terminados (1107)."
+        )
+    return redirect("costos_orden", orden_id=orden_id)
 
 
 @login_required
@@ -358,6 +376,69 @@ def consultar_rendimiento(request):
 
 @login_required
 @require_http_methods(["GET"])
+def dashboard_api(request):
+    """Entrega datos del dashboard sin habilitar acciones de costos."""
+    try:
+        resumen = crear_orden_service().resumen_dashboard(request.user)
+    except SIN_PERMISO as error:
+        return JsonResponse({"error": str(error)}, status=403)
+
+    def fila_json(fila):
+        orden = fila["orden"]
+        evaluacion = fila["evaluacion"]
+        return {
+            "id": orden.pk,
+            "juego": orden.juego.nombre,
+            "estimacion": (
+                f"{orden.estimacion_ref.juego.nombre} · v"
+                f"{orden.estimacion_ref.numero}"
+                if orden.estimacion_ref else None
+            ),
+            "totalEstimado": (
+                str(fila["total_estimado"])
+                if fila["total_estimado"] is not None else None
+            ),
+            "totalReal": (
+                str(fila["total_real"])
+                if fila["total_real"] is not None else None
+            ),
+            "variacion": (
+                str(evaluacion["variacion"]) if evaluacion else None
+            ),
+            "porcentaje": (
+                str(evaluacion["porcentaje"])
+                if evaluacion and evaluacion["porcentaje"] is not None
+                else None
+            ),
+            "viable": evaluacion["viable"] if evaluacion else None,
+        }
+    ultima_registrada = resumen["ultima_orden_registrada"]
+    return JsonResponse({
+        "ordenesPendientes": resumen["ordenes_pendientes"],
+        "ordenesFinalizadas": resumen["ordenes_finalizadas"],
+        "ultimaOrden": (
+            fila_json(resumen["ultima_orden"])
+            if resumen["ultima_orden"] else None
+        ),
+        "ultimaOrdenRegistrada": (
+            {
+                **fila_json(ultima_registrada),
+                "estado": ultima_registrada["orden"].get_estado_display(),
+                "fechaInicio": (
+                    ultima_registrada["orden"].fecha_inicio.isoformat()
+                ),
+            }
+            if ultima_registrada else None
+        ),
+        "ordenesFinalizadasRecientes": [
+            fila_json(fila)
+            for fila in resumen["ordenes_finalizadas_recientes"]
+        ],
+    })
+
+
+@login_required
+@require_http_methods(["GET"])
 def evaluar_rentabilidad(request, orden_id):
     servicio = crear_orden_service()
     try:
@@ -415,7 +496,8 @@ def _registrar(servicio, actor, orden_id, elemento, datos):
     comunes = dict(
         orden_id=orden_id, fecha=datos["fecha"],
         proceso_id=_int(datos["proceso"]),
-        contrapartida_id=_int(datos["contrapartida"]), clave=datos["clave"],
+        contrapartida_id=_int(datos.get("contrapartida")),
+        clave=datos["clave"],
     )
     if elemento == Elemento.MANO_OBRA:
         return servicio.registrar_mano_obra(

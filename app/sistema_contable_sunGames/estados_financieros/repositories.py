@@ -59,7 +59,14 @@ class EstadosFinancierosRepository:
     def agregados_hoja(self, desde, hasta):
         """Por cuenta: apertura y Debe/Haber del rango, sin y con ajustes."""
         rango = Q(movimientos__fecha__gte=desde, movimientos__fecha__lte=hasta)
-        ajuste = Q(movimientos__tipo=TipoMovimiento.AJUSTE)
+        reclasificacion = Q(
+            movimientos__transaccion__reclasificacion_costo__isnull=False
+        )
+        ajuste = (Q(movimientos__tipo=TipoMovimiento.AJUSTE)
+                  & ~reclasificacion)
+        movimiento_regular = (
+            ~Q(movimientos__tipo=TipoMovimiento.AJUSTE) | reclasificacion
+        )
         debe, haber = Q(movimientos__importe__gt=0), Q(
             movimientos__importe__lt=0
         )
@@ -69,8 +76,8 @@ class EstadosFinancierosRepository:
             .select_related("rubro", "naturaleza")
             .annotate(
                 apertura=Sum(importe, filter=Q(movimientos__fecha__lt=desde)),
-                debe=Sum(importe, filter=rango & debe & ~ajuste),
-                haber=Sum(importe, filter=rango & haber & ~ajuste),
+                debe=Sum(importe, filter=rango & debe & movimiento_regular),
+                haber=Sum(importe, filter=rango & haber & movimiento_regular),
                 ajuste_debe=Sum(importe, filter=rango & debe & ajuste),
                 ajuste_haber=Sum(importe, filter=rango & haber & ajuste),
             ).order_by("codigo")
@@ -79,6 +86,8 @@ class EstadosFinancierosRepository:
     def ajustes(self, desde, hasta):
         return list(Movimiento.objects.filter(
             tipo=TipoMovimiento.AJUSTE, fecha__gte=desde, fecha__lte=hasta
+        ).filter(
+            transaccion__reclasificacion_costo__isnull=True
         ).select_related("cuenta").order_by("fecha", "pk"))
 
     def periodo_con_rango(self, desde, hasta):
