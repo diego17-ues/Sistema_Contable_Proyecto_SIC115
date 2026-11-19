@@ -186,7 +186,7 @@ class AccesoService:
     MODULOS_CONTADOR_GENERAL = frozenset(
         {"dashboard", "ledger", "accounts", "reports", "operations"}
     )
-    MODULOS_COSTOS = frozenset({"estimacion", "costos"})
+    MODULOS_COSTOS = frozenset({"estimacion", "costos", "rendimiento"})
     MODULOS = {
         Rol.CONTADOR_GENERAL: MODULOS_CONTADOR_GENERAL,
         Rol.CONTADOR_COSTOS: MODULOS_COSTOS,

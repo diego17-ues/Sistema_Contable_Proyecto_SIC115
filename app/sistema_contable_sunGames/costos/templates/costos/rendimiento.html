@@ -1,0 +1,139 @@
+{% extends "sic_sunGames/index.html" %}
+{% load static %}
+
+{% block server_rendered %} data-server-rendered="true"{% endblock %}
+
+{% block page_content %}
+<div class="page-heading">
+  <div>
+    <h1>Consultar rendimiento de videojuegos</h1>
+    <p>Resultados por orden: estimación vinculada frente a costos reales vigentes.</p>
+  </div>
+  <div class="heading-actions">
+    <a class="button button-secondary" href="{% url 'costos_ordenes' %}">Costeo Videojuego</a>
+  </div>
+</div>
+
+<section class="card">
+  <div class="card-header">
+    <div>
+      <h2>Costo real vs estimación</h2>
+      <p>Comparación de las órdenes mostradas en esta página.</p>
+    </div>
+    <span class="tag">{{ grafico_rendimiento|length }} comparaciones</span>
+  </div>
+  <div class="card-body">
+    <p class="help">Una orden es viable si su costo real acumulado no supera la estimación vinculada. Si está en borrador, la comparación es preliminar.</p>
+    <div class="table-wrap">
+      <svg data-rendimiento-chart role="img" aria-label="Gráfico de costo real frente a estimación"{% if not grafico_rendimiento %} hidden{% endif %}></svg>
+    </div>
+    <div class="empty-state" data-rendimiento-vacio{% if grafico_rendimiento %} hidden{% endif %}>
+      <strong>Aún no hay comparaciones para graficar.</strong><br>
+      Vincula una estimación libre y registra costos vigentes para mostrar el resultado.
+    </div>
+    {{ grafico_rendimiento|json_script:"graficoRendimiento" }}
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-header">
+    <div>
+      <h2>Resultados de videojuegos</h2>
+      <p>Viable cuando el costo real es igual o menor que la estimación.</p>
+    </div>
+    <span class="tag">{{ pagina.paginator.count }} orden{{ pagina.paginator.count|pluralize:"es" }}</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Videojuego</th>
+          <th>Orden</th>
+          <th>Estado</th>
+          <th>Estimación</th>
+          <th class="num">Costo estimado</th>
+          <th class="num">Costo real</th>
+          <th class="num">Variación</th>
+          <th class="num">Variación %</th>
+          <th>Viabilidad</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for fila in pagina %}
+        <tr>
+          <td><strong>{{ fila.orden.juego.nombre }}</strong></td>
+          <td>OT-{{ fila.orden.pk }}</td>
+          <td><span class="tag {% if fila.orden.abierta %}tag-open{% else %}tag-muted{% endif %}">{{ fila.orden.get_estado_display }}</span></td>
+          <td>{% if fila.orden.estimacion_ref %}{{ fila.orden.estimacion_ref.juego.nombre }} · v{{ fila.orden.estimacion_ref.numero }}<small class="muted">{{ fila.orden.estimacion_ref.get_estado_display }}</small>{% else %}<span class="muted">Sin vínculo</span>{% endif %}</td>
+          <td class="num">{% if fila.total_estimado is not None %}${{ fila.total_estimado|floatformat:"2g" }}{% else %}—{% endif %}</td>
+          <td class="num">{% if fila.total_real is not None %}${{ fila.total_real|floatformat:"2g" }}{% else %}<span class="muted">Sin costos vigentes</span>{% endif %}</td>
+          <td class="num">
+            {% if fila.evaluacion %}
+              {% if fila.evaluacion.variacion > 0 %}+${{ fila.evaluacion.variacion_abs|floatformat:"2g" }}{% elif fila.evaluacion.variacion < 0 %}−${{ fila.evaluacion.variacion_abs|floatformat:"2g" }}{% else %}$0.00{% endif %}
+            {% else %}—{% endif %}
+          </td>
+          <td class="num">{% if fila.evaluacion and fila.evaluacion.porcentaje is not None %}{% if fila.evaluacion.porcentaje > 0 %}+{% endif %}{{ fila.evaluacion.porcentaje|floatformat:"2g" }}%{% else %}—{% endif %}</td>
+          <td>
+            {% if fila.evaluacion %}
+              {% if fila.evaluacion.viable %}<span class="tag tag-open">Viable con presupuesto</span>
+              {% else %}<span class="tag tag-warn">No viable: excede presupuesto</span>{% endif %}
+            {% elif fila.total_estimado is None %}<span class="tag tag-muted">Sin estimación</span>
+            {% else %}<span class="tag tag-muted">Pendiente de costos</span>{% endif %}
+          </td>
+          <td>
+            <a class="text-button" href="{% url 'costos_orden' fila.orden.pk %}">Abrir orden</a>
+            {% if fila.evaluacion %}
+            <a class="text-button" href="{% url 'costos_evaluar_rentabilidad' fila.orden.pk %}?pagina={{ pagina.number }}">Evaluar viabilidad</a>
+            {% elif not fila.orden.estimacion_ref %}
+            <a class="text-button" href="{% url 'costos_orden_estimacion' fila.orden.pk %}">Vincular estimación</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="10"><div class="empty-state"><strong>No hay órdenes de trabajo para consultar.</strong><br>Las órdenes y sus estimaciones aparecerán aquí cuando estén registradas.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "sic_sunGames/paginacion.html" %}
+</section>
+{% endblock %}
+
+{% block modal %}
+{% if modal_evaluacion %}
+<div class="modal-backdrop" data-costos-modal>
+  <section class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloRentabilidad">
+    <div class="modal-header">
+      <div>
+        <h2 id="tituloRentabilidad">Evaluar viabilidad del presupuesto</h2>
+        <p>OT-{{ modal_evaluacion.orden.pk }} · {{ modal_evaluacion.orden.juego.nombre }} · estimación {{ modal_evaluacion.orden.estimacion_ref.juego.nombre }} v{{ modal_evaluacion.orden.estimacion_ref.numero }}</p>
+      </div>
+      <a class="modal-close" href="{% url 'costos_rendimiento' %}?pagina={{ pagina.number }}" aria-label="Cerrar">×</a>
+    </div>
+    <div class="modal-form">
+      <dl class="close-summary">
+        <div><dt>Total estimado</dt><dd>${{ modal_evaluacion.total_estimado|floatformat:"2g" }}</dd></div>
+        <div><dt>Costo real vigente</dt><dd>${{ modal_evaluacion.total_real|floatformat:"2g" }}</dd></div>
+        <div>
+          <dt>Variación (real − estimado)</dt>
+          <dd>{% if modal_evaluacion.variacion > 0 %}+${{ modal_evaluacion.variacion_abs|floatformat:"2g" }}{% elif modal_evaluacion.variacion < 0 %}−${{ modal_evaluacion.variacion_abs|floatformat:"2g" }}{% else %}$0.00{% endif %}</dd>
+        </div>
+        <div>
+          <dt>Variación porcentual</dt>
+          <dd>{% if modal_evaluacion.porcentaje is not None %}{% if modal_evaluacion.porcentaje > 0 %}+{% endif %}{{ modal_evaluacion.porcentaje|floatformat:"2g" }}%{% else %}No calculable con estimación de $0.00{% endif %}</dd>
+        </div>
+      </dl>
+      <p class="form-section">
+        {% if modal_evaluacion.viable %}<span class="tag tag-open">Viable: está dentro del presupuesto</span>
+        {% else %}<span class="tag tag-warn">No viable: excede el presupuesto</span>{% endif %}
+      </p>
+      <p class="muted">Se considera viable si el costo real acumulado es igual o menor que la estimación vinculada. La comparación de una versión en borrador es preliminar.</p>
+      <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_rendimiento' %}?pagina={{ pagina.number }}">Cerrar</a></div>
+    </div>
+  </section>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}{{ block.super }}<script src="{% static 'costos/costos.js' %}?v=20261119-1"></script>{% endblock %}

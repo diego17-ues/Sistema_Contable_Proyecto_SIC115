@@ -3,8 +3,10 @@
 
 {% block server_rendered %} data-server-rendered="true"{% endblock %}
 
+{% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'costos/costos.css' %}?v=20261119-2">{% endblock %}
+
 {% block page_content %}
-<div class="page-heading"><div><h1>Costos · Catálogos</h1><p>Procesos de desarrollo y cuentas contables por elemento del costo.</p></div><div class="heading-actions"><a class="button button-secondary" href="{% url 'costos_ordenes' %}">← Órdenes</a></div></div>
+<div class="page-heading"><div><h1>Costos · Catálogos</h1><p>Procesos, cuentas de costo y fuentes indirectas dedicadas al desarrollo.</p></div><div class="heading-actions"><a class="button button-secondary" href="{% url 'costos_indirectos_periodo' %}">Indirectos del período</a><a class="button button-secondary" href="{% url 'costos_ordenes' %}">← Órdenes</a></div></div>
 
 <section class="card">
   <div class="card-header"><div><h2>Cuentas por elemento del costo</h2><p>Cuenta de costo (debe), contrapartidas permitidas (haber) y la contrapartida por defecto. Sin configuración el registro del elemento queda bloqueado.</p></div></div>
@@ -24,6 +26,55 @@
           {% endif %}
           <td class="num"><a class="text-button" href="{% url 'costos_configuracion_editar' valor %}">Configurar</a></td>
         </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card section-gap">
+  <div class="card-header"><div><h2>Fuentes de costos indirectos</h2><p>El sistema toma el saldo neto de la cuenta en el período y lo distribuye según las horas registradas. Configura solo cuentas exclusivas de desarrollo; las cuentas compartidas se excluyen.</p></div><a class="button button-secondary" href="{% url 'costos_fuente_indirecta_nueva' %}">＋ Fuente indirecta</a></div>
+  <div class="table-wrap">
+    <table class="indirectos-tabla">
+      <thead><tr><th>Fuente</th><th>Tipo</th><th>Cuenta de origen</th><th>Proceso</th><th>Estado</th></tr></thead>
+      <tbody>
+        {% for fuente in fuentes_indirectas %}
+        <tr>
+          <td data-label="Fuente"><strong>{{ fuente.nombre }}</strong></td>
+          <td data-label="Tipo">{{ fuente.get_tipo_display }}</td>
+          <td data-label="Cuenta">{{ fuente.cuenta_origen.codigo }} · {{ fuente.cuenta_origen.denominacion }}</td>
+          <td data-label="Proceso">{{ fuente.proceso.nombre|default:"Pool general" }}</td>
+          <td data-label="Estado"><span class="tag {% if fuente.activa %}tag-open{% else %}tag-muted{% endif %}">{% if fuente.activa %}Activa{% else %}Inactiva{% endif %}</span></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5"><div class="empty-state"><strong>Sin fuentes configuradas</strong>Las cuentas compartidas no se distribuyen. Registra una fuente solo si su saldo corresponde exclusivamente a desarrollo.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card section-gap">
+  <div class="card-header"><div><h2>Cuentas excluidas</h2><p>Estas cuentas no se aceptan como origen de una distribución automática.</p></div><a class="button button-secondary" href="{% url 'costos_cuenta_indirecta_excluir' %}">＋ Excluir cuenta</a></div>
+  <div class="table-wrap">
+    <table class="indirectos-tabla">
+      <thead><tr><th>Cuenta</th><th>Motivo</th><th>Registrada por</th><th></th></tr></thead>
+      <tbody>
+        {% for exclusion in cuentas_excluidas %}
+        <tr>
+          <td data-label="Cuenta">{{ exclusion.cuenta.codigo }} · {{ exclusion.cuenta.denominacion }}</td>
+          <td data-label="Motivo">{{ exclusion.motivo }}</td>
+          <td data-label="Registrada por">{{ exclusion.creada_por.nombre_completo }}</td>
+          <td data-label="Acción" class="num">
+            <form method="post" action="{% url 'costos_cuenta_indirecta_habilitar' exclusion.pk %}" data-costos-form>
+              {% csrf_token %}
+              <label><input type="checkbox" name="confirmar" required> Confirmar</label>
+              <button class="text-button" type="submit">Retirar exclusión</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4"><div class="empty-state"><strong>No hay cuentas excluidas explícitamente.</strong>Las fuentes aún requieren confirmar que su cuenta sea exclusiva de desarrollo.</div></td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -59,12 +110,12 @@
 {% endblock %}
 
 {% block modal %}
-{% if form_proceso or form_config %}
+{% if form_proceso or form_config or form_fuente or form_excluir %}
 <div class="modal-backdrop" data-costos-modal><section class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloCatalogo">
-  <div class="modal-header"><div><h2 id="tituloCatalogo">{% if form_proceso %}Nuevo proceso{% else %}Cuentas · {{ elemento_config.label }}{% endif %}</h2><p>{% if form_proceso %}Proceso de desarrollo para clasificar los registros.{% else %}Las cuentas salen del catálogo de cuentas.{% endif %}</p></div><a class="modal-close" href="{% url 'costos_catalogos' %}" aria-label="Cerrar">×</a></div>
-  <form class="modal-form" method="post" action="{% if form_proceso %}{% url 'costos_proceso_nuevo' %}{% else %}{% url 'costos_configuracion_editar' elemento_config.value %}{% endif %}" novalidate data-costos-form>
+  <div class="modal-header"><div><h2 id="tituloCatalogo">{% if form_proceso %}Nuevo proceso{% elif form_config %}Cuentas · {{ elemento_config.label }}{% elif form_fuente %}Nueva fuente indirecta{% else %}Excluir cuenta{% endif %}</h2><p>{% if form_proceso %}Proceso de desarrollo para clasificar los registros.{% elif form_config %}Las cuentas salen del catálogo contable.{% elif form_fuente %}El importe se tomará del mayor y se reclasificará a costos de desarrollo.{% else %}La cuenta no participará en la distribución automática.{% endif %}</p></div><a class="modal-close" href="{% url 'costos_catalogos' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% if form_proceso %}{% url 'costos_proceso_nuevo' %}{% elif form_config %}{% url 'costos_configuracion_editar' elemento_config.value %}{% elif form_fuente %}{% url 'costos_fuente_indirecta_nueva' %}{% else %}{% url 'costos_cuenta_indirecta_excluir' %}{% endif %}" novalidate data-costos-form>
     {% csrf_token %}
-    {% if form_proceso %}{% include "costos/campos.html" with form=form_proceso %}{% else %}{% include "costos/campos.html" with form=form_config %}{% endif %}
+    {% if form_proceso %}{% include "costos/campos.html" with form=form_proceso %}{% elif form_config %}{% include "costos/campos.html" with form=form_config %}{% elif form_fuente %}{% include "costos/campos.html" with form=form_fuente %}{% else %}{% include "costos/campos.html" with form=form_excluir %}{% endif %}
     <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_catalogos' %}">Cancelar</a><button class="button button-primary" type="submit">Guardar</button></div>
   </form>
 </section></div>

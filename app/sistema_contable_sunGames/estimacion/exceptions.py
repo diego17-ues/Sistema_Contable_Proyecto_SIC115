@@ -36,6 +36,10 @@ class EstimacionDuplicadaError(EstimacionError):
     )
 
 
+class EstimacionNoEncontradaError(EstimacionError):
+    mensaje = "La estimación seleccionada no existe."
+
+
 class RondaNoEncontradaError(EstimacionError):
     mensaje = "La ronda Delphi seleccionada no existe."
 

@@ -13,7 +13,7 @@ from django.utils import timezone
 
 from catalogo.models import Cuenta
 from estimacion.models import VersionPresupuesto
-from libro_mayor.models import Transaccion
+from libro_mayor.models import PeriodoContable, Transaccion
 
 DINERO_MAX = 14
 HORAS_MAX = 10
@@ -46,8 +46,8 @@ class OrdenTrabajo(models.Model):
         (ESTADO_CERRADA, "Cerrada"),
     ]
 
-    juego = models.OneToOneField(
-        Juego, on_delete=models.PROTECT, related_name="orden"
+    juego = models.ForeignKey(
+        Juego, on_delete=models.PROTECT, related_name="ordenes_trabajo"
     )
     estado = models.CharField(
         "estado", max_length=10, choices=ESTADOS, default=ESTADO_ABIERTA
@@ -64,6 +64,13 @@ class OrdenTrabajo(models.Model):
         blank=True, related_name="ordenes_trabajo",
         verbose_name="estimación de referencia",
     )
+    eliminado_en = models.DateTimeField(
+        "eliminado en", null=True, blank=True
+    )
+    eliminado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name="ordenes_eliminadas", null=True, blank=True,
+    )
     creado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
         related_name="ordenes_creadas", null=True, blank=True,
@@ -78,6 +85,26 @@ class OrdenTrabajo(models.Model):
                 | models.Q(licencias_estimadas__gt=0),
                 name="orden_licencias_positivas",
             ),
+            models.UniqueConstraint(
+                fields=["estimacion_ref"],
+                condition=models.Q(estimacion_ref__isnull=False,
+                                   eliminado_en__isnull=True),
+                name="orden_estimacion_ref_unica",
+            ),
+            models.UniqueConstraint(
+                fields=["juego"],
+                condition=models.Q(eliminado_en__isnull=True),
+                name="orden_activa_unica_por_juego",
+            ),
+            models.CheckConstraint(
+                check=(
+                    models.Q(eliminado_en__isnull=True,
+                             eliminado_por__isnull=True)
+                    | models.Q(eliminado_en__isnull=False,
+                              eliminado_por__isnull=False)
+                ),
+                name="orden_baja_logica_completa",
+            ),
         ]
 
     def __str__(self):
@@ -86,6 +113,10 @@ class OrdenTrabajo(models.Model):
     @property
     def abierta(self):
         return self.estado == self.ESTADO_ABIERTA
+
+    @property
+    def eliminada(self):
+        return self.eliminado_en is not None
 
 
 class Proceso(models.Model):
@@ -140,6 +171,64 @@ class ConfiguracionCuentaCosto(models.Model):
         return f"{self.get_elemento_display()} → {self.cuenta_costo.codigo}"
 
 
+class FuenteIndirecta(models.Model):
+    """Cuenta del mayor dedicada exclusivamente a indirectos de desarrollo.
+
+    La contabilidad actual no calcula depreciación por activo; por eso
+    todas las fuentes configuradas se reclasifican desde importes que ya
+    están registrados en el Libro Mayor.
+    """
+
+    class Tipo(models.TextChoices):
+        EQUIPO = "EQUIPO", "Depreciación de equipo de desarrollo"
+        LICENCIA = "LICENCIA", "Amortización de licencias"
+        SERVICIO = "SERVICIO", "Servicio consumido"
+
+    nombre = models.CharField("nombre de la fuente", max_length=120)
+    tipo = models.CharField("tipo", max_length=12, choices=Tipo.choices)
+    cuenta_origen = models.OneToOneField(
+        Cuenta, on_delete=models.PROTECT,
+        related_name="fuente_indirecta",
+        verbose_name="cuenta de origen",
+    )
+    proceso = models.ForeignKey(
+        Proceso, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="fuentes_indirectas",
+    )
+    exclusiva_desarrollo = models.BooleanField(
+        "cuenta exclusiva de desarrollo", default=False
+    )
+    activa = models.BooleanField("activa", default=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nombre", "id"]
+
+    def __str__(self):
+        return self.nombre
+
+
+class CuentaIndirectaExcluida(models.Model):
+    """Cuenta que no se puede usar como origen de una distribución."""
+
+    cuenta = models.OneToOneField(
+        Cuenta, on_delete=models.PROTECT,
+        related_name="exclusion_indirecta",
+    )
+    motivo = models.CharField("motivo de exclusión", max_length=200)
+    creada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name="cuentas_indirectas_excluidas",
+    )
+    creada_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["cuenta__codigo"]
+
+    def __str__(self):
+        return f"{self.cuenta} · {self.motivo}"
+
+
 class RegistroCosto(models.Model):
     """Registro de un elemento del costo en una orden.
 
@@ -184,6 +273,14 @@ class RegistroCosto(models.Model):
         Cuenta, on_delete=models.PROTECT,
         related_name="registros_costo_haber",
     )
+    fuente_indirecta = models.ForeignKey(
+        FuenteIndirecta, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="registros_aplicados",
+    )
+    periodo_indirecto = models.ForeignKey(
+        PeriodoContable, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="costos_indirectos_aplicados",
+    )
     estado = models.CharField(
         "estado", max_length=10, choices=ESTADOS, default=ESTADO_VIGENTE
     )
@@ -222,6 +319,16 @@ class RegistroCosto(models.Model):
                 ),
                 name="registro_costo_mano_obra_completa",
             ),
+            models.CheckConstraint(
+                check=(
+                    models.Q(fuente_indirecta__isnull=True,
+                             periodo_indirecto__isnull=True)
+                    | models.Q(fuente_indirecta__isnull=False,
+                              periodo_indirecto__isnull=False,
+                              elemento=Elemento.INDIRECTO)
+                ),
+                name="registro_fuente_indirecta_con_periodo",
+            ),
         ]
 
     def __str__(self):
@@ -231,6 +338,10 @@ class RegistroCosto(models.Model):
     @property
     def vigente(self):
         return self.estado == self.ESTADO_VIGENTE
+
+    @property
+    def es_automatico(self):
+        return self.fuente_indirecta_id is not None
 
 
 class AsientoCosto(models.Model):

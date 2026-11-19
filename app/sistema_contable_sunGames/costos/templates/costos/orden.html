@@ -3,13 +3,15 @@
 
 {% block server_rendered %} data-server-rendered="true"{% endblock %}
 
-{% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'costos/costos.css' %}">{% endblock %}
+{% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'costos/costos.css' %}?v=20261118-1">{% endblock %}
 
 {% block page_content %}
 <div class="page-heading hoja-heading">
   <div><h1>Hoja de costos · OT-{{ orden.pk }} · {{ orden.juego.nombre }}</h1>
     <p>{{ orden.get_estado_display }} · Inicio: {{ orden.fecha_inicio|date:"d/m/Y" }}</p></div>
   <div class="heading-actions hoja-acciones">
+    <a class="button button-secondary" href="{% url 'costos_orden_editar' orden.pk %}">Editar orden</a>
+    <a class="button button-secondary" href="{% url 'costos_orden_eliminar' orden.pk %}">Archivar</a>
     {% if orden.abierta %}
     <a class="button button-primary" href="{% url 'costos_registro_nuevo' orden.pk 'mano-obra' %}">＋ Mano de obra directa</a>
     <a class="button button-secondary" href="{% url 'costos_registro_nuevo' orden.pk 'directo' %}">＋ Costo directo</a>
@@ -28,7 +30,7 @@
   <section class="card hoja-dato"><span>Costo total de la orden</span><strong>${{ resumen.total|floatformat:"2g" }}</strong></section>
   <section class="card hoja-dato"><span>Licencias estimadas</span>{% if resumen.licencias_estimadas %}<strong>{{ resumen.licencias_estimadas }}</strong>{% else %}<strong>—</strong><small>Indica las licencias para calcular el costo unitario.</small>{% endif %}<a class="text-button" href="{% url 'costos_orden_licencias' orden.pk %}">Editar</a></section>
   <section class="card hoja-dato"><span>Costo unitario por licencia estimada</span>{% if resumen.costo_unitario is not None %}<strong>${{ resumen.costo_unitario|floatformat:"2g" }}</strong>{% else %}<strong>—</strong><small>Ingresa las licencias estimadas.</small>{% endif %}</section>
-  <section class="card hoja-dato"><span>Estimación de referencia</span>{% if resumen.estimacion_ref %}<strong>${{ resumen.total_estimado|floatformat:"2g" }}</strong><small>{{ resumen.estimacion_ref.juego.nombre }} · versión {{ resumen.estimacion_ref.numero }} ({{ resumen.estimacion_ref.get_estado_display|lower }}) · solo lectura</small>{% else %}<strong>—</strong><small>Sin estimación vinculada.</small>{% endif %}<a class="text-button" href="{% url 'costos_orden_estimacion' orden.pk %}">Vincular</a></section>
+  <section class="card hoja-dato"><span>Estimación de referencia</span>{% if resumen.estimacion_ref %}<strong>${{ resumen.total_estimado|floatformat:"2g" }}</strong><small>{{ resumen.estimacion_ref.juego.nombre }} · versión {{ resumen.estimacion_ref.numero }} ({{ resumen.estimacion_ref.get_estado_display|lower }}) · solo lectura</small>{% else %}<strong>—</strong><small>Sin estimación vinculada.</small>{% endif %}<a class="text-button" href="{% url 'costos_orden_estimacion' orden.pk %}">Vincular</a>{% if resumen.estimacion_ref and resumen.total > 0 %}<a class="text-button" href="{% url 'costos_orden_evaluacion' orden.pk %}">Evaluar rendimiento</a>{% endif %}</section>
 </div>
 
 {% for seccion in secciones %}
@@ -42,7 +44,7 @@
         <tr class="{% if not registro.vigente %}hoja-anulado{% endif %}">
           <td data-label="Fecha">{{ registro.fecha|date:"d/m/Y" }}</td>
           <td data-label="Proceso">{{ registro.proceso.nombre|default:"—" }}</td>
-          <td data-label="Descripción"><strong>{{ registro.descripcion }}</strong>{% if not registro.vigente %}<small>Anulado: {{ registro.motivo_anulacion }}</small>{% endif %}</td>
+          <td data-label="Descripción"><strong>{{ registro.descripcion }}</strong>{% if registro.es_automatico %}<small>Origen automático · {{ registro.fuente_indirecta.nombre }} · {{ registro.periodo_indirecto.nombre }}</small>{% endif %}{% if not registro.vigente %}<small>Anulado: {{ registro.motivo_anulacion }}</small>{% endif %}</td>
           {% if seccion.elemento == 'MANO_OBRA' %}
           <td class="num" data-label="Horas">{{ registro.horas|floatformat:"2g" }}</td>
           <td class="num" data-label="Costo/hora">${{ registro.costo_hora|floatformat:"2g" }}</td>
@@ -50,7 +52,7 @@
           <td class="num" data-label="Monto">${{ registro.importe|floatformat:"2g" }}</td>
           <td data-label="Asiento">{% for asiento in registro.asientos.all %}<span class="tag tag-muted">{% if asiento.tipo == 'ANULACION' %}Contra {% endif %}#{{ asiento.transaccion_id }}</span> {% endfor %}</td>
           <td data-label="Estado"><span class="tag {% if registro.vigente %}tag-open{% else %}tag-warn{% endif %}">{% if registro.vigente %}Activo{% else %}Anulado{% endif %}</span></td>
-          <td class="num hoja-accion">{% if registro.vigente %}<a class="text-button" href="{% url 'costos_registro_anular' orden.pk registro.pk %}">Anular</a>{% endif %}</td>
+          <td class="num hoja-accion">{% if registro.vigente and not registro.es_automatico %}<a class="text-button" href="{% url 'costos_registro_anular' orden.pk registro.pk %}">Anular</a>{% elif registro.vigente %}<span class="tag tag-muted">Reversión por período</span>{% endif %}</td>
         </tr>
         {% empty %}
         <tr class="hoja-vacia"><td colspan="{% if seccion.elemento == 'MANO_OBRA' %}9{% else %}7{% endif %}"><div class="empty-state"><strong>Sin registros de {{ seccion.nombre|lower }}.</strong></div></td></tr>
@@ -80,7 +82,25 @@
 {% endblock %}
 
 {% block modal %}
-{% if form_registro %}
+{% if form_orden %}
+<div class="modal-backdrop" data-costos-modal><section class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloEditarOrden">
+  <div class="modal-header"><div><h2 id="tituloEditarOrden">Editar orden de trabajo</h2><p>OT-{{ orden.pk }} · puedes actualizar el juego, la fecha, las licencias y la estimación vinculada.</p></div><a class="modal-close" href="{% url 'costos_orden' orden.pk %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'costos_orden_editar' orden.pk %}" novalidate data-costos-form>
+    {% csrf_token %}
+    {% include "costos/campos.html" with form=form_orden %}
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_orden' orden.pk %}">Cancelar</a><button class="button button-primary" type="submit">Guardar cambios</button></div>
+  </form>
+</section></div>
+{% elif form_baja %}
+<div class="modal-backdrop" data-costos-modal><section class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloArchivarOrden">
+  <div class="modal-header"><div><h2 id="tituloArchivarOrden">Archivar orden de trabajo</h2><p>OT-{{ orden.pk }} · {{ orden.juego.nombre }}. Los costos y asientos contables se conservarán para consulta histórica.</p></div><a class="modal-close" href="{% url 'costos_orden' orden.pk %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'costos_orden_eliminar' orden.pk %}">
+    {% csrf_token %}
+    <div class="field"><label for="id_confirmar">{{ form_baja.confirmar.label }}</label>{{ form_baja.confirmar }}{% for error in form_baja.confirmar.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_orden' orden.pk %}">Cancelar</a><button class="button button-primary" type="submit">Archivar orden</button></div>
+  </form>
+</section></div>
+{% elif form_registro %}
 <div class="modal-backdrop" data-costos-modal><section class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloRegistro">
   <div class="modal-header"><div><h2 id="tituloRegistro">{{ elemento_registro }}</h2><p>OT-{{ orden.pk }} · Debe {{ configuracion.cuenta_costo.codigo }} {{ configuracion.cuenta_costo.denominacion }} · haber la contrapartida elegida.</p></div><a class="modal-close" href="{% url 'costos_orden' orden.pk %}" aria-label="Cerrar">×</a></div>
   <form class="modal-form" method="post" action="{% url 'costos_registro_nuevo' orden.pk tipo_registro %}" novalidate data-costos-form{% if tipo_registro == 'mano-obra' %} data-mano-obra{% endif %}>
@@ -115,12 +135,27 @@
 </section></div>
 {% elif form_licencias or form_estimacion %}
 <div class="modal-backdrop" data-costos-modal><section class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloOrden">
-  <div class="modal-header"><div><h2 id="tituloOrden">{% if form_licencias %}Licencias estimadas{% else %}Estimación de referencia{% endif %}</h2><p>OT-{{ orden.pk }} · {{ orden.juego.nombre }}{% if form_estimacion %} · vínculo de solo lectura, sin cálculo de variación{% endif %}.</p></div><a class="modal-close" href="{% url 'costos_orden' orden.pk %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-header"><div><h2 id="tituloOrden">{% if form_licencias %}Licencias estimadas{% else %}Estimación de referencia{% endif %}</h2><p>OT-{{ orden.pk }} · {{ orden.juego.nombre }}{% if form_estimacion %} · la versión seleccionada se usa para comparar el costo real{% endif %}.</p></div><a class="modal-close" href="{% url 'costos_orden' orden.pk %}" aria-label="Cerrar">×</a></div>
   <form class="modal-form" method="post" action="{% if form_licencias %}{% url 'costos_orden_licencias' orden.pk %}{% else %}{% url 'costos_orden_estimacion' orden.pk %}{% endif %}" novalidate data-costos-form>
     {% csrf_token %}
     {% if form_licencias %}{% include "costos/campos.html" with form=form_licencias %}{% else %}{% include "costos/campos.html" with form=form_estimacion %}{% endif %}
     <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_orden' orden.pk %}">Cancelar</a><button class="button button-primary" type="submit">Guardar</button></div>
   </form>
+</section></div>
+{% elif evaluacion %}
+<div class="modal-backdrop" data-costos-modal><section class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloEvaluacion">
+  <div class="modal-header"><div><h2 id="tituloEvaluacion">Evaluación del rendimiento</h2><p>OT-{{ orden.pk }} · {{ orden.juego.nombre }} · estimación v{{ resumen.estimacion_ref.numero }}</p></div><a class="modal-close" href="{% url 'costos_orden' orden.pk %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-form">
+    <dl class="close-summary">
+      <div><dt>Total estimado</dt><dd>${{ evaluacion.total_estimado|floatformat:"2g" }}</dd></div>
+      <div><dt>Costo real vigente</dt><dd>${{ evaluacion.total_real|floatformat:"2g" }}</dd></div>
+      <div><dt>Variación (real − estimado)</dt><dd>{% if evaluacion.variacion > 0 %}+${{ evaluacion.variacion_abs|floatformat:"2g" }}{% elif evaluacion.variacion < 0 %}−${{ evaluacion.variacion_abs|floatformat:"2g" }}{% else %}$0.00{% endif %}</dd></div>
+      <div><dt>Variación porcentual</dt><dd>{% if evaluacion.porcentaje is not None %}{% if evaluacion.porcentaje > 0 %}+{% endif %}{{ evaluacion.porcentaje|floatformat:"2g" }}%{% else %}No calculable con estimación de $0.00{% endif %}</dd></div>
+    </dl>
+    <p class="form-section">{% if evaluacion.viable %}<span class="tag tag-open">Viable: está dentro del presupuesto</span>{% else %}<span class="tag tag-warn">No viable: excede el presupuesto</span>{% endif %}</p>
+    <p class="muted">Se considera viable si el costo real acumulado es igual o menor que la estimación vinculada.</p>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_orden' orden.pk %}">Cerrar</a></div>
+  </div>
 </section></div>
 {% endif %}
 {% endblock %}

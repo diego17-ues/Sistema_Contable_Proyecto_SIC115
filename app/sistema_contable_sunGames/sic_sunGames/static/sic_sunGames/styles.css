@@ -126,6 +126,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .button-small { min-height: 30px; padding: 0 10px; font-size: 10px; }
 .text-button { padding: 4px; border: 0; color: #416683; background: none; font-size: 10px; font-weight: 700; }
 .text-button:hover { color: var(--navy); text-decoration: underline; }
+.text-button-danger { color: #9d574a; }
+.text-button-danger:hover { color: #7e3428; }
+.inline-form { display: inline; }
 .filter-bar { display: flex; flex-wrap: wrap; align-items: end; gap: 11px; margin-bottom: 17px; padding: 13px; border: 1px solid var(--line); border-radius: 9px; background: white; }
 .field { min-width: 130px; }
 .field.grow { flex: 1; }

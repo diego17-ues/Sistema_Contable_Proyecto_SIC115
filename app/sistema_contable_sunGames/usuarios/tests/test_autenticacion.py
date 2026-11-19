@@ -214,6 +214,14 @@ class AccesoServiceTests(SimpleTestCase):
         with self.assertRaises(RolNoAutorizadoError):
             self.servicio.verificar_acceso(costos, "users")
 
+    def test_rendimiento_solo_es_visible_para_contador_de_costos(self):
+        costos = Usuario(username="costos", rol=Rol.CONTADOR_COSTOS)
+        self.servicio.verificar_acceso(costos, "rendimiento")
+        self.assertIn("rendimiento", self.servicio.modulos(costos))
+        for usuario in (self.contador, self.admin):
+            with self.assertRaises(RolNoAutorizadoError):
+                self.servicio.verificar_acceso(usuario, "rendimiento")
+
     def test_usuario_inactivo_no_accede(self):
         self.contador.activo = False
 

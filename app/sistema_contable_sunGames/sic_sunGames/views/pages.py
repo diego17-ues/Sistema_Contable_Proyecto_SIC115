@@ -18,6 +18,7 @@ SCREEN_URL_NAMES = {
     "reports": "reports",
     "operations": "operations",
     "costos": "costos_ordenes",
+    "rendimiento": "costos_rendimiento",
     "users": "users",
     "audit": "audit",
     "estimacion": "estimacion",

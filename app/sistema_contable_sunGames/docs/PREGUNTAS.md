@@ -24,17 +24,17 @@ Abiertas:
    alimenta la tarifa de cada proceso? `MapeoCuenta` lo permite por
    proceso; falta el mapeo inicial.
 
-2. **Cuentas origen de costos indirectos** (asiento 3): candidatas
-   `4203`–`4208` (honorarios no; depreciación 4207, amortización de
-   licencias 4208, alquileres 4204, servicios básicos 4205, papelería
-   4206) y las no circulantes si procede. ¿Cuáles alimentan el pool y a
-   qué proceso se asigna cada una (o reparto por horas totales)?
+2. **Cuentas origen de costos indirectos** (asiento 3): resuelto para la
+   automatización actual mediante `FuenteIndirecta`. Se configuran desde
+   Costos · Catálogos, solo con cuentas de costos/gastos declaradas
+   exclusivas de desarrollo; no se siembran cuentas por defecto. Las
+   compartidas quedan excluidas por instrucción del usuario. Una fuente
+   puede asignarse a un proceso o al pool general por horas totales.
 
-3. **Anti doble conteo**: la regla compara lo aplicado contra "el saldo
-   de la cuenta origen en el período". ¿Saldo = suma neta de
-   movimientos del mayor en el período (debe − haber) o solo el debe?
-   Asumo **neto del período**; confirmar. ¿El `porcentaje` del mapeo
-   reduce la base comparada o solo lo aplicado?
+3. **Anti doble conteo**: la fuente se toma del saldo neto firmado del
+   período (Debe menos Haber); cada combinación fuente/orden/período
+   tiene clave idempotente y no se aplica dos veces. El modelo actual no
+   usa un porcentaje de mapeo.
 
 4. **Reapertura del período**: el mayor permite reabrir (Admin +
    contraseña) pero no revierte movimientos. ¿El módulo genera los
@@ -172,3 +172,29 @@ documenta la decisión tomada para poder revertirla.
     las tablas de cortes, fondos, equipos, salarios, parámetros, tasas
     por proceso, mapeos, horas y cargos del modelo anterior (nunca
     generaron asientos). Revertir la migración recrea las tablas vacías.
+
+## Distribución automática de costos indirectos (2026-11-19)
+
+El diagnóstico está en `docs/DIAGNOSTICO_OT.md`, sección
+«Diagnóstico para distribuir costos indirectos automáticamente».
+
+Decisiones aplicadas:
+
+- El usuario indicó excluir cuentas compartidas por ahora. No se modificó
+  el Libro Mayor. La pantalla de fuentes acepta solo cuentas de costos o
+  gastos y exige confirmar que sean exclusivas de desarrollo; las cuentas
+  compartidas se registran en la lista de exclusión.
+- La base es el saldo neto firmado del período (Debe menos Haber), acorde
+  con el modelo de movimientos firmado y la consulta existente de saldos.
+  Los créditos/reversiones reducen el pool.
+- Todas las fuentes reclasifican saldos ya registrados en el mayor. La
+  contabilidad no tiene activos ni cálculo de depreciación/amortización
+  por activo, por lo que no se calcula ni asienta una depreciación nueva.
+- Las fuentes sin proceso se distribuyen sobre todas las horas elegibles;
+  una fuente con proceso se distribuye solo sobre las horas de ese proceso.
+- No se cargan fuentes iniciales automáticamente; el Contador de Costos
+  las configura después de confirmar que su cuenta no está compartida.
+
+Pendiente operativo: configurar las cuentas que la empresa haya separado
+exclusivamente para desarrollo. Mientras no se configure ninguna, la
+pantalla muestra la alerta y no aplica importes.

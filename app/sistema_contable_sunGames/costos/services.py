@@ -21,7 +21,7 @@ from django.utils import timezone
 
 from bitacora.eventos import Accion, Resultado
 from libro_mayor.exceptions import FechaInvalidaError, LibroMayorError
-from libro_mayor.models import TipoMovimiento
+from libro_mayor.models import EstadoPeriodo, TipoMovimiento
 from usuarios.exceptions import RolNoAutorizadoError, UsuarioInactivoError
 from usuarios.roles import Rol
 
@@ -41,7 +41,13 @@ from .exceptions import (
     RegistroNoEncontradoError,
     RegistroYaAnuladoError,
 )
-from .models import AsientoCosto, Elemento, RegistroCosto
+from .models import (
+    AsientoCosto,
+    CuentaIndirectaExcluida,
+    Elemento,
+    FuenteIndirecta,
+    RegistroCosto,
+)
 
 # Módulo exclusivo del Contador de Costos (separado del Contador General).
 ROLES_COSTOS = frozenset({Rol.CONTADOR_COSTOS})
@@ -93,6 +99,54 @@ class OrdenService(CostosService):
         orden = self._orden(orden_id)
         return self._resumen(orden, self._repo.registros_de_orden(orden))
 
+    def evaluar_rendimiento(self, actor, orden_id):
+        """Compara la estimación vinculada con los costos vigentes de la OT."""
+        _verificar(actor)
+        orden = self._orden(orden_id)
+        if orden.estimacion_ref is None:
+            raise DatosInsuficientesError(
+                "Vincula una estimación aprobada antes de evaluar la orden."
+            )
+        if self._total_estimacion is None:
+            raise DatosInsuficientesError(
+                "No está disponible el total de la estimación vinculada."
+            )
+
+        registros = list(self._repo.registros_de_orden(orden))
+        if not any(registro.vigente for registro in registros):
+            raise DatosInsuficientesError(
+                "La evaluación requiere al menos un costo vigente."
+            )
+
+        _, _, total_real = calculos.resumir(registros, Elemento.values)
+        total_estimado = self._total_estimacion(orden.estimacion_ref)
+        return calculos.comparar_estimado_real(total_estimado, total_real)
+
+    def resultados_rendimiento(self, actor):
+        """Lista estimación y costo real vigente por orden de trabajo."""
+        _verificar(actor)
+        resultados = []
+        for orden in self._repo.ordenes_rendimiento():
+            total_real = orden.total_vigente
+            total_estimado = None
+            if (orden.estimacion_ref is not None
+                    and self._total_estimacion is not None):
+                total_estimado = self._total_estimacion(orden.estimacion_ref)
+
+            evaluacion = None
+            if total_estimado is not None and total_real is not None:
+                evaluacion = calculos.comparar_estimado_real(
+                    total_estimado, total_real
+                )
+
+            resultados.append({
+                "orden": orden,
+                "total_estimado": total_estimado,
+                "total_real": total_real,
+                "evaluacion": evaluacion,
+            })
+        return resultados
+
     def hoja_costos(self, actor, orden_id):
         _verificar(actor)
         orden = self._orden(orden_id)
@@ -107,9 +161,13 @@ class OrdenService(CostosService):
         ]
         return orden, secciones, resumen
 
-    def versiones_aprobadas(self, actor):
+    def versiones_disponibles(self, actor, *, orden_id=None):
         _verificar(actor)
-        return list(self._repo.versiones_aprobadas())
+        if orden_id is not None:
+            self._orden(orden_id)
+        return list(self._repo.versiones_disponibles(
+            orden_id=orden_id
+        ))
 
     def actualizar_licencias(self, actor, orden_id, licencias):
         _verificar(actor)
@@ -126,23 +184,36 @@ class OrdenService(CostosService):
         return orden
 
     def vincular_estimacion(self, actor, orden_id, version_id):
-        """Vínculo de solo lectura con una versión aprobada o vigente."""
+        """Vincula una versión disponible y aprobada o vigente."""
         _verificar(actor)
         orden = self._orden(orden_id)
         version = None
         if version_id:
-            version = self._repo.obtener_version(version_id)
+            version = self._repo.obtener_version_disponible(
+                version_id, orden_id=orden.pk
+            )
             if version is None:
                 raise DatosInsuficientesError(
-                    "Solo se vincula una versión de presupuesto aprobada.",
-                    campo="version",
+                    "La estimación no está disponible o ya pertenece a "
+                    "otra orden.", campo="version",
                 )
-        orden.estimacion_ref = version
-        self._repo.guardar_orden(orden)
-        self._auditar(
-            actor, Accion.ORDEN_TRABAJO, f"OT {orden.pk}",
-            f"Estimación de referencia: {version.pk if version else '—'}",
-        )
+        try:
+            with self._transaccion():
+                orden.estimacion_ref = version
+                self._repo.guardar_orden(orden)
+                self._auditar(
+                    actor, Accion.ORDEN_TRABAJO, f"OT {orden.pk}",
+                    "Estimación de referencia: "
+                    f"{version.pk if version else '—'}",
+                )
+        except IntegrityError as exc:
+            if (version_id and self._repo.obtener_version_disponible(
+                    version_id, orden_id=orden.pk) is None):
+                raise DatosInsuficientesError(
+                    "La estimación ya fue vinculada a otra orden.",
+                    campo="version",
+                ) from exc
+            raise
         return orden
 
     def _resumen(self, orden, registros):
@@ -172,9 +243,11 @@ class OrdenService(CostosService):
             "total_estimado": total_estimado,
         }
 
-    def listar(self, actor, *, estado=None):
+    def listar(self, actor, *, estado=None, incluir_eliminadas=False):
         _verificar(actor)
-        return list(self._repo.ordenes(estado=estado))
+        return list(self._repo.ordenes(
+            estado=estado, incluir_eliminadas=incluir_eliminadas
+        ))
 
     def detalle(self, actor, orden_id):
         _verificar(actor)
@@ -184,31 +257,174 @@ class OrdenService(CostosService):
         _verificar(actor)
         return list(self._repo.registros_de_orden(orden))
 
-    def crear_orden(self, actor, *, nombre_juego, fecha_inicio):
+    def crear_orden(self, actor, *, nombre_juego=None, fecha_inicio,
+                    estimacion_id=None):
         _verificar(actor)
-        nombre = (nombre_juego or "").strip()
-        if not nombre:
-            raise DatosInsuficientesError(
-                "Indica el juego de la orden.", campo="nombre_juego"
-            )
         if fecha_inicio is None:
             raise DatosInsuficientesError(
                 "Indica la fecha de inicio.", campo="fecha_inicio"
             )
-        with self._transaccion():
-            juego = self._repo.juego_por_nombre(nombre)
-            if juego is None:
-                juego = self._repo.crear_juego(nombre=nombre)
-            elif self._repo.orden_por_juego(juego) is not None:
-                raise OrdenDuplicadaError(
-                    "Ese juego ya tiene una orden de trabajo.",
-                    campo="nombre_juego",
+        try:
+            with self._transaccion():
+                version = None
+                if estimacion_id:
+                    version = self._repo.obtener_version_disponible(
+                        estimacion_id
+                    )
+                    if version is None:
+                        raise DatosInsuficientesError(
+                            "La estimación no está disponible o ya fue "
+                            "vinculada a otra orden.", campo="estimacion",
+                        )
+                    nombre = version.juego.nombre
+                else:
+                    nombre = (nombre_juego or "").strip()
+                    if not nombre:
+                        raise DatosInsuficientesError(
+                            "Indica el juego de la orden o selecciona una "
+                            "estimación.", campo="nombre_juego"
+                        )
+
+                juego = self._repo.juego_por_nombre(nombre)
+                if juego is None:
+                    juego = self._repo.crear_juego(nombre=nombre)
+                elif self._repo.orden_por_juego(juego) is not None:
+                    raise OrdenDuplicadaError(
+                        "Ese juego ya tiene una orden de trabajo.",
+                        campo="nombre_juego",
+                    )
+                orden = self._repo.crear_orden(
+                    juego=juego, fecha_inicio=fecha_inicio, usuario=actor,
+                    estimacion_ref=version,
                 )
-            orden = self._repo.crear_orden(
-                juego=juego, fecha_inicio=fecha_inicio, usuario=actor,
+                detalle = "Alta de orden"
+                if version is not None:
+                    detalle += f" · estimación: {version.pk}"
+                self._auditar(
+                    actor, Accion.ORDEN_TRABAJO,
+                    f"OT {orden.pk} · {juego.nombre}", detalle,
+                )
+        except IntegrityError as exc:
+            if (estimacion_id and self._repo.obtener_version_disponible(
+                    estimacion_id) is None):
+                raise DatosInsuficientesError(
+                    "La estimación ya fue vinculada a otra orden.",
+                    campo="estimacion",
+                ) from exc
+            raise
+        return orden
+
+    def actualizar_orden(self, actor, orden_id, *, nombre_juego,
+                         fecha_inicio, estimacion_id=None,
+                         licencias_estimadas=None):
+        _verificar(actor)
+        orden = self._orden(orden_id)
+        if fecha_inicio is None:
+            raise DatosInsuficientesError(
+                "Indica la fecha de inicio.", campo="fecha_inicio"
             )
-            self._auditar(actor, Accion.ORDEN_TRABAJO,
-                          f"OT {orden.pk} · {juego.nombre}", "Alta de orden")
+        primera_fecha = self._repo.primera_fecha_registro_orden(orden)
+        if primera_fecha and fecha_inicio > primera_fecha:
+            raise DatosInsuficientesError(
+                "La fecha de inicio no puede ser posterior al primer costo "
+                "registrado.", campo="fecha_inicio",
+            )
+
+        version = None
+        if estimacion_id:
+            version = self._repo.obtener_version_disponible(
+                estimacion_id, orden_id=orden.pk
+            )
+            if (version is None
+                    and int(estimacion_id) == orden.estimacion_ref_id):
+                version = orden.estimacion_ref
+            if version is None:
+                raise DatosInsuficientesError(
+                    "La estimación no está disponible o pertenece a otra "
+                    "orden.", campo="estimacion",
+                )
+            nombre = version.juego.nombre
+        else:
+            nombre = (nombre_juego or "").strip()
+            if not nombre:
+                raise DatosInsuficientesError(
+                    "Indica el nombre del juego o selecciona una "
+                    "estimación.", campo="nombre_juego",
+                )
+
+        juego_existente = self._repo.juego_por_nombre(nombre)
+        if (juego_existente is not None
+                and juego_existente.pk != orden.juego_id):
+            raise OrdenDuplicadaError(
+                "Ya existe otro juego con ese nombre.",
+                campo="nombre_juego",
+            )
+        if licencias_estimadas not in (None, ""):
+            if int(licencias_estimadas) <= 0:
+                raise DatosInsuficientesError(
+                    "Las licencias estimadas deben ser mayores que cero.",
+                    campo="licencias_estimadas",
+                )
+
+        with self._transaccion():
+            orden.juego.nombre = nombre
+            self._repo.guardar_juego(orden.juego)
+            orden.fecha_inicio = fecha_inicio
+            orden.estimacion_ref = version
+            if licencias_estimadas not in (None, ""):
+                orden.licencias_estimadas = int(licencias_estimadas)
+            self._repo.guardar_orden(orden)
+            self._auditar(
+                actor, Accion.ORDEN_TRABAJO, f"OT {orden.pk}",
+                "Modificación de orden de trabajo.",
+            )
+        return orden
+
+    def eliminar(self, actor, orden_id):
+        _verificar(actor)
+        orden = self._repo.obtener_orden(
+            orden_id, incluir_eliminada=True
+        )
+        if orden is None:
+            raise OrdenNoEncontradaError("La orden de trabajo no existe.")
+        if orden.eliminada:
+            return orden
+        with self._transaccion():
+            orden.eliminado_en = timezone.now()
+            orden.eliminado_por = actor
+            self._repo.guardar_orden(orden)
+            self._auditar(
+                actor, Accion.ORDEN_TRABAJO, f"OT {orden.pk}",
+                "Baja lógica; se conservan la orden, costos y asientos.",
+            )
+        return orden
+
+    def restaurar(self, actor, orden_id):
+        _verificar(actor)
+        orden = self._repo.obtener_orden(
+            orden_id, incluir_eliminada=True
+        )
+        if orden is None:
+            raise OrdenNoEncontradaError("La orden de trabajo no existe.")
+        if not orden.eliminada:
+            return orden
+        if self._repo.hay_otra_orden_activa(orden):
+            raise OrdenDuplicadaError(
+                "Ya existe una orden activa para este juego. Archívala "
+                "antes de restaurar la orden anterior."
+            )
+        if self._repo.estimacion_en_otra_orden_activa(orden):
+            raise DatosInsuficientesError(
+                "La estimación ya está vinculada a otra orden activa."
+            )
+        with self._transaccion():
+            orden.eliminado_en = None
+            orden.eliminado_por = None
+            self._repo.guardar_orden(orden)
+            self._auditar(
+                actor, Accion.ORDEN_TRABAJO, f"OT {orden.pk}",
+                "Restauración de la orden archivada.",
+            )
         return orden
 
 
@@ -316,6 +532,11 @@ class RegistroCostoService(CostosService):
         registro = self._registro(registro_id)
         if not registro.vigente:
             raise RegistroYaAnuladoError("El registro ya está anulado.")
+        if registro.es_automatico:
+            raise DatosInsuficientesError(
+                "Los indirectos automáticos se revierten desde la pantalla "
+                "del período, no por orden individual."
+            )
         motivo = (motivo or "").strip()
         if not motivo:
             raise DatosInsuficientesError(
@@ -553,6 +774,134 @@ class CatalogoCostosService(CostosService):
         _verificar(actor)
         return list(self._repo.cuentas_posteables())
 
+    def fuentes_indirectas(self, actor):
+        _verificar(actor)
+        return list(self._repo.fuentes_indirectas())
+
+    def cuentas_fuentes_disponibles(self, actor):
+        _verificar(actor)
+        return list(self._repo.cuentas_fuentes_disponibles())
+
+    def cuentas_indirectas_excluidas(self, actor):
+        _verificar(actor)
+        return list(self._repo.cuentas_indirectas_excluidas())
+
+    def crear_fuente_indirecta(self, actor, *, nombre, tipo, cuenta,
+                               proceso=None, exclusiva_desarrollo=False):
+        _verificar(actor)
+        nombre = (nombre or "").strip()
+        if not nombre:
+            raise DatosInsuficientesError(
+                "Indica el nombre de la fuente.", campo="nombre"
+            )
+        if tipo not in FuenteIndirecta.Tipo.values:
+            raise DatosInsuficientesError(
+                "Selecciona un tipo de fuente válido.", campo="tipo"
+            )
+        if proceso is not None and not proceso.activo:
+            raise ProcesoNoValidoError(
+                "El proceso asignado está inactivo.", campo="proceso"
+            )
+        if not exclusiva_desarrollo:
+            raise DatosInsuficientesError(
+                "Solo se pueden aplicar cuentas dedicadas exclusivamente "
+                "a costos de desarrollo.", campo="exclusiva_desarrollo"
+            )
+        if cuenta is None or not cuenta.activa:
+            raise CuentaNoValidaError(
+                "La cuenta de origen no existe o está inactiva.",
+                campo="cuenta_origen",
+            )
+        if cuenta.rubro.codigo != "4":
+            raise CuentaNoValidaError(
+                "El origen debe ser una cuenta de costos o gastos.",
+                campo="cuenta_origen",
+            )
+        if self._repo.cuenta_indirecta_excluida(cuenta):
+            raise CuentaNoValidaError(
+                "La cuenta está excluida de la distribución automática.",
+                campo="cuenta_origen",
+            )
+        existente = self._repo.fuentes_indirectas().filter(
+            cuenta_origen=cuenta
+        ).first()
+        if existente is not None:
+            raise CuentaNoValidaError(
+                "La cuenta ya está registrada como fuente indirecta.",
+                campo="cuenta_origen",
+            )
+        try:
+            with self._transaccion():
+                fuente = self._repo.crear_fuente_indirecta(
+                    nombre=nombre, tipo=tipo, cuenta_origen=cuenta,
+                    proceso=proceso, exclusiva_desarrollo=True, activa=True,
+                )
+                self._auditar(
+                    actor, Accion.CATALOGO_COSTOS,
+                    f"Fuente indirecta {fuente.pk}",
+                    f"{fuente.nombre} · cuenta {cuenta.codigo}",
+                )
+        except IntegrityError as exc:
+            raise CuentaNoValidaError(
+                "La cuenta ya está registrada como fuente indirecta."
+            ) from exc
+        return fuente
+
+    def excluir_cuenta_indirecta(self, actor, *, cuenta, motivo):
+        _verificar(actor)
+        motivo = (motivo or "").strip()
+        if cuenta is None or not cuenta.activa:
+            raise CuentaNoValidaError("Selecciona una cuenta activa.")
+        if not motivo:
+            raise DatosInsuficientesError(
+                "Describe por qué se excluye esta cuenta.", campo="motivo"
+            )
+        fuente = self._repo.fuentes_indirectas().filter(
+            cuenta_origen=cuenta
+        ).first()
+        try:
+            with self._transaccion():
+                if fuente is not None:
+                    fuente.activa = False
+                    self._repo.guardar_fuente_indirecta(fuente)
+                exclusion = self._repo.excluir_cuenta_indirecta(
+                    cuenta=cuenta, motivo=motivo, actor=actor
+                )
+                self._auditar(
+                    actor, Accion.CATALOGO_COSTOS,
+                    f"Cuenta indirecta excluida {cuenta.codigo}",
+                    motivo[:200],
+                )
+        except IntegrityError as exc:
+            raise CuentaNoValidaError(
+                "La cuenta ya está en la lista de exclusión."
+            ) from exc
+        return exclusion
+
+    def quitar_exclusion_indirecta(self, actor, exclusion_id):
+        _verificar(actor)
+        exclusion = next((e for e in self._repo.cuentas_indirectas_excluidas()
+                          if e.pk == exclusion_id), None)
+        if exclusion is None:
+            raise DatosInsuficientesError(
+                "La cuenta excluida ya no existe."
+            )
+        cuenta = exclusion.cuenta
+        with self._transaccion():
+            self._repo.eliminar_exclusion_indirecta(exclusion)
+            fuente = self._repo.fuentes_indirectas().filter(
+                cuenta_origen=cuenta
+            ).first()
+            if fuente is not None and fuente.exclusiva_desarrollo:
+                fuente.activa = True
+                self._repo.guardar_fuente_indirecta(fuente)
+            self._auditar(
+                actor, Accion.CATALOGO_COSTOS,
+                f"Cuenta indirecta habilitada {cuenta.codigo}",
+                "Eliminada de la lista de exclusión",
+            )
+        return cuenta
+
     def guardar_configuracion(self, actor, *, elemento, cuenta_costo,
                               contrapartidas, contrapartida_defecto):
         _verificar(actor)
@@ -587,3 +936,320 @@ class CatalogoCostosService(CostosService):
                 + ", ".join(c.codigo for c in contrapartidas),
             )
         return config
+
+
+class AplicacionIndirectosService(CostosService):
+    """Vista previa, distribución y asiento de indirectos por horas."""
+
+    def __init__(self, repositorio, mayor, bitacora,
+                 transaccion=nullcontext):
+        super().__init__(repositorio, bitacora, transaccion)
+        self._mayor = mayor
+
+    def periodos(self, actor):
+        _verificar(actor)
+        return list(self._repo.periodos_contables())
+
+    def previsualizar(self, actor, periodo_id):
+        _verificar(actor)
+        periodo = self._periodo(periodo_id)
+        existentes = list(self._repo.registros_indirectos_periodo(periodo))
+        por_fuente = {}
+        for registro in existentes:
+            por_fuente.setdefault(registro.fuente_indirecta_id, []).append(
+                registro
+            )
+
+        alertas = []
+        fuentes_resumen = []
+        distribucion = []
+        total_pool = Decimal("0.00")
+        total_distribuido = Decimal("0.00")
+        fuentes = list(self._repo.fuentes_indirectas(solo_activas=True))
+        if not fuentes:
+            alertas.append(
+                "No hay fuentes indirectas exclusivas de desarrollo "
+                "configuradas. Las cuentas compartidas quedan fuera."
+            )
+
+        for fuente in fuentes:
+            previa = por_fuente.get(fuente.pk, [])
+            if previa:
+                activas = [r for r in previa if r.vigente]
+                importe = sum((r.importe for r in activas), Decimal("0.00"))
+                total_pool += sum(
+                    (r.importe for r in previa), Decimal("0.00")
+                )
+                total_distribuido += importe
+                fuentes_resumen.append({
+                    "fuente": fuente,
+                    "pool": sum((r.importe for r in previa),
+                                Decimal("0.00")),
+                    "horas": sum((r.horas or Decimal("0") for r in activas),
+                                 Decimal("0")),
+                    "distribuido": importe,
+                    "estado": "APLICADA" if activas else "REVERTIDA",
+                })
+                if not activas:
+                    alertas.append(
+                        f"{fuente.nombre}: la aplicación fue revertida; "
+                        "no se vuelve a aplicar para evitar duplicados."
+                    )
+                continue
+
+            if self._repo.cuenta_indirecta_excluida(fuente.cuenta_origen):
+                alertas.append(
+                    f"{fuente.nombre}: su cuenta está excluida y no se "
+                    "aplicará."
+                )
+                continue
+            if not fuente.cuenta_origen.activa:
+                alertas.append(
+                    f"{fuente.nombre}: la cuenta de origen está inactiva."
+                )
+                continue
+
+            pool = Decimal(self._repo.saldo_cuenta_periodo(
+                fuente.cuenta_origen, periodo
+            ))
+            if pool <= 0:
+                alertas.append(
+                    f"{fuente.nombre}: no tiene saldo neto deudor en el "
+                    "período."
+                )
+                fuentes_resumen.append({
+                    "fuente": fuente, "pool": pool,
+                    "horas": Decimal("0"),
+                    "distribuido": Decimal("0.00"),
+                    "estado": "SIN SALDO",
+                })
+                continue
+
+            horas_ordenes = self._repo.horas_por_orden_periodo(
+                periodo, proceso=fuente.proceso
+            )
+            horas = {
+                orden.pk: Decimal(orden.horas)
+                for orden in horas_ordenes
+            }
+            total_horas = sum(horas.values(), Decimal("0"))
+            total_pool += pool
+            if total_horas <= 0:
+                alertas.append(
+                    f"{fuente.nombre}: hay ${pool:.2f} en el pool, pero "
+                    "ninguna orden abierta tiene horas elegibles; queda "
+                    "como gasto del período."
+                )
+                fuentes_resumen.append({
+                    "fuente": fuente, "pool": pool,
+                    "horas": total_horas,
+                    "distribuido": Decimal("0.00"), "estado": "SIN HORAS",
+                })
+                continue
+
+            asignaciones = calculos.distribuir_por_horas(pool, horas)
+            total_fuente = sum(asignaciones.values(), Decimal("0.00"))
+            total_distribuido += total_fuente
+            nombres = {orden.pk: orden.juego.nombre
+                       for orden in horas_ordenes}
+            for orden in horas_ordenes:
+                importe = asignaciones.get(orden.pk, Decimal("0.00"))
+                if importe <= 0:
+                    continue
+                distribucion.append({
+                    "fuente": fuente,
+                    "orden_id": orden.pk,
+                    "juego": nombres[orden.pk],
+                    "horas": horas[orden.pk],
+                    "tasa": pool / total_horas,
+                    "importe": importe,
+                })
+            fuentes_resumen.append({
+                "fuente": fuente, "pool": pool, "horas": total_horas,
+                "tasa": pool / total_horas,
+                "distribuido": total_fuente, "estado": "LISTA",
+            })
+
+        estado = "LISTA" if distribucion else "PENDIENTE"
+        hay_aplicadas = any(
+            f["estado"] == "APLICADA" for f in fuentes_resumen
+        )
+        if hay_aplicadas:
+            estado = "APLICADA"
+        elif any(f["estado"] == "REVERTIDA" for f in fuentes_resumen):
+            estado = "REVERTIDA"
+        return {
+            "periodo": periodo,
+            "estado": estado,
+            "periodo_abierto": periodo.estado == EstadoPeriodo.ABIERTO,
+            "fuentes": fuentes_resumen,
+            "distribucion": distribucion,
+            "alertas": alertas,
+            "total_pool": total_pool,
+            "total_distribuido": total_distribuido,
+            "puede_aplicar": bool(distribucion),
+            "puede_revertir": hay_aplicadas,
+        }
+
+    def aplicar(self, actor, periodo_id):
+        _verificar(actor)
+        vista = self.previsualizar(actor, periodo_id)
+        periodo = vista["periodo"]
+        if periodo.estado != EstadoPeriodo.ABIERTO:
+            raise PeriodoNoAbiertoError(
+                "El período contable está cerrado; no se pueden aplicar "
+                "costos indirectos."
+            )
+        if not vista["distribucion"]:
+            return vista
+        configuracion = self._repo.configuracion(Elemento.INDIRECTO)
+        if configuracion is None:
+            raise ConfiguracionNoEncontradaError(
+                "Configura la cuenta de costos indirectos antes de aplicar "
+                "el pool."
+            )
+        cuenta_costo = configuracion.cuenta_costo
+        self._verificar_cuenta_asiento(cuenta_costo)
+
+        try:
+            with self._transaccion():
+                for linea in vista["distribucion"]:
+                    self._registrar_linea(actor, periodo, cuenta_costo,
+                                         linea)
+        except IntegrityError:
+            # El índice único de la clave impide repetir el envío si dos
+            # peticiones confirman la misma aplicación simultáneamente.
+            return self.previsualizar(actor, periodo_id)
+
+        self._auditar(
+            actor, Accion.CARGO_ORDEN,
+            f"Indirectos período {periodo.pk}",
+            f"Distribuidos ${vista['total_distribuido']:.2f} en "
+            f"{len(vista['distribucion'])} órdenes",
+        )
+        return self.previsualizar(actor, periodo_id)
+
+    def revertir(self, actor, periodo_id):
+        _verificar(actor)
+        periodo = self._periodo(periodo_id)
+        if periodo.estado != EstadoPeriodo.ABIERTO:
+            raise PeriodoNoAbiertoError(
+                "El período está cerrado; no se puede revertir la "
+                "aplicación de indirectos."
+            )
+        registros = [r for r in self._repo.registros_indirectos_periodo(
+            periodo
+        ) if r.vigente]
+        if not registros:
+            return self.previsualizar(actor, periodo_id)
+
+        with self._transaccion():
+            for registro in registros:
+                lineas = calculos.lineas_contrarias(
+                    calculos.lineas_registro(
+                        registro.cuenta_costo, registro.contrapartida,
+                        registro.importe,
+                    )
+                )
+                clave = f"rev-indirecto-{periodo.pk}-{registro.pk}"
+                transaccion = self._mayor.crear_transaccion(usuario=actor)
+                if not calculos.cuadra(lineas):
+                    raise AsientoDescuadradoError(
+                        "El contra-asiento automático no cuadra."
+                    )
+                for cuenta, importe in lineas:
+                    self._mayor.crear_movimiento(
+                        transaccion=transaccion, cuenta=cuenta,
+                        fecha=periodo.fecha_fin,
+                        concepto=(f"Reversión indirectos · "
+                                  f"{registro.fuente_indirecta.nombre}"),
+                        referencia=(f"OT-{registro.orden_id} · "
+                                    f"I{registro.pk}")[:40],
+                        tipo=TipoMovimiento.AJUSTE, importe=importe,
+                    )
+                self._repo.crear_asiento(
+                    transaccion=transaccion,
+                    tipo=AsientoCosto.TIPO_ANULACION,
+                    orden=registro.orden, registro=registro,
+                    clave_idempotencia=clave,
+                )
+                registro.estado = RegistroCosto.ESTADO_ANULADO
+                registro.motivo_anulacion = (
+                    "Reversión de aplicación de indirectos del período"
+                )
+                registro.anulado_por = actor
+                registro.anulado_en = timezone.now()
+                self._repo.guardar_registro(registro)
+
+        self._auditar(
+            actor, Accion.CARGO_ORDEN,
+            f"Reversión indirectos período {periodo.pk}",
+            f"Contra-asientos: {len(registros)}",
+        )
+        return self.previsualizar(actor, periodo_id)
+
+    def _periodo(self, periodo_id):
+        periodo = self._repo.obtener_periodo_contable(periodo_id)
+        if periodo is None:
+            raise DatosInsuficientesError(
+                "Selecciona un período contable válido.", campo="periodo"
+            )
+        return periodo
+
+    def _verificar_cuenta_asiento(self, cuenta):
+        if (cuenta is None or not cuenta.activa
+                or self._mayor.tiene_subcuentas(cuenta)):
+            raise CuentaNoValidaError(
+                "La cuenta de costos indirectos no admite movimientos."
+            )
+
+    def _registrar_linea(self, actor, periodo, cuenta_costo, linea):
+        fuente = linea["fuente"]
+        orden = self._repo.obtener_orden(linea["orden_id"])
+        if orden is None or not orden.abierta:
+            raise OrdenCerradaError(
+                "Una orden dejó de estar abierta; no se aplicó el período."
+            )
+        if self._repo.cuenta_indirecta_excluida(fuente.cuenta_origen):
+            raise CuentaNoValidaError(
+                f"La cuenta de «{fuente.nombre}» está excluida."
+            )
+        self._verificar_cuenta_asiento(fuente.cuenta_origen)
+        importe = calculos.a_centavos(linea["importe"])
+        clave = f"ind-{periodo.pk}-{fuente.pk}-{orden.pk}"
+        if self._repo.registro_por_clave(clave) is not None:
+            return
+
+        descripcion = f"Indirecto automático · {fuente.nombre}"
+        if fuente.proceso is not None:
+            descripcion += f" · {fuente.proceso.nombre}"
+        registro = self._repo.crear_registro(
+            orden=orden, elemento=Elemento.INDIRECTO,
+            fecha=periodo.fecha_fin, proceso=fuente.proceso,
+            descripcion=descripcion[:200], horas=linea["horas"],
+            costo_hora=None, importe=importe,
+            cuenta_costo=cuenta_costo,
+            contrapartida=fuente.cuenta_origen,
+            fuente_indirecta=fuente, periodo_indirecto=periodo,
+            clave_idempotencia=clave, usuario=actor,
+        )
+        lineas = calculos.lineas_registro(
+            cuenta_costo, fuente.cuenta_origen, importe
+        )
+        if not calculos.cuadra(lineas):
+            raise AsientoDescuadradoError(
+                "El asiento automático de indirectos no cuadra."
+            )
+        transaccion = self._mayor.crear_transaccion(usuario=actor)
+        for cuenta, monto in lineas:
+            self._mayor.crear_movimiento(
+                transaccion=transaccion, cuenta=cuenta,
+                fecha=periodo.fecha_fin,
+                concepto=f"OT-{orden.pk} · {descripcion}"[:200],
+                referencia=f"OT-{orden.pk} · I{registro.pk}"[:40],
+                tipo=TipoMovimiento.DIARIO, importe=monto,
+            )
+        self._repo.crear_asiento(
+            transaccion=transaccion, tipo=AsientoCosto.TIPO_REGISTRO,
+            orden=orden, registro=registro, clave_idempotencia=clave,
+        )

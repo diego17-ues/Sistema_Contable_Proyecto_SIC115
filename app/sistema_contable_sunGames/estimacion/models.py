@@ -164,6 +164,14 @@ class EstimacionExperto(models.Model):
     experto = models.ForeignKey(
         Experto, on_delete=models.PROTECT, related_name="estimaciones"
     )
+    eliminado_en = models.DateTimeField(
+        "eliminado en", null=True, blank=True
+    )
+    eliminado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name="estimaciones_experto_eliminadas",
+        null=True, blank=True,
+    )
     ronda = models.PositiveIntegerField("ronda")
     optimista = models.DecimalField(
         "optimista (O)", max_digits=10,
@@ -197,12 +205,26 @@ class EstimacionExperto(models.Model):
             ),
             models.UniqueConstraint(
                 fields=["juego", "fase", "rol", "experto", "ronda"],
+                condition=models.Q(eliminado_en__isnull=True),
                 name="estimacion_unica_por_ronda",
+            ),
+            models.CheckConstraint(
+                check=(
+                    models.Q(eliminado_en__isnull=True,
+                             eliminado_por__isnull=True)
+                    | models.Q(eliminado_en__isnull=False,
+                              eliminado_por__isnull=False)
+                ),
+                name="estimacion_baja_logica_completa",
             ),
         ]
 
     def __str__(self):
         return f"{self.fase} / {self.rol} ronda {self.ronda}"
+
+    @property
+    def eliminada(self):
+        return self.eliminado_en is not None
 
 
 class RondaDelphi(models.Model):
@@ -261,6 +283,14 @@ class VersionPresupuesto(models.Model):
         settings.AUTH_USER_MODEL, verbose_name="autor",
         on_delete=models.PROTECT, related_name="versiones_presupuesto",
     )
+    eliminado_en = models.DateTimeField(
+        "eliminado en", null=True, blank=True
+    )
+    eliminado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name="versiones_presupuesto_eliminadas",
+        null=True, blank=True,
+    )
     fecha = models.DateTimeField("fecha", auto_now_add=True)
     snapshot_parametros = models.JSONField(
         "parámetros usados", default=dict
@@ -278,6 +308,15 @@ class VersionPresupuesto(models.Model):
                 check=models.Q(estado__in=EstadoVersion.values),
                 name="version_estado_valido",
             ),
+            models.CheckConstraint(
+                check=(
+                    models.Q(eliminado_en__isnull=True,
+                             eliminado_por__isnull=True)
+                    | models.Q(eliminado_en__isnull=False,
+                              eliminado_por__isnull=False)
+                ),
+                name="version_baja_logica_completa",
+            ),
         ]
 
     def __str__(self):
@@ -289,10 +328,8 @@ class VersionPresupuesto(models.Model):
 
     def save(self, *args, **kwargs):
         if self.pk:
-            anterior = type(self).objects.filter(pk=self.pk).values_list(
-                "estado", flat=True
-            ).first()
-            if anterior in (
+            anterior = type(self).objects.filter(pk=self.pk).first()
+            if anterior and anterior.estado in (
                 self.Estado.APROBADO, self.Estado.VIGENTE,
                 self.Estado.RECHAZADO,
             ):
@@ -300,17 +337,34 @@ class VersionPresupuesto(models.Model):
         super().save(*args, **kwargs)
 
     def _verificar_cambio_permitido(self, anterior):
+        campos_de_baja_logica = {"eliminado_en", "eliminado_por_id"}
+        campos_controlados = campos_de_baja_logica | {"estado"}
+        cambios_de_datos = any(
+            getattr(self, campo.attname) != getattr(anterior, campo.attname)
+            for campo in self._meta.concrete_fields
+            if campo.attname not in campos_controlados
+        )
+        if cambios_de_datos:
+            raise VersionInmutableError()
+
+        if anterior.estado == self.estado:
+            return
+
         permitidas = {
             (self.Estado.APROBADO, self.Estado.VIGENTE),
             (self.Estado.VIGENTE, self.Estado.APROBADO),
         }
-        if (anterior, self.estado) not in permitidas:
+        if (anterior.estado, self.estado) not in permitidas:
             raise VersionInmutableError()
 
     def delete(self, *args, **kwargs):
         raise VersionInmutableError(
             "Las versiones de presupuesto no se eliminan."
         )
+
+    @property
+    def eliminada(self):
+        return self.eliminado_en is not None
 
 
 class LineaPresupuesto(models.Model):

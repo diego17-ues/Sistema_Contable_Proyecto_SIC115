@@ -8,6 +8,7 @@ from usuarios.composition import crear_bitacora_service
 
 from .repositories import CostosRepository
 from .services import (
+    AplicacionIndirectosService,
     CatalogoCostosService,
     OrdenService,
     RegistroCostoService,
@@ -35,3 +36,10 @@ def crear_registro_service():
 
 def crear_catalogo_costos_service():
     return _servicio(CatalogoCostosService)
+
+
+def crear_aplicacion_indirectos_service():
+    return AplicacionIndirectosService(
+        CostosRepository(), TransaccionRepository(),
+        crear_bitacora_service(), transaction.atomic,
+    )

@@ -65,6 +65,55 @@ de orden con traslado al intangible (fuera de alcance).
   estáticos los sirve WhiteNoise); la hoja nueva se ve en el navegador.
 - Pruebas: 34 del módulo; suite completa OK.
 
+## Etapa 1 · Fase 3 — Distribución automática de costos indirectos
+
+Fecha: 2026-11-19. El usuario indicó excluir las cuentas compartidas por
+ahora; no se modificó el Libro Mayor ni el módulo de estimación.
+
+- Migración nueva `costos/0008`: catálogo de fuentes indirectas,
+  exclusiones de cuentas y trazabilidad de fuente/período en el registro
+  de costo. Aplicar con `python manage.py migrate costos`.
+- En *Costos · Catálogos* se pueden configurar fuentes por cuenta de
+  costos/gastos, tipo y proceso opcional. Para guardar una fuente se exige
+  confirmar que la cuenta es exclusiva de desarrollo. También se pueden
+  excluir cuentas; una cuenta excluida no se puede usar como fuente.
+- Pantalla *Indirectos del período*: lee el saldo neto firmado de las
+  fuentes configuradas, suma las horas vigentes de mano de obra en órdenes
+  abiertas dentro del período y muestra tasa y reparto antes de aplicar.
+  El pool general usa todas las horas; si una fuente tiene proceso,
+  utiliza solo las horas de ese proceso. El centavo residual se asigna a
+  la última orden por id.
+- Al confirmar se crean asientos cuadrados por fuente y orden: debe a la
+  cuenta de costos indirectos configurada y haber a la cuenta fuente. La
+  clave fuente/período/orden evita duplicados. Los registros aparecen en
+  la hoja de costos como automáticos y se revierten por período mediante
+  contra-asientos.
+- No se sembraron fuentes. La contabilidad actual no calcula depreciación
+  ni amortización por activo; por tanto se reclasifica únicamente el gasto
+  que ya esté contabilizado en una cuenta declarada exclusiva. Si no hay
+  una fuente elegible o no hay horas, la pantalla alerta y no aplica ese
+  pool.
+- Pruebas funcionales sin cliente HTTP: `python manage.py test --keepdb
+  costos.tests.test_costos.CalculosPurosTests
+  costos.tests.test_costos.OrdenFormTests
+  costos.tests.test_costos.RegistroServiceUnitTests
+  costos.tests.test_costos.RegistroElementosTests
+  costos.tests.test_costos.AplicacionIndirectosTests
+  costos.tests.test_costos.AnulacionTests
+  costos.tests.test_costos.CatalogoTests
+  costos.tests.test_costos.HojaCostosTests` → **45 pruebas OK**.
+- `python manage.py check`, compilación de templates y `git diff --check`
+  → OK. `collectstatic --noinput` copió el CSS actualizado.
+- La suite completa de costos se intentó y falló en tests con cliente HTTP
+  por `BaseContext.__copy__` de Django 4.2 sobre Python 3.14; el error se
+  produce al copiar el contexto de template y también afecta las pantallas
+  existentes.
+
+Pendiente operativo: configurar una fuente solo después de confirmar que
+su cuenta no mezcla desarrollo con gastos compartidos. No hay cálculo de
+depreciación/amortización por activo ni ajuste de una aplicación ya
+revertida en el mismo período.
+
 ---
 
 ## Historial anterior (modelo reemplazado en la Etapa 1)

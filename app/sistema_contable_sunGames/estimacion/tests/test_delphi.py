@@ -175,6 +175,81 @@ class DelphiTests(TestCase):
                 moda=Decimal("400"), pesimista=Decimal("300"),
             )
 
+    def test_estimacion_experta_se_puede_editar_en_ronda_abierta(self):
+        estimacion = self.estimacion(self.experto1, 10, 20, 30)
+
+        actualizada = self.servicio.actualizar_estimacion(
+            self.admin, self.juego.pk, estimacion.pk,
+            optimista=Decimal("12"), moda=Decimal("24"),
+            pesimista=Decimal("36"), justificacion="Revisada",
+        )
+
+        self.assertEqual(actualizada.optimista, Decimal("12"))
+        self.assertEqual(actualizada.moda, Decimal("24"))
+        self.assertEqual(actualizada.pesimista, Decimal("36"))
+        self.assertEqual(actualizada.justificacion, "Revisada")
+
+    def test_baja_logica_de_estimacion_conserva_y_permite_restaurar(self):
+        estimacion = self.estimacion(self.experto1, 10, 20, 30)
+
+        archivada = self.servicio.eliminar_estimacion(
+            self.admin, self.juego.pk, estimacion.pk
+        )
+
+        self.assertTrue(archivada.eliminada)
+        self.assertEqual(archivada.eliminado_por, self.admin)
+        self.assertTrue(EstimacionExperto.objects.filter(
+            pk=estimacion.pk
+        ).exists())
+        self.assertEqual(
+            list(self.servicio.estimaciones(self.admin, self.juego.pk)), []
+        )
+        archivadas = list(self.servicio.estimaciones(
+            self.admin, self.juego.pk, incluir_eliminadas=True
+        ))
+        self.assertEqual(len(archivadas), 1)
+
+        restaurada = self.servicio.restaurar_estimacion(
+            self.admin, self.juego.pk, estimacion.pk
+        )
+        self.assertFalse(restaurada.eliminada)
+        self.assertEqual(
+            len(list(self.servicio.estimaciones(
+                self.admin, self.juego.pk
+            ))),
+            1,
+        )
+
+    def test_estimacion_archivada_puede_reemplazarse_y_no_restaurarse_duplicada(self):
+        archivada = self.estimacion(self.experto1, 10, 20, 30)
+        self.servicio.eliminar_estimacion(
+            self.admin, self.juego.pk, archivada.pk
+        )
+        nueva = self.estimacion(self.experto1, 11, 21, 31)
+
+        self.assertNotEqual(archivada.pk, nueva.pk)
+        with self.assertRaises(EstimacionDuplicadaError):
+            self.servicio.restaurar_estimacion(
+                self.admin, self.juego.pk, archivada.pk
+            )
+
+    def test_estimacion_de_ronda_cerrada_no_se_edita_ni_archiva(self):
+        estimacion = self.estimacion(self.experto1, 10, 20, 30)
+        self.servicio.cerrar_ronda(
+            self.admin, self.juego.pk, 1, fecha=FECHA
+        )
+
+        with self.assertRaises(RondaCerradaError):
+            self.servicio.actualizar_estimacion(
+                self.admin, self.juego.pk, estimacion.pk,
+                optimista=Decimal("12"), moda=Decimal("24"),
+                pesimista=Decimal("36"),
+            )
+        with self.assertRaises(RondaCerradaError):
+            self.servicio.eliminar_estimacion(
+                self.admin, self.juego.pk, estimacion.pk
+            )
+
     def test_contador_general_no_accede(self):
         with self.assertRaises(RolNoAutorizadoError):
             self.servicio.listar_juegos(self.general)
