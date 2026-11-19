@@ -93,6 +93,12 @@ class EstadosRepositoryEnMemoria:
         self.consultas_saldos += 1
         return list(self._saldos)
 
+    def agregados_hoja(self, desde, hasta):
+        return []
+
+    def ajustes(self, desde, hasta):
+        return []
+
     def conteo(self, periodo):
         return self._conteo
 

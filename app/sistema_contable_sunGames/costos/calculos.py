@@ -16,6 +16,96 @@ def importe_mano_obra(horas, costo_hora):
     return a_centavos(Decimal(horas) * Decimal(costo_hora))
 
 
+def desglosar_mano_obra(salario_bruto, parametros):
+    """Calcula retenciones y cargas patronales desde mano de obra directa."""
+    bruto = a_centavos(salario_bruto)
+    base_isss = min(bruto, Decimal(parametros.isss_tope_mensual))
+    isss_empleado = a_centavos(
+        base_isss * Decimal(parametros.isss_empleado) / Decimal("100")
+    )
+    afp_empleado = a_centavos(
+        bruto * Decimal(parametros.afp_empleado) / Decimal("100")
+    )
+    base_renta = max(bruto - isss_empleado - afp_empleado, CERO)
+    renta = calcular_renta_mensual(base_renta, parametros)
+
+    isss_patronal = a_centavos(
+        base_isss * Decimal(parametros.isss_patronal) / Decimal("100")
+    )
+    afp_patronal = a_centavos(
+        bruto * Decimal(parametros.afp_patronal) / Decimal("100")
+    )
+    incaf_patronal = a_centavos(
+        bruto * Decimal(parametros.incaf_patronal) / Decimal("100")
+    )
+    cargas_patronales = a_centavos(
+        isss_patronal + afp_patronal + incaf_patronal
+    )
+    retenciones = a_centavos(isss_empleado + afp_empleado + renta)
+    return {
+        "salario_bruto": bruto,
+        "isss_empleado": isss_empleado,
+        "afp_empleado": afp_empleado,
+        "renta_retenida": renta,
+        "isss_patronal": isss_patronal,
+        "afp_patronal": afp_patronal,
+        "incaf_patronal": incaf_patronal,
+        "retenciones": retenciones,
+        "cargas_patronales": cargas_patronales,
+        "salario_neto": a_centavos(bruto - retenciones),
+        "costo_total": a_centavos(bruto + cargas_patronales),
+        "base_renta": base_renta,
+    }
+
+
+def calcular_renta_mensual(base, parametros):
+    """Aplica la tabla mensual de retención parametrizada."""
+    base = a_centavos(base)
+    if base <= Decimal(parametros.renta_tramo_1_hasta):
+        return a_centavos(0)
+
+    if base <= Decimal(parametros.renta_tramo_2_hasta):
+        porcentaje = Decimal(parametros.renta_tramo_2_porcentaje)
+        exceso = Decimal(parametros.renta_tramo_2_exceso)
+        cuota = Decimal(parametros.renta_tramo_2_cuota)
+    elif base <= Decimal(parametros.renta_tramo_3_hasta):
+        porcentaje = Decimal(parametros.renta_tramo_3_porcentaje)
+        exceso = Decimal(parametros.renta_tramo_3_exceso)
+        cuota = Decimal(parametros.renta_tramo_3_cuota)
+    else:
+        porcentaje = Decimal(parametros.renta_tramo_4_porcentaje)
+        exceso = Decimal(parametros.renta_tramo_4_exceso)
+        cuota = Decimal(parametros.renta_tramo_4_cuota)
+    return a_centavos(
+        cuota + (base - exceso) * porcentaje / Decimal("100")
+    )
+
+
+def lineas_mano_obra(cuenta_costo, cuenta_salarios, cuenta_retenciones,
+                     cuenta_renta, cuenta_cargas, desglose):
+    """Asiento de mano de obra, deducciones del trabajador y cargas."""
+    lineas = [
+        (cuenta_costo, desglose["costo_total"]),
+        (cuenta_salarios, -desglose["salario_neto"]),
+        (cuenta_retenciones, -a_centavos(
+            desglose["isss_empleado"] + desglose["afp_empleado"]
+        )),
+        (cuenta_renta, -desglose["renta_retenida"]),
+        (cuenta_cargas, -desglose["cargas_patronales"]),
+    ]
+    importes_por_cuenta = {}
+    cuentas = {}
+    for cuenta, importe in lineas:
+        importes_por_cuenta[cuenta.pk] = (
+            importes_por_cuenta.get(cuenta.pk, CERO) + importe
+        )
+        cuentas[cuenta.pk] = cuenta
+    return [
+        (cuentas[pk], a_centavos(importe))
+        for pk, importe in importes_por_cuenta.items() if importe
+    ]
+
+
 def distribuir_por_horas(pool, horas_por_orden):
     """Distribuye un pool proporcional a las horas de cada orden.
 

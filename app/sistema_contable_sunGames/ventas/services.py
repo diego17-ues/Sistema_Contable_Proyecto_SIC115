@@ -30,7 +30,7 @@ from .exceptions import (
     VentasError,
     VentaYaRegistradaError,
 )
-from .models import CENTAVO, EstadoVenta, TipoProducto
+from .models import CENTAVO, EstadoVenta, OrigenVenta, TipoProducto
 
 CERO = Decimal("0.00")
 
@@ -59,6 +59,7 @@ class ResumenConciliacion:
     cuentas_por_cobrar: Decimal
     comision: Decimal
     errores: tuple = ()
+    cuentas_afectadas: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -67,6 +68,7 @@ class VistaPreviaConciliacion:
     total: Decimal
     cuentas_por_cobrar: Decimal
     comision: Decimal
+    cuentas_afectadas: tuple = ()
 
 
 def _ahora():
@@ -75,7 +77,7 @@ def _ahora():
 
 class VentasService:
     ROLES_CONSULTA = frozenset({Rol.CONTADOR_GENERAL, Rol.ADMINISTRADOR})
-    ROLES_REGISTRO = frozenset({Rol.CONTADOR_GENERAL})
+    ROLES_REGISTRO = frozenset({Rol.CONTADOR_GENERAL, Rol.ADMINISTRADOR})
 
     def __init__(self, repositorio, mayor, bitacora, configuracion=None,
                  transaccion=nullcontext, reloj=_ahora):
@@ -91,7 +93,7 @@ class VentasService:
 
     def recibir(self, *, identificador, titulo, tipo_producto, cantidad,
                 precio_unitario, moneda, pais, fecha_hora, comision,
-                impuesto=CERO):
+                impuesto=CERO, origen=OrigenVenta.REAL):
         """CU-08.4: valida y guarda un evento; queda pendiente de revisión."""
         referencia = f"Steam {identificador}"[:60]
         try:
@@ -101,6 +103,8 @@ class VentasService:
                     f"Moneda {moneda} no admitida; solo se reciben ventas en "
                     f"{self._config.moneda}."
                 )
+            if origen not in OrigenVenta.values:
+                raise EventoInvalidoError("El origen de la venta no es válido.")
             total = (precio_unitario * cantidad).quantize(CENTAVO)
             if comision > total:
                 raise EventoInvalidoError(
@@ -113,7 +117,7 @@ class VentasService:
                 tipo_producto=tipo_producto, cantidad=cantidad,
                 precio_unitario=precio_unitario, moneda=moneda,
                 pais=pais.upper(), fecha_hora=fecha_hora, comision=comision,
-                impuesto=impuesto,
+                impuesto=impuesto, origen=origen,
             )
         except VentasError as error:
             with self._transaccion():
@@ -172,7 +176,8 @@ class VentasService:
         total = sum((venta.total for venta in ventas), CERO)
         comision = sum((venta.comision for venta in ventas), CERO)
         return VistaPreviaConciliacion(
-            len(ventas), total, total - comision, comision
+            len(ventas), total, total - comision, comision,
+            tuple(self._cuentas_afectadas(ventas)),
         )
 
     def conciliar(self, actor, desde, hasta):
@@ -184,6 +189,7 @@ class VentasService:
             total = CERO
             comision = CERO
             errores = []
+            ventas_conciliadas = []
             for venta in ventas:
                 try:
                     if venta.estado != EstadoVenta.REGISTRADA:
@@ -197,6 +203,7 @@ class VentasService:
                 conciliadas += 1
                 total += venta.total
                 comision += venta.comision
+                ventas_conciliadas.append(venta)
 
             resultado = (Resultado.RECHAZADO
                          if errores and conciliadas == 0
@@ -211,8 +218,49 @@ class VentasService:
             )
             return ResumenConciliacion(
                 conciliadas, total, total - comision, comision,
-                tuple(errores),
+                tuple(errores), tuple(self._cuentas_afectadas(
+                    ventas_conciliadas
+                )),
             )
+
+    def _cuentas_afectadas(self, ventas):
+        """Resume los movimientos existentes por cuenta y lado contable."""
+        importes = {}
+        for venta in ventas:
+            cuenta_ingreso = (
+                self._config.cuenta_ingreso_dlc
+                if venta.tipo_producto == TipoProducto.DLC
+                else self._config.cuenta_ingreso_juego
+            )
+            importes[self._config.cuenta_por_cobrar] = (
+                importes.get(self._config.cuenta_por_cobrar, CERO)
+                + venta.neto
+            )
+            if venta.comision:
+                importes[self._config.cuenta_comision] = (
+                    importes.get(self._config.cuenta_comision, CERO)
+                    + venta.comision
+                )
+            importes[cuenta_ingreso] = (
+                importes.get(cuenta_ingreso, CERO) - venta.total
+            )
+
+        filas = []
+        for codigo, importe in importes.items():
+            if not importe:
+                continue
+            try:
+                cuenta = self._mayor.obtener_cuenta(codigo)
+                denominacion = getattr(cuenta, "denominacion", codigo)
+            except (AttributeError, LibroMayorError):
+                denominacion = codigo
+            filas.append({
+                "codigo": codigo,
+                "denominacion": denominacion,
+                "debe": importe if importe > CERO else CERO,
+                "haber": abs(importe) if importe < CERO else CERO,
+            })
+        return filas
 
     def _ventas_para_conciliar(self, desde, hasta):
         if desde > hasta:

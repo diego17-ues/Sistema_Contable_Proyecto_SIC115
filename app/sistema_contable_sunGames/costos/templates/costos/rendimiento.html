@@ -7,7 +7,6 @@
 <div class="page-heading">
   <div>
     <h1>Consultar rendimiento de videojuegos</h1>
-    <p>Resultados por orden: estimación vinculada frente a costos reales vigentes.</p>
   </div>
   <div class="heading-actions">
     <a class="button button-secondary" href="{% url 'costos_ordenes' %}">Costeo Videojuego</a>
@@ -18,12 +17,10 @@
   <div class="card-header">
     <div>
       <h2>Costo real vs estimación</h2>
-      <p>Comparación de las órdenes mostradas en esta página.</p>
     </div>
     <span class="tag">{{ grafico_rendimiento|length }} comparaciones</span>
   </div>
   <div class="card-body">
-    <p class="help">Una orden es viable si su costo real acumulado no supera la estimación vinculada. Si está en borrador, la comparación es preliminar.</p>
     <div class="table-wrap">
       <svg data-rendimiento-chart role="img" aria-label="Gráfico de costo real frente a estimación"{% if not grafico_rendimiento %} hidden{% endif %}></svg>
     </div>
@@ -39,7 +36,6 @@
   <div class="card-header">
     <div>
       <h2>Resultados de videojuegos</h2>
-      <p>Viable cuando el costo real es igual o menor que la estimación.</p>
     </div>
     <span class="tag">{{ pagina.paginator.count }} orden{{ pagina.paginator.count|pluralize:"es" }}</span>
   </div>
@@ -51,7 +47,7 @@
           <th>Orden</th>
           <th>Estado</th>
           <th>Estimación</th>
-          <th class="num">Costo estimado</th>
+          <th class="num">Presupuesto estimado</th>
           <th class="num">Costo real</th>
           <th class="num">Variación</th>
           <th class="num">Variación %</th>
@@ -128,7 +124,6 @@
         {% if modal_evaluacion.viable %}<span class="tag tag-open">Viable: está dentro del presupuesto</span>
         {% else %}<span class="tag tag-warn">No viable: excede el presupuesto</span>{% endif %}
       </p>
-      <p class="muted">Se considera viable si el costo real acumulado es igual o menor que la estimación vinculada. La comparación de una versión en borrador es preliminar.</p>
       <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_rendimiento' %}?pagina={{ pagina.number }}">Cerrar</a></div>
     </div>
   </section>

@@ -46,11 +46,12 @@ from .models import (
     CuentaIndirectaExcluida,
     Elemento,
     FuenteIndirecta,
+    ReclasificacionCosto,
     RegistroCosto,
 )
 
-# Módulo exclusivo del Contador de Costos (separado del Contador General).
-ROLES_COSTOS = frozenset({Rol.CONTADOR_COSTOS})
+# El módulo de costos está disponible para Costos y Administración.
+ROLES_COSTOS = frozenset({Rol.CONTADOR_COSTOS, Rol.ADMINISTRADOR})
 
 
 def _verificar(actor):
@@ -85,13 +86,177 @@ class CostosService:
             )
 
 
+class ReclasificacionCostoService(CostosService):
+    """Traslada los costos de desarrollo al activo correspondiente."""
+
+    CUENTA_PROCESO = "1106"
+    CUENTA_TERMINADO = "1107"
+
+    def __init__(self, repositorio, mayor, bitacora, transaccion=nullcontext):
+        super().__init__(repositorio, bitacora, transaccion)
+        self._mayor = mayor
+
+    def trasladar_cierre(self, actor, periodo):
+        """Capitaliza al cierre los costos de las órdenes del período."""
+        ciclo = self._repo.siguiente_ciclo_reclasificacion(periodo)
+        for fila in self._repo.costos_pendientes_reclasificar(
+                hasta=periodo.fecha_fin, periodo=periodo):
+            importe = Decimal(fila["importe"] or 0)
+            if importe <= 0:
+                continue
+            orden = self._repo.obtener_orden(
+                fila["orden_id"], incluir_eliminada=True
+            )
+            if orden is None:
+                raise OrdenNoEncontradaError(
+                    "No se encontró la orden asociada a un costo del período."
+                )
+            cuenta_origen = self._cuenta(fila["cuenta_costo__codigo"])
+            destino_codigo = (
+                self.CUENTA_PROCESO if orden.abierta
+                else self.CUENTA_TERMINADO
+            )
+            self._crear_traslado(
+                actor, periodo=periodo, orden=orden,
+                cuenta_origen=cuenta_origen,
+                cuenta_destino=self._cuenta(destino_codigo),
+                importe=importe, tipo=ReclasificacionCosto.TIPO_CIERRE,
+                ciclo=ciclo,
+                clave=(f"cierre-{periodo.pk}-{ciclo}-{orden.pk}-"
+                       f"{cuenta_origen.pk}"),
+                fecha=periodo.fecha_fin,
+            )
+
+    def revertir_cierre(self, actor, periodo):
+        """Revierte las reclasificaciones que afectan el período reabierto."""
+        cierres = list(self._repo.traslados_costo(
+            periodo=periodo, tipo=ReclasificacionCosto.TIPO_CIERRE,
+            solo_activos=True,
+        ))
+        directas = list(self._repo.traslados_costo(
+            periodo=periodo, tipo=ReclasificacionCosto.TIPO_FINALIZACION,
+            solo_directos=True, solo_activos=True,
+        ))
+        derivadas = []
+        for cierre in cierres:
+            derivadas.extend(self._repo.traslados_costo(
+                origen=cierre, tipo=ReclasificacionCosto.TIPO_FINALIZACION,
+                solo_activos=True,
+            ))
+
+        # Primero se devuelve de terminados a proceso y luego de proceso a
+        # las cuentas 4101/4102 para restaurar el saldo original completo.
+        for traslado in [*derivadas, *directas, *reversed(cierres)]:
+            self._crear_traslado(
+                actor, periodo=periodo, orden=traslado.orden,
+                cuenta_origen=traslado.cuenta_destino,
+                cuenta_destino=traslado.cuenta_origen,
+                importe=traslado.importe,
+                tipo=ReclasificacionCosto.TIPO_REVERSION,
+                ciclo=traslado.ciclo,
+                clave=f"reversion-{traslado.pk}",
+                fecha=periodo.fecha_fin, revierte=traslado,
+            )
+
+    def finalizar_orden(self, actor, orden):
+        """Mueve a 1107 los saldos en proceso y costos del período abierto."""
+        periodo = self._repo.periodo_abierto_mas_reciente()
+        if periodo is None:
+            raise PeriodoNoAbiertoError(
+                "Abre un período contable antes de finalizar la orden."
+            )
+        hoy = timezone.localdate()
+        fecha = min(max(hoy, periodo.fecha_inicio), periodo.fecha_fin)
+
+        # Costos ya capitalizados como producción en proceso pasan de 1106
+        # a 1107. Se guarda el vínculo para que reabrir el cierre de origen
+        # revierta también este segundo traslado.
+        cierres = self._repo.traslados_costo(
+            orden=orden, tipo=ReclasificacionCosto.TIPO_CIERRE,
+            cuenta_destino_codigo=self.CUENTA_PROCESO, solo_activos=True,
+        )
+        for cierre in cierres:
+            if self._repo.tiene_finalizacion_derivada_activa(cierre):
+                continue
+            self._crear_traslado(
+                actor, periodo=periodo, orden=orden,
+                cuenta_origen=cierre.cuenta_destino,
+                cuenta_destino=self._cuenta(self.CUENTA_TERMINADO),
+                importe=cierre.importe,
+                tipo=ReclasificacionCosto.TIPO_FINALIZACION,
+                ciclo=cierre.ciclo,
+                clave=f"finaliza-cierre-{cierre.pk}",
+                fecha=fecha, origen=cierre,
+            )
+
+        # Los costos aún pendientes en 4101/4102 se capitalizan directamente
+        # en videojuegos terminados.
+        for fila in self._repo.costos_pendientes_reclasificar(
+                hasta=fecha, orden=orden):
+            cuenta_origen = self._cuenta(fila["cuenta_costo__codigo"])
+            importe = Decimal(fila["importe"])
+            clave = (f"finaliza-directo-{periodo.pk}-{orden.pk}-"
+                     f"{cuenta_origen.pk}")
+            self._crear_traslado(
+                actor, periodo=periodo, orden=orden,
+                cuenta_origen=cuenta_origen,
+                cuenta_destino=self._cuenta(self.CUENTA_TERMINADO),
+                importe=importe,
+                tipo=ReclasificacionCosto.TIPO_FINALIZACION,
+                ciclo=1, clave=clave, fecha=fecha,
+            )
+
+    def _crear_traslado(self, actor, *, periodo, orden, cuenta_origen,
+                        cuenta_destino, importe, tipo, ciclo, clave, fecha,
+                        origen=None, revierte=None):
+        importe = Decimal(importe).quantize(Decimal("0.01"))
+        if importe <= 0:
+            return None
+        transaccion = self._mayor.crear_transaccion(usuario=actor)
+        referencia = f"OT-{orden.pk} · {clave}"[:40]
+        concepto = f"Reclasificación de costos OT-{orden.pk}"[:200]
+        try:
+            self._mayor.crear_movimiento(
+                transaccion=transaccion, cuenta=cuenta_origen,
+                fecha=fecha, concepto=concepto, referencia=referencia,
+                tipo=TipoMovimiento.DIARIO, importe=-importe,
+            )
+            self._mayor.crear_movimiento(
+                transaccion=transaccion, cuenta=cuenta_destino,
+                fecha=fecha, concepto=concepto, referencia=referencia,
+                tipo=TipoMovimiento.DIARIO, importe=importe,
+            )
+        except LibroMayorError as exc:
+            raise PeriodoNoAbiertoError(str(exc)) from exc
+        return self._repo.crear_reclasificacion(
+            periodo=periodo, orden=orden, transaccion=transaccion,
+            cuenta_origen=cuenta_origen, cuenta_destino=cuenta_destino,
+            importe=importe, tipo=tipo, ciclo=ciclo, origen=origen,
+            revierte=revierte, clave_idempotencia=clave,
+        )
+
+    def _cuenta(self, codigo):
+        try:
+            cuenta = self._mayor.obtener_cuenta(codigo)
+        except LibroMayorError as exc:
+            raise CuentaNoValidaError(
+                f"La cuenta requerida {codigo} no existe en el catálogo."
+            ) from exc
+        if (not cuenta.activa or self._mayor.tiene_subcuentas(cuenta)):
+            raise CuentaNoValidaError(
+                f"La cuenta {codigo} debe estar activa y admitir movimientos."
+            )
+        return cuenta
+
+
 class OrdenService(CostosService):
     """Alta y consulta de órdenes de trabajo y su hoja de costos."""
 
     def __init__(self, repositorio, bitacora, transaccion=nullcontext,
-                 total_estimacion=None):
+                 total_estimacion=None, reclasificaciones=None):
         super().__init__(repositorio, bitacora, transaccion)
         self._total_estimacion = total_estimacion
+        self._reclasificaciones = reclasificaciones
 
     def resumen_orden(self, orden_id):
         """Totales por elemento y por proceso, horas por proceso, costo
@@ -146,6 +311,52 @@ class OrdenService(CostosService):
                 "evaluacion": evaluacion,
             })
         return resultados
+
+    def resumen_dashboard(self, actor):
+        """Resumen de lectura para Costos y para el Dashboard General."""
+        if not actor.activo:
+            raise UsuarioInactivoError()
+        if actor.rol not in {
+            Rol.CONTADOR_COSTOS, Rol.CONTADOR_GENERAL, Rol.ADMINISTRADOR
+        }:
+            raise RolNoAutorizadoError()
+
+        resumen = self._repo.resumen_dashboard()
+        recientes = [
+            self._rendimiento_dashboard(orden)
+            for orden in resumen["finalizadas_recientes"]
+        ]
+        ultima_registrada = resumen["ultima_registrada"]
+        return {
+            "ordenes_pendientes": resumen["pendientes"],
+            "ordenes_finalizadas": resumen["finalizadas"],
+            "ultima_orden": recientes[0] if recientes else None,
+            "ordenes_finalizadas_recientes": recientes,
+            "ultima_orden_registrada": (
+                self._rendimiento_dashboard(ultima_registrada)
+                if ultima_registrada is not None else None
+            ),
+        }
+
+    def _rendimiento_dashboard(self, orden):
+        total_real = orden.total_vigente
+        version = orden.estimacion_ref
+        total_estimado = (
+            self._total_estimacion(version)
+            if version is not None and self._total_estimacion is not None
+            else None
+        )
+        evaluacion = None
+        if total_estimado is not None and total_real is not None:
+            evaluacion = calculos.comparar_estimado_real(
+                total_estimado, total_real
+            )
+        return {
+            "orden": orden,
+            "total_real": total_real,
+            "total_estimado": total_estimado,
+            "evaluacion": evaluacion,
+        }
 
     def hoja_costos(self, actor, orden_id):
         _verificar(actor)
@@ -380,6 +591,27 @@ class OrdenService(CostosService):
             )
         return orden
 
+    def finalizar(self, actor, orden_id):
+        """Finaliza la OT y traslada sus costos capitalizados a 1107."""
+        _verificar(actor)
+        orden = self._orden(orden_id)
+        if not orden.abierta:
+            raise OrdenCerradaError("La orden de trabajo ya está finalizada.")
+        if self._reclasificaciones is None:
+            raise DatosInsuficientesError(
+                "No está disponible el servicio de reclasificación de costos."
+            )
+        with self._transaccion():
+            self._reclasificaciones.finalizar_orden(actor, orden)
+            orden.estado = orden.ESTADO_CERRADA
+            self._repo.guardar_orden(orden)
+            self._auditar(
+                actor, Accion.ORDEN_TRABAJO, f"OT {orden.pk}",
+                "Orden finalizada; costos trasladados a videojuegos "
+                "terminados.",
+            )
+        return orden
+
     def eliminar(self, actor, orden_id):
         _verificar(actor)
         orden = self._repo.obtener_orden(
@@ -591,9 +823,30 @@ class RegistroCostoService(CostosService):
         self._verificar_periodo(fecha)
         config = self._config(elemento)
         cuenta_costo = self._cuenta_valida(config.cuenta_costo)
-        contrapartida = self._contrapartida(config, contrapartida_id)
-        lineas = calculos.lineas_registro(cuenta_costo, contrapartida,
-                                          importe)
+        contrapartida = (
+            self._cuenta_mano_obra("2106")
+            if elemento == Elemento.MANO_OBRA
+            else self._contrapartida(config, contrapartida_id)
+        )
+        lineas = None
+        if elemento == Elemento.MANO_OBRA:
+            parametros = self._repo.parametros_mano_obra()
+            if parametros is None:
+                raise ConfiguracionNoEncontradaError(
+                    "No están configurados los parámetros de mano de obra."
+                )
+            desglose = calculos.desglosar_mano_obra(importe, parametros)
+            importe = desglose["costo_total"]
+            lineas = calculos.lineas_mano_obra(
+                cuenta_costo, contrapartida,
+                self._cuenta_mano_obra("2104"),
+                self._cuenta_mano_obra("2107"),
+                self._cuenta_mano_obra("2105"), desglose,
+            )
+        else:
+            lineas = calculos.lineas_registro(
+                cuenta_costo, contrapartida, importe
+            )
         try:
             with self._transaccion():
                 registro = self._repo.crear_registro(
@@ -645,9 +898,29 @@ class RegistroCostoService(CostosService):
         )
 
     def _lineas_anulacion(self, registro):
-        return calculos.lineas_contrarias(calculos.lineas_registro(
-            registro.cuenta_costo, registro.contrapartida, registro.importe
-        ))
+        asiento_original = self._repo.asiento_por_clave(
+            registro.clave_idempotencia
+        )
+        if asiento_original is not None:
+            movimientos = self._repo.movimientos_de(
+                asiento_original.transaccion_id
+            )
+            if movimientos:
+                originales = [(m.cuenta, Decimal(m.importe))
+                              for m in movimientos]
+                return calculos.lineas_contrarias(originales)
+        raise ConfiguracionNoEncontradaError(
+            "No se encontró el asiento original para revertir el registro."
+        )
+
+    def _cuenta_mano_obra(self, codigo):
+        try:
+            cuenta = self._mayor.obtener_cuenta(codigo)
+        except LibroMayorError as exc:
+            raise CuentaNoValidaError(
+                f"La cuenta contable {codigo} no existe en el catálogo."
+            ) from exc
+        return self._cuenta_valida(cuenta)
 
     def _repetido(self, clave, orden_id):
         if not clave:
@@ -908,6 +1181,15 @@ class CatalogoCostosService(CostosService):
         if elemento not in Elemento.values:
             raise DatosInsuficientesError("Elemento del costo no válido.")
         contrapartidas = list(contrapartidas)
+        if elemento == Elemento.MANO_OBRA and (
+                len(contrapartidas) != 1
+                or contrapartida_defecto is None
+                or contrapartidas[0].codigo != "2106"
+                or contrapartida_defecto.codigo != "2106"):
+            raise CuentaNoValidaError(
+                "La mano de obra se registra en la cuenta 2106 para sueldos "
+                "por pagar.", campo="contrapartidas",
+            )
         if not contrapartidas:
             raise DatosInsuficientesError(
                 "Selecciona al menos una contrapartida.",

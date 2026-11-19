@@ -129,6 +129,21 @@ class EstadosFinancierosTests(BaseTest):
         self.assertIn("origen: snapshot",
                       self.bitacora.registros[-1]["detalle"])
 
+    def test_costos_puede_consultar_documentos_emitidos_del_cierre_activo(self):
+        costos = crear_usuario("costos", Rol.CONTADOR_COSTOS)
+        self.cerrar()
+
+        consulta = self.estados.cierre_activo(costos)
+
+        self.assertEqual(consulta.periodo, self.periodo)
+        self.assertEqual(set(consulta.estados), {BALANCE, RESULTADOS})
+        self.assertIn("rows", consulta.hoja_trabajo)
+
+    def test_costos_no_ve_documentos_si_no_hay_cierre_activo(self):
+        costos = crear_usuario("costos", Rol.CONTADOR_COSTOS)
+
+        self.assertIsNone(self.estados.cierre_activo(costos))
+
     def test_pdf_con_encabezado_niif_y_balance_cuadrado(self):
         archivo = self.estados.exportar_pdf(self.contador, 1, BALANCE)
 
@@ -157,6 +172,14 @@ class CierreTests(BaseTest):
         self.periodo.estado = EstadoPeriodo.CIERRE_PROVISIONAL
 
         estado = self.cierre.estado_actual(self.contador)
+
+        self.assertEqual(estado, EstadoPeriodo.CIERRE_PROVISIONAL)
+
+    def test_estado_actual_esta_disponible_para_costos_en_solo_lectura(self):
+        costos = crear_usuario("costos", Rol.CONTADOR_COSTOS)
+        self.periodo.estado = EstadoPeriodo.CIERRE_PROVISIONAL
+
+        estado = self.cierre.estado_actual(costos)
 
         self.assertEqual(estado, EstadoPeriodo.CIERRE_PROVISIONAL)
 
@@ -191,10 +214,14 @@ class CierreTests(BaseTest):
         with self.assertRaises(PeriodoNoAbiertoError):
             self.cerrar()
 
-    def test_solo_el_contador_general_cierra(self):
-        with self.assertRaises(RolNoAutorizadoError):
-            self.cierre.cerrar(self.admin, 1, confirmacion="CONFIRMAR",
-                               motivo="x")
+    def test_administrador_tambien_puede_cerrar(self):
+        self.cierre.cerrar(
+            self.admin, 1, confirmacion="CONFIRMAR", motivo="Cierre anual"
+        )
+
+        self.assertEqual(
+            self.periodo.estado, EstadoPeriodo.CIERRE_PROVISIONAL
+        )
 
     def test_cierre_correcto_emite_snapshot_y_audita(self):
         self.cerrar()

@@ -7,7 +7,7 @@
 
 {% block page_content %}
 <div class="page-heading">
-  <div><h1>Indirectos del período</h1><p>Distribución automática del saldo neto de las fuentes exclusivas de desarrollo, según las horas registradas en las órdenes abiertas.</p></div>
+  <div><h1>Indirectos del período</h1></div>
   <div class="heading-actions"><a class="button button-secondary" href="{% url 'costos_catalogos' %}">Fuentes y exclusiones</a><a class="button button-secondary" href="{% url 'costos_ordenes' %}">← Órdenes</a></div>
 </div>
 
@@ -36,7 +36,7 @@
 {% endif %}
 
 <section class="card section-gap">
-  <div class="card-header"><div><h2>Fuentes y tasas</h2><p>La tasa por hora es el pool dividido entre las horas elegibles de este período.</p></div></div>
+  <div class="card-header"><div><h2>Fuentes y tasas</h2></div></div>
   <div class="table-wrap">
     <table class="indirectos-tabla">
       <thead><tr><th>Fuente</th><th>Cuenta de origen</th><th>Proceso</th><th class="num">Pool</th><th class="num">Horas</th><th class="num">Tasa/hora</th><th class="num">Distribuido</th><th>Estado</th></tr></thead>
@@ -61,7 +61,7 @@
 </section>
 
 <section class="card section-gap">
-  <div class="card-header"><div><h2>Distribución por orden</h2><p>Solo participan órdenes abiertas con horas vigentes de mano de obra directa dentro del período.</p></div></div>
+  <div class="card-header"><div><h2>Distribución por orden</h2></div></div>
   <div class="table-wrap">
     <table class="indirectos-tabla">
       <thead><tr><th>Fuente</th><th>Orden</th><th>Juego</th><th class="num">Horas</th><th class="num">Tasa/hora</th><th class="num">Costo asignado</th></tr></thead>

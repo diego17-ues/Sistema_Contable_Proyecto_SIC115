@@ -6,7 +6,7 @@
 {% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'costos/costos.css' %}?v=20261118-2">{% endblock %}
 
 {% block page_content %}
-<div class="page-heading"><div><h1>Órdenes de trabajo</h1><p>Costeo real por juego: mano de obra directa, costos directos y costos indirectos de desarrollo.</p></div><div class="heading-actions"><a class="button button-primary" href="{% url 'costos_orden_nueva' %}">＋ Nueva orden</a> <a class="button button-secondary" href="{% url 'costos_indirectos_periodo' %}">Indirectos del período</a> <a class="button button-secondary" href="{% url 'costos_catalogos' %}">Catálogos</a></div></div>
+<div class="page-heading"><div><h1>Órdenes de trabajo</h1></div><div class="heading-actions"><a class="button button-primary" href="{% url 'costos_orden_nueva' %}">＋ Nueva orden</a> <a class="button button-secondary" href="{% url 'costos_indirectos_periodo' %}">Indirectos del período</a> <a class="button button-secondary" href="{% url 'costos_catalogos' %}">Catálogos</a></div></div>
 <form class="filter-bar" method="get" action="{% url 'costos_ordenes' %}" novalidate>
   <div class="field">
     <label for="{{ filtro.estado.id_for_label }}">Estado</label>
@@ -16,7 +16,7 @@
   {% if estado %}<a class="text-button" href="{% url 'costos_ordenes' %}">Limpiar</a>{% endif %}
 </form>
 <section class="card">
-  <div class="card-header"><div><h2>Órdenes</h2><p>Una orden por juego.</p></div><span class="tag">{{ pagina.paginator.count }} orden{{ pagina.paginator.count|pluralize:"es" }}</span></div>
+  <div class="card-header"><div><h2>Órdenes</h2></div><span class="tag">{{ pagina.paginator.count }} orden{{ pagina.paginator.count|pluralize:"es" }}</span></div>
   <div class="table-wrap">
     <table>
       <thead><tr><th>Orden</th><th>Juego</th><th>Estado</th><th>Inicio</th><th class="num">Costo acumulado</th><th></th></tr></thead>
@@ -52,7 +52,7 @@
 {% block modal %}
 {% if form_nueva %}
 <div class="modal-backdrop" data-costos-modal><section class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloNuevaOrden">
-  <div class="modal-header"><div><h2 id="tituloNuevaOrden">Nueva orden de trabajo</h2><p>Una orden por juego. Puedes vincular una estimación disponible al crearla.</p></div><a class="modal-close" href="{% url 'costos_ordenes' %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-header"><div><h2 id="tituloNuevaOrden">Nueva orden de trabajo</h2></div><a class="modal-close" href="{% url 'costos_ordenes' %}" aria-label="Cerrar">×</a></div>
   <form class="modal-form" method="post" action="{% url 'costos_orden_nueva' %}" novalidate data-costos-form>
     {% csrf_token %}
     {% include "costos/campos.html" with form=form_nueva %}

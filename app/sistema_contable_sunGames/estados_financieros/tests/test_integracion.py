@@ -35,6 +35,7 @@ class CierreIntegracionTests(TestCase):
     def setUp(self):
         self.contador = self.usuario("cont", Rol.CONTADOR_GENERAL)
         self.admin = self.usuario("admin", Rol.ADMINISTRADOR)
+        self.costos = self.usuario("costos", Rol.CONTADOR_COSTOS)
         self.periodo = PeriodoContable.objects.get(nombre=NOMBRE)
         self.transaccion = Transaccion.objects.create(usuario=self.contador)
         for codigo, importe in (("1101", "1500"), ("3101", "-1000"),
@@ -210,10 +211,18 @@ class CierreIntegracionTests(TestCase):
         self.assertFalse(EstadoFinancieroEmitido.objects.exists())
         self.assertFalse(self.eventos(Accion.CIERRE_PERIODO).exists())
 
-    def test_administrador_no_cierra(self):
+    def test_administrador_cierra_y_puede_reabrir(self):
         self.client.force_login(self.admin)
 
-        self.assertEqual(self.cerrar().status_code, 403)
+        respuesta = self.cerrar()
+
+        self.assertRedirects(respuesta, reverse("cierre_periodos"))
+        self.periodo.refresh_from_db()
+        self.assertTrue(self.periodo.cerrado)
+
+        self.assertRedirects(self.reabrir(), reverse("cierre_periodos"))
+        self.periodo.refresh_from_db()
+        self.assertEqual(self.periodo.estado, EstadoPeriodo.ABIERTO)
 
     def test_reapertura_por_no_administrador_se_rechaza(self):
         self.cerrar_como_contador()
@@ -235,10 +244,13 @@ class CierreIntegracionTests(TestCase):
     def test_estado_cerrado_se_conserva_al_cambiar_pantalla_y_usuario(self):
         self.cerrar_como_contador()
 
-        for usuario in (self.contador, self.admin):
+        for usuario in (self.contador, self.admin, self.costos):
             with self.subTest(usuario=usuario.username):
                 self.client.force_login(usuario)
-                for pantalla in ("dashboard", "reports"):
+                pantallas = ("dashboard",) if usuario is self.costos else (
+                    "dashboard", "reports"
+                )
+                for pantalla in pantallas:
                     with self.subTest(pantalla=pantalla):
                         respuesta = self.client.get(reverse(pantalla))
 
@@ -251,6 +263,22 @@ class CierreIntegracionTests(TestCase):
                         self.assertContains(
                             respuesta, "Período cerrado provisionalmente"
                         )
+
+    def test_costos_consulta_hoja_y_estados_emitidos_en_cierre_activo(self):
+        self.cerrar_como_contador()
+        self.client.force_login(self.costos)
+
+        respuesta = self.client.get(reverse("api_cierre_activo"))
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertTrue(respuesta.json()["cerrado"])
+        self.assertTrue(respuesta.json()["worksheet"]["rows"])
+        self.assertEqual(
+            set(respuesta.json()["estados"]), {"balance", "resultados"}
+        )
+        self.assertEqual(self.client.get(reverse("closed_period")).status_code,
+                         200)
+        self.assertEqual(self.client.get(reverse("reports")).status_code, 403)
 
     def test_reapertura_con_contrasena_incorrecta(self):
         self.cerrar_como_contador()

@@ -4,6 +4,7 @@ import hmac
 import json
 
 from django.contrib.auth.decorators import login_required
+from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import (
@@ -26,6 +27,7 @@ from ventas.forms import (
     EventoSteamForm,
     FiltroVentasForm,
 )
+from simulador_steam.ciclos import ejecutar_ciclo
 
 SIN_PERMISO = (RolNoAutorizadoError, UsuarioInactivoError)
 
@@ -35,7 +37,10 @@ def _error(mensaje, status, **extra):
 
 
 def _autorizado(request):
-    token = token_steam()
+    return _autorizado_con_token(request, token_steam())
+
+
+def _autorizado_con_token(request, token):
     recibido = request.headers.get("Authorization", "")
     return bool(token) and hmac.compare_digest(recibido, f"Bearer {token}")
 
@@ -53,6 +58,7 @@ def venta_json(venta):
         "id": venta.identificador, "date": venta.fecha.isoformat(),
         "time": venta.fecha_hora.isoformat(), "title": venta.titulo,
         "type": venta.get_tipo_producto_display(), "channel": "Steam",
+        "origin": venta.get_origen_display(),
         "status": venta.get_estado_display(), "amount": str(venta.total),
         "quantity": venta.cantidad, "unitPrice": str(venta.precio_unitario),
         "currency": venta.moneda, "country": venta.pais,
@@ -104,6 +110,33 @@ def steam_latido(request):
         return _error("No autorizado.", 401)
     crear_ventas_service().latido()
     return JsonResponse({"estado": "Conectado"})
+
+
+def _respuesta_ciclo():
+    resultado = ejecutar_ciclo()
+    estado_http = 502 if resultado["estado"] == "error" else 200
+    return JsonResponse(resultado, status=estado_http)
+
+
+@csrf_exempt
+@require_POST
+def steam_simular_ciclo(request):
+    """Disparo para cron externo; requiere SIMULATOR_CRON_TOKEN."""
+    token = getattr(settings, "SIMULATOR_CRON_TOKEN", "")
+    if not token:
+        return _error("El token del cron no está configurado.", 503)
+    if not _autorizado_con_token(request, token):
+        return _error("No autorizado.", 401)
+    return _respuesta_ciclo()
+
+
+@login_required
+@require_POST
+def simulador_ciclo_api(request):
+    """Dispara un ciclo desde el panel de ventas autenticado."""
+    if (denegado := verificar_modulo(request, "operations")):
+        return denegado
+    return _respuesta_ciclo()
 
 
 @login_required
@@ -161,6 +194,15 @@ def conciliacion_api(request):
                 "total": str(resumen.total),
                 "cuentasPorCobrar": str(resumen.cuentas_por_cobrar),
                 "comision": str(resumen.comision),
+                "cuentasAfectadas": [
+                    {
+                        "codigo": fila["codigo"],
+                        "denominacion": fila["denominacion"],
+                        "debe": str(fila["debe"]),
+                        "haber": str(fila["haber"]),
+                    }
+                    for fila in resumen.cuentas_afectadas
+                ],
             })
         resultado = servicio.conciliar(request.user, desde, hasta)
     except SIN_PERMISO as error:
@@ -172,6 +214,15 @@ def conciliacion_api(request):
         "total": str(resultado.total),
         "cuentasPorCobrar": str(resultado.cuentas_por_cobrar),
         "comision": str(resultado.comision),
+        "cuentasAfectadas": [
+            {
+                "codigo": fila["codigo"],
+                "denominacion": fila["denominacion"],
+                "debe": str(fila["debe"]),
+                "haber": str(fila["haber"]),
+            }
+            for fila in resultado.cuentas_afectadas
+        ],
         "errores": list(resultado.errores),
     })
 

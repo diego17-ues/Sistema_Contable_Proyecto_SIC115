@@ -36,14 +36,24 @@ COMISION = Decimal("0.30")
 CENTAVO = Decimal("0.01")
 
 
-def generar_evento(azar=random):
-    titulo, tipo, precio = azar.choice(CATALOGO)
+def generar_evento(azar=random, titulos_finalizados=None):
+    if titulos_finalizados is None:
+        titulo, tipo, precio = azar.choice(CATALOGO)
+    else:
+        if not titulos_finalizados:
+            raise ValueError("No hay títulos de órdenes finalizadas.")
+        catalogo_juegos = tuple(
+            item for item in CATALOGO if item[1] == "JUEGO"
+        )
+        _, tipo, precio = azar.choice(catalogo_juegos)
+        titulo = azar.choice(titulos_finalizados)
     cantidad = azar.randint(1, 5)
     total = precio * cantidad
     return {
-        "id": f"STM-{uuid.uuid4().hex[:12].upper()}",
+        "id": f"SIM-{uuid.uuid4().hex.upper()}",
         "titulo": titulo,
         "tipo": tipo,
+        "origen": "SIMULADA",
         "cantidad": cantidad,
         "precio_unitario": str(precio),
         "moneda": "USD",
@@ -54,17 +64,26 @@ def generar_evento(azar=random):
     }
 
 
-def enviar(url, token, datos=None):
+def enviar(url, token, datos=None, timeout=10):
     cuerpo = json.dumps(datos or {}).encode()
     peticion = request.Request(url, data=cuerpo, method="POST", headers={
         "Content-Type": "application/json",
         "Authorization": f"Bearer {token}",
     })
     try:
-        with request.urlopen(peticion, timeout=10) as respuesta:
-            return respuesta.status, json.loads(respuesta.read() or b"{}")
+        with request.urlopen(peticion, timeout=timeout) as respuesta:
+            return respuesta.status, _leer_json(respuesta.read())
     except error.HTTPError as exc:
-        return exc.code, json.loads(exc.read() or b"{}")
+        return exc.code, _leer_json(exc.read())
+
+
+def _leer_json(contenido):
+    if not contenido:
+        return {}
+    try:
+        return json.loads(contenido)
+    except (TypeError, ValueError):
+        return {"mensaje": contenido.decode(errors="replace")[:300]}
 
 
 def main(argv=None):

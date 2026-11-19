@@ -22,6 +22,7 @@ SCREEN_URL_NAMES = {
     "users": "users",
     "audit": "audit",
     "estimacion": "estimacion",
+    "closed": "closed_period",
 }
 
 
@@ -41,12 +42,7 @@ def contexto_panel(request, screen):
         acceso.verificar_acceso(request.user, screen)
     except UsuarioError as error:
         raise PermissionDenied(str(error)) from error
-    try:
-        estado_guardado = crear_cierre_service().estado_actual(request.user)
-    except UsuarioError:
-        # Roles sin consulta de estados (p. ej. Contador de Costos): el
-        # estado del período no aplica a su módulo.
-        estado_guardado = EstadoPeriodo.ABIERTO
+    estado_guardado = crear_cierre_service().estado_actual(request.user)
     estado_periodo = (
         "CERRADO_PROVISIONAL"
         if estado_guardado == EstadoPeriodo.CIERRE_PROVISIONAL
@@ -56,10 +52,14 @@ def contexto_panel(request, screen):
     screen_urls = {
         "login": reverse("login"),
         "logout": reverse("logout"),
+        "api_session_activity": reverse("session_activity"),
+        "api_cost_dashboard": reverse("costos_dashboard_api"),
         "closing": reverse("cierre_periodos"),
         "api_ventas": reverse("api_ventas"),
+        "api_simulator_cycle": reverse("api_simulador_ciclo"),
         "api_conciliar_ventas": reverse("api_conciliar_ventas"),
         "api_hoja": reverse("api_hoja_trabajo"),
+        "api_cierre_activo": reverse("api_cierre_activo"),
         "api_ajuste": reverse("api_ajuste"),
         "api_cierre_provisional": reverse("api_cierre_provisional"),
         "pdf_estados": reverse("estado_pdf_rango", args=["TIPO"]),
@@ -85,6 +85,10 @@ def contexto_panel(request, screen):
 def render_screen(request, screen):
     if screen not in SCREEN_URL_NAMES:
         raise Http404
+    if screen == "closed":
+        contexto = contexto_panel(request, "dashboard")
+        contexto["initial_screen"] = "closed"
+        return render(request, "sic_sunGames/index.html", contexto)
     return render(
         request, "sic_sunGames/index.html", contexto_panel(request, screen)
     )

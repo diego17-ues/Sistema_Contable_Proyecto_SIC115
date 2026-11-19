@@ -39,6 +39,7 @@ CERO = Decimal("0.00")
 MOTIVO_MAX = 300
 DETALLE_MAX = 500
 ROLES_CONSULTA = frozenset({Rol.CONTADOR_GENERAL, Rol.ADMINISTRADOR})
+ROLES_CONSULTA_CIERRE = ROLES_CONSULTA | {Rol.CONTADOR_COSTOS}
 
 
 def _verificar(actor, roles):
@@ -74,6 +75,13 @@ class EstadoConsultado:
     @property
     def desde_snapshot(self):
         return self.emitido is not None
+
+
+@dataclass(frozen=True)
+class CierreActivoConsultado:
+    periodo: object
+    hoja_trabajo: dict
+    estados: dict
 
 
 class EstadosFinancierosService:
@@ -163,6 +171,32 @@ class EstadosFinancierosService:
     def hoja_trabajo(self, actor, desde, hasta):
         _verificar(actor, ROLES_CONSULTA)
         _validar_rango(desde, hasta)
+        return self._construir_hoja_trabajo(desde, hasta)
+
+    def cierre_activo(self, actor):
+        """Devuelve el cierre más reciente y sus documentos de consulta."""
+        _verificar(actor, ROLES_CONSULTA_CIERRE)
+        periodo = self._repositorio.periodo_mas_reciente()
+        if periodo is None or not periodo.cerrado:
+            return None
+
+        estados = {}
+        for tipo in (TipoEstado.ESTADO_RESULTADOS,
+                     TipoEstado.BALANCE_GENERAL):
+            emitido = self._repositorio.ultimo_emitido(periodo, tipo)
+            if emitido is None:
+                raise SnapshotNoDisponibleError()
+            estados[tipo] = emitido.datos
+
+        return CierreActivoConsultado(
+            periodo=periodo,
+            hoja_trabajo=self._construir_hoja_trabajo(
+                periodo.fecha_inicio, periodo.fecha_fin
+            ),
+            estados=estados,
+        )
+
+    def _construir_hoja_trabajo(self, desde, hasta):
         hoja = hoja_trabajo.construir(
             desde, hasta, self._repositorio.agregados_hoja(desde, hasta)
         )
@@ -210,16 +244,17 @@ class ResumenCierre:
 
 
 class CierrePeriodoService:
-    ROLES_CIERRE = frozenset({Rol.CONTADOR_GENERAL})
+    ROLES_CIERRE = frozenset({Rol.CONTADOR_GENERAL, Rol.ADMINISTRADOR})
     ROLES_REAPERTURA = frozenset({Rol.ADMINISTRADOR})
 
     def __init__(self, repositorio, estados, bitacora,
-                 transaccion=nullcontext, ventas=None):
+                 transaccion=nullcontext, ventas=None, costos=None):
         self._repositorio = repositorio
         self._estados = estados
         self._bitacora = bitacora
         self._transaccion = transaccion
         self._ventas = ventas
+        self._costos = costos
 
     def puede_cerrar(self, actor):
         return actor.activo and actor.rol in self.ROLES_CIERRE
@@ -233,7 +268,7 @@ class CierrePeriodoService:
 
     def estado_actual(self, actor):
         """Estado persistido del período contable más reciente."""
-        _verificar(actor, ROLES_CONSULTA)
+        _verificar(actor, ROLES_CONSULTA_CIERRE)
         periodo = self._repositorio.periodo_mas_reciente()
         return periodo.estado if periodo else EstadoPeriodo.ABIERTO
 
@@ -334,6 +369,8 @@ class CierrePeriodoService:
             raise ContrasenaIncorrectaError(campo="contrasena")
         with self._transaccion():
             self._repositorio.reabrir(periodo)
+            if self._costos is not None:
+                self._costos.revertir_cierre(actor, periodo)
             self._registrar(Accion.REAPERTURA_PERIODO, Resultado.EXITOSO,
                             actor, periodo, f"Motivo: {motivo}")
         return periodo
@@ -378,6 +415,8 @@ class CierrePeriodoService:
     def _emitir_y_cerrar(self, actor, periodo, motivo):
         if periodo.pk is None:
             self._repositorio.guardar_periodo(periodo)
+        if self._costos is not None:
+            self._costos.trasladar_cierre(actor, periodo)
         for tipo, datos in self._estados.calcular_todos(periodo).items():
             self._repositorio.guardar_emitido(
                 periodo=periodo, tipo=tipo, datos=datos, usuario=actor

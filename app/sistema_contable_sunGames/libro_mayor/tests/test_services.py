@@ -187,11 +187,21 @@ class RegistrarMovimientosTest(LibroMayorTestCase):
                         "1101", [linea(debe="5", concepto=concepto)]
                     )
 
-    def test_solo_el_contador_general_registra(self):
+    def test_administrador_tambien_puede_registrar(self):
+        admin = crear_usuario("admin", Rol.ADMINISTRADOR)
+
+        self.servicio.registrar(
+            admin, cuenta="1101", movimientos=[linea(debe="5")],
+        )
+
+        self.assertEqual(len(self.repositorio.transacciones), 1)
+        self.assertEqual(len(self.repositorio.guardados), 1)
+
+    def test_contador_costos_no_puede_registrar(self):
         with self.assertRaises(RolNoAutorizadoError):
             self.servicio.registrar(
-                crear_usuario("admin"), cuenta="1101",
-                movimientos=[linea(debe="5")],
+                crear_usuario("costos", Rol.CONTADOR_COSTOS),
+                cuenta="1101", movimientos=[linea(debe="5")],
             )
         self.assertNadaGuardado()
 

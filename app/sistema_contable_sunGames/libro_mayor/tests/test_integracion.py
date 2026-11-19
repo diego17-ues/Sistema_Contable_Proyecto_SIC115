@@ -146,7 +146,7 @@ class LibroMayorIntegracionTests(TestCase):
         self.assertFalse(RegistroBitacora.objects.filter(
             accion=Accion.REGISTRO_TRANSACCION).exists())
 
-    def test_otro_rol_recibe_403_al_registrar(self):
+    def test_administrador_tambien_puede_registrar(self):
         self.client.force_login(self.admin)
 
         respuesta = self.registrar(
@@ -155,10 +155,23 @@ class LibroMayorIntegracionTests(TestCase):
         pantalla = self.client.get(reverse("ledger"))
         balance = self.client.get(reverse("ledger"), {"mode": "trial-balance"})
 
+        self.assertRedirects(
+            respuesta, f"{reverse('ledger')}?cuenta=1101&desde=&hasta="
+        )
+        self.assertTrue(Movimiento.objects.exists())
+        self.assertContains(pantalla, reverse("transaccion_registrar"))
+        self.assertEqual(balance.status_code, 200)
+
+    def test_contador_costos_no_puede_registrar_en_el_mayor(self):
+        costos = self.crear_usuario("costos", Rol.CONTADOR_COSTOS)
+        self.client.force_login(costos)
+
+        respuesta = self.registrar(
+            "1101", [("2026-11-03", "Venta", INGRESO, "5", "")]
+        )
+
         self.assertEqual(respuesta.status_code, 403)
         self.assertFalse(Movimiento.objects.exists())
-        self.assertNotContains(pantalla, reverse("transaccion_registrar"))
-        self.assertEqual(balance.status_code, 200)
 
     def test_descarga_del_balance_en_pdf(self):
         self.client.force_login(self.contador)

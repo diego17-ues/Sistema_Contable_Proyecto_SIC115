@@ -11,6 +11,7 @@ from .services import (
     AplicacionIndirectosService,
     CatalogoCostosService,
     OrdenService,
+    ReclasificacionCostoService,
     RegistroCostoService,
 )
 
@@ -20,10 +21,18 @@ def _servicio(clase):
                  transaction.atomic)
 
 
+def crear_reclasificacion_service():
+    return ReclasificacionCostoService(
+        CostosRepository(), TransaccionRepository(),
+        crear_bitacora_service(), transaction.atomic,
+    )
+
+
 def crear_orden_service():
     return OrdenService(
         CostosRepository(), crear_bitacora_service(), transaction.atomic,
         total_estimacion=crear_presupuesto_service().total,
+        reclasificaciones=crear_reclasificacion_service(),
     )
 
 

@@ -13,6 +13,7 @@
     <a class="button button-secondary" href="{% url 'costos_orden_editar' orden.pk %}">Editar orden</a>
     <a class="button button-secondary" href="{% url 'costos_orden_eliminar' orden.pk %}">Archivar</a>
     {% if orden.abierta %}
+    <form method="post" action="{% url 'costos_orden_finalizar' orden.pk %}" class="inline-form" onsubmit="return confirm('¿Finalizar esta orden y trasladar sus costos a videojuegos terminados (1107)?');">{% csrf_token %}<button class="button button-secondary" type="submit">Finalizar orden</button></form>
     <a class="button button-primary" href="{% url 'costos_registro_nuevo' orden.pk 'mano-obra' %}">＋ Mano de obra directa</a>
     <a class="button button-secondary" href="{% url 'costos_registro_nuevo' orden.pk 'directo' %}">＋ Costo directo</a>
     <a class="button button-secondary" href="{% url 'costos_registro_nuevo' orden.pk 'indirecto' %}">＋ Costo indirecto</a>
@@ -64,7 +65,7 @@
 {% endfor %}
 
 <section class="card hoja-seccion">
-  <div class="card-header"><div><h2>Resumen por proceso</h2><p>Registros activos de los tres elementos.</p></div></div>
+  <div class="card-header"><div><h2>Resumen por proceso</h2></div></div>
   <div class="table-wrap">
     <table class="hoja-tabla">
       <thead><tr><th>Proceso</th><th class="num">Horas</th><th class="num">Costo</th></tr></thead>
@@ -84,7 +85,7 @@
 {% block modal %}
 {% if form_orden %}
 <div class="modal-backdrop" data-costos-modal><section class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloEditarOrden">
-  <div class="modal-header"><div><h2 id="tituloEditarOrden">Editar orden de trabajo</h2><p>OT-{{ orden.pk }} · puedes actualizar el juego, la fecha, las licencias y la estimación vinculada.</p></div><a class="modal-close" href="{% url 'costos_orden' orden.pk %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-header"><div><h2 id="tituloEditarOrden">Editar orden de trabajo</h2><p>OT-{{ orden.pk }} · {{ orden.juego.nombre }}</p></div><a class="modal-close" href="{% url 'costos_orden' orden.pk %}" aria-label="Cerrar">×</a></div>
   <form class="modal-form" method="post" action="{% url 'costos_orden_editar' orden.pk %}" novalidate data-costos-form>
     {% csrf_token %}
     {% include "costos/campos.html" with form=form_orden %}
@@ -102,7 +103,7 @@
 </section></div>
 {% elif form_registro %}
 <div class="modal-backdrop" data-costos-modal><section class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloRegistro">
-  <div class="modal-header"><div><h2 id="tituloRegistro">{{ elemento_registro }}</h2><p>OT-{{ orden.pk }} · Debe {{ configuracion.cuenta_costo.codigo }} {{ configuracion.cuenta_costo.denominacion }} · haber la contrapartida elegida.</p></div><a class="modal-close" href="{% url 'costos_orden' orden.pk %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-header"><div><h2 id="tituloRegistro">{{ elemento_registro }}</h2><p>OT-{{ orden.pk }} · {% if tipo_registro == 'mano-obra' %}Retenciones y cargas patronales se calculan y contabilizan automáticamente.{% else %}Debe {{ configuracion.cuenta_costo.codigo }} {{ configuracion.cuenta_costo.denominacion }} · haber la contrapartida elegida.{% endif %}</p></div><a class="modal-close" href="{% url 'costos_orden' orden.pk %}" aria-label="Cerrar">×</a></div>
   <form class="modal-form" method="post" action="{% url 'costos_registro_nuevo' orden.pk tipo_registro %}" novalidate data-costos-form{% if tipo_registro == 'mano-obra' %} data-mano-obra{% endif %}>
     {% csrf_token %}
     {% include "costos/campos.html" with form=form_registro %}
@@ -153,7 +154,6 @@
       <div><dt>Variación porcentual</dt><dd>{% if evaluacion.porcentaje is not None %}{% if evaluacion.porcentaje > 0 %}+{% endif %}{{ evaluacion.porcentaje|floatformat:"2g" }}%{% else %}No calculable con estimación de $0.00{% endif %}</dd></div>
     </dl>
     <p class="form-section">{% if evaluacion.viable %}<span class="tag tag-open">Viable: está dentro del presupuesto</span>{% else %}<span class="tag tag-warn">No viable: excede el presupuesto</span>{% endif %}</p>
-    <p class="muted">Se considera viable si el costo real acumulado es igual o menor que la estimación vinculada.</p>
     <div class="modal-actions"><a class="button button-secondary" href="{% url 'costos_orden' orden.pk %}">Cerrar</a></div>
   </div>
 </section></div>

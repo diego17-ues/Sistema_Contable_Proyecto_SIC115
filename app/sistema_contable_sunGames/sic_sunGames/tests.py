@@ -1,7 +1,13 @@
 import secrets
 from unittest.mock import patch
+from unittest.mock import patch
 
 from django.contrib.auth import SESSION_KEY
+from django.contrib.sessions.models import Session
+from django.contrib.staticfiles.management.commands.runserver import (
+    Command as StaticFilesRunserverCommand,
+)
+from django.core.management import get_commands, load_command_class
 from django.contrib.staticfiles import finders
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
@@ -158,6 +164,22 @@ class LoginIntegracionTests(TestCase):
         self.assertRedirects(respuesta, reverse("users"))
         self.assertIn(SESSION_KEY, self.client.session)
 
+        panel = self.client.get(reverse("users"))
+        self.assertContains(panel, '"costos"')
+        self.assertEqual(
+            self.client.get(reverse("costos_ordenes")).status_code, 200
+        )
+        self.assertEqual(
+            self.client.get(reverse("costos_dashboard_api")).status_code, 200
+        )
+
+    def test_contador_costos_entra_al_dashboard(self):
+        self.crear_usuario("costos", Rol.CONTADOR_COSTOS)
+
+        respuesta = self.post("costos", CLAVE)
+
+        self.assertRedirects(respuesta, reverse("dashboard"))
+
     def test_contador_no_accede_a_modulos_de_administrador(self):
         self.client.force_login(self.contador)
 
@@ -173,6 +195,15 @@ class LoginIntegracionTests(TestCase):
 
         self.assertRedirects(respuesta, self.url)
         self.assert_sin_sesion()
+
+    def test_pulso_de_actividad_extiende_sesion(self):
+        self.client.force_login(self.contador)
+
+        respuesta = self.client.post(reverse("session_activity"))
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.json(), {"active": True})
+        self.assertLessEqual(self.client.session.get_expiry_age(), 600)
 
 
 class AppJsSinDatosDeDemostracionTests(SimpleTestCase):
@@ -195,6 +226,45 @@ class AppJsSinDatosDeDemostracionTests(SimpleTestCase):
 
     def test_no_expone_el_tipo_tecnico_del_cierre_provisional(self):
         self.assertNotIn("Tipo: PROVISIONAL_MENSUAL", self.codigo)
+
+    def test_dashboard_usa_rendimiento_real_y_no_montos_de_demostracion(self):
+        self.assertIn("api_cost_dashboard", self.codigo)
+        self.assertIn("órdenes finalizadas", self.codigo.lower())
+        self.assertNotIn("money(49600)", self.codigo)
+        self.assertNotIn("34420", self.codigo)
+        self.assertNotIn("12860", self.codigo)
+        self.assertNotIn("28640", self.codigo)
+        self.assertIn("dashboardSalesInPeriod", self.codigo)
+        self.assertNotIn("＋ Nueva venta", self.codigo)
+        self.assertIn("Presupuesto estimado", self.codigo)
+
+    def test_dashboard_de_costos_es_especifico_del_rol(self):
+        dashboard_costos = self.codigo.split(
+            "function dashboardCostosPage()", 1
+        )[1].split("function dashboardCostosSummary()", 1)[0]
+        self.assertIn("Última orden registrada", dashboard_costos)
+        self.assertIn("Pendientes de finalizar", dashboard_costos)
+        self.assertIn(
+            "Rendimiento de la última orden finalizada", dashboard_costos
+        )
+        self.assertNotIn("venta", dashboard_costos.lower())
+
+    def test_cliente_cierra_sesion_despues_de_diez_minutos_inactivo(self):
+        self.assertIn("10 * 60 * 1000", self.codigo)
+        self.assertIn("api_session_activity", self.codigo)
+
+
+class RunserverSessionInvalidationTests(SimpleTestCase):
+    def test_runserver_de_la_aplicacion_invalida_sesiones_anteriores(self):
+        self.assertEqual(get_commands()["runserver"], "sic_sunGames")
+        comando = load_command_class("sic_sunGames", "runserver")
+        with patch.object(Session.objects, "all") as sesiones:
+            with patch.object(
+                StaticFilesRunserverCommand, "handle", return_value=None
+            ):
+                comando.handle()
+
+        sesiones.return_value.delete.assert_called_once_with()
 
 
 class AdministracionIntegracionTests(TestCase):
@@ -225,7 +295,9 @@ class AdministracionIntegracionTests(TestCase):
         self.client.force_login(self.admin)
 
         for nombre in ("dashboard", "ledger", "accounts", "reports",
-                       "operations"):
+                       "operations", "estimacion", "costos_ordenes",
+                       "costos_rendimiento", "costos_catalogos",
+                       "costos_indirectos_periodo"):
             self.assertEqual(
                 self.client.get(reverse(nombre)).status_code, 200, nombre
             )

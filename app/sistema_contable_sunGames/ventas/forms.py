@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import TipoProducto
+from .models import OrigenVenta, TipoProducto
 
 MAXIMO = 10 ** 10
 
@@ -11,6 +11,9 @@ class EventoSteamForm(forms.Form):
     id = forms.RegexField(regex=r"^[A-Za-z0-9_-]{4,64}$")
     titulo = forms.CharField(max_length=120)
     tipo = forms.ChoiceField(choices=TipoProducto.choices)
+    origen = forms.ChoiceField(
+        choices=OrigenVenta.choices, required=False,
+    )
     cantidad = forms.IntegerField(min_value=1, max_value=10000)
     precio_unitario = forms.DecimalField(
         min_value=0.01, max_value=MAXIMO, decimal_places=2
@@ -28,6 +31,7 @@ class EventoSteamForm(forms.Form):
         return {
             "identificador": datos["id"], "titulo": datos["titulo"].strip(),
             "tipo_producto": datos["tipo"], "cantidad": datos["cantidad"],
+            "origen": datos.get("origen") or OrigenVenta.REAL,
             "precio_unitario": datos["precio_unitario"],
             "moneda": datos["moneda"], "pais": datos["pais"],
             "fecha_hora": datos["fecha_hora"], "comision": datos["comision"],

@@ -3,6 +3,7 @@
 from django.contrib.staticfiles import finders
 from django.db import transaction
 
+from costos.composition import crear_reclasificacion_service
 from libro_mayor.composition import LOGO
 from usuarios.composition import crear_bitacora_service
 from ventas.composition import crear_ventas_service
@@ -23,4 +24,5 @@ def crear_cierre_service():
     return CierrePeriodoService(
         EstadosFinancierosRepository(), crear_estados_financieros_service(),
         crear_bitacora_service(), transaction.atomic, crear_ventas_service(),
+        crear_reclasificacion_service(),
     )

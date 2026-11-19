@@ -171,6 +171,79 @@ class ConfiguracionCuentaCosto(models.Model):
         return f"{self.get_elemento_display()} → {self.cuenta_costo.codigo}"
 
 
+class ParametrosCostosManoObra(models.Model):
+    """Tasas parametrizables para calcular el costo de la mano de obra."""
+
+    isss_patronal = models.DecimalField(
+        "ISSS patronal (%)", max_digits=5, decimal_places=2,
+        default="7.50",
+    )
+    isss_empleado = models.DecimalField(
+        "ISSS empleado (%)", max_digits=5, decimal_places=2,
+        default="3.00",
+    )
+    isss_tope_mensual = models.DecimalField(
+        "Base máxima mensual ISSS", max_digits=10, decimal_places=2,
+        default="1000.00",
+    )
+    afp_patronal = models.DecimalField(
+        "AFP patronal (%)", max_digits=5, decimal_places=2,
+        default="7.75",
+    )
+    afp_empleado = models.DecimalField(
+        "AFP empleado (%)", max_digits=5, decimal_places=2,
+        default="7.25",
+    )
+    incaf_patronal = models.DecimalField(
+        "INCAF patronal (%)", max_digits=5, decimal_places=2,
+        default="1.00",
+    )
+    renta_tramo_1_hasta = models.DecimalField(
+        max_digits=10, decimal_places=2, default="550.00",
+    )
+    renta_tramo_2_hasta = models.DecimalField(
+        max_digits=10, decimal_places=2, default="895.24",
+    )
+    renta_tramo_2_porcentaje = models.DecimalField(
+        max_digits=5, decimal_places=2, default="10.00",
+    )
+    renta_tramo_2_exceso = models.DecimalField(
+        max_digits=10, decimal_places=2, default="550.00",
+    )
+    renta_tramo_2_cuota = models.DecimalField(
+        max_digits=10, decimal_places=2, default="17.67",
+    )
+    renta_tramo_3_hasta = models.DecimalField(
+        max_digits=10, decimal_places=2, default="2038.10",
+    )
+    renta_tramo_3_porcentaje = models.DecimalField(
+        max_digits=5, decimal_places=2, default="20.00",
+    )
+    renta_tramo_3_exceso = models.DecimalField(
+        max_digits=10, decimal_places=2, default="895.24",
+    )
+    renta_tramo_3_cuota = models.DecimalField(
+        max_digits=10, decimal_places=2, default="60.00",
+    )
+    renta_tramo_4_porcentaje = models.DecimalField(
+        max_digits=5, decimal_places=2, default="30.00",
+    )
+    renta_tramo_4_exceso = models.DecimalField(
+        max_digits=10, decimal_places=2, default="2038.10",
+    )
+    renta_tramo_4_cuota = models.DecimalField(
+        max_digits=10, decimal_places=2, default="288.57",
+    )
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "parámetros de mano de obra"
+        verbose_name_plural = "parámetros de mano de obra"
+
+    def __str__(self):
+        return "Parámetros de mano de obra"
+
+
 class FuenteIndirecta(models.Model):
     """Cuenta del mayor dedicada exclusivamente a indirectos de desarrollo.
 
@@ -379,3 +452,63 @@ class AsientoCosto(models.Model):
 
     def __str__(self):
         return f"Asiento {self.transaccion_id} · {self.get_tipo_display()}"
+
+
+class ReclasificacionCosto(models.Model):
+    """Rastrea traslados de 4101/4102 a producción y sus reversiones."""
+
+    TIPO_CIERRE = "CIERRE"
+    TIPO_FINALIZACION = "FINALIZACION"
+    TIPO_REVERSION = "REVERSION"
+    TIPOS = [
+        (TIPO_CIERRE, "Cierre provisional"),
+        (TIPO_FINALIZACION, "Finalización de orden"),
+        (TIPO_REVERSION, "Reversión"),
+    ]
+
+    periodo = models.ForeignKey(
+        PeriodoContable, on_delete=models.PROTECT,
+        related_name="reclasificaciones_costos",
+    )
+    orden = models.ForeignKey(
+        OrdenTrabajo, on_delete=models.PROTECT,
+        related_name="reclasificaciones_costos",
+    )
+    transaccion = models.OneToOneField(
+        Transaccion, on_delete=models.PROTECT,
+        related_name="reclasificacion_costo",
+    )
+    cuenta_origen = models.ForeignKey(
+        Cuenta, on_delete=models.PROTECT,
+        related_name="reclasificaciones_costo_origen",
+    )
+    cuenta_destino = models.ForeignKey(
+        Cuenta, on_delete=models.PROTECT,
+        related_name="reclasificaciones_costo_destino",
+    )
+    importe = models.DecimalField(
+        "importe", max_digits=DINERO_MAX, decimal_places=2,
+        validators=[MinValueValidator(0.01)],
+    )
+    tipo = models.CharField("tipo", max_length=16, choices=TIPOS)
+    ciclo = models.PositiveIntegerField(default=1)
+    origen = models.ForeignKey(
+        "self", on_delete=models.PROTECT, null=True, blank=True,
+        related_name="derivadas",
+        help_text="Reclasificación de cierre que originó el saldo en 1106.",
+    )
+    revierte = models.OneToOneField(
+        "self", on_delete=models.PROTECT, null=True, blank=True,
+        related_name="reversion",
+    )
+    clave_idempotencia = models.CharField(
+        "clave de idempotencia", max_length=100, unique=True,
+    )
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return (f"{self.get_tipo_display()} · OT-{self.orden_id} · "
+                f"${self.importe}")
