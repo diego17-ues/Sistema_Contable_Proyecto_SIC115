@@ -241,6 +241,14 @@ class EstimacionRepository:
             "rol"
         ).order_by("rol__nivel", "rol__nombre", "vigente_desde")
 
+    def obtener_salario(self, salario_id):
+        try:
+            return SalarioReferencia.objects.select_related(
+                "rol"
+            ).get(pk=salario_id)
+        except SalarioReferencia.DoesNotExist as exc:
+            raise SalarioNoEncontradoError() from exc
+
     def nuevo_salario(self, **campos):
         return SalarioReferencia(**campos)
 

@@ -8,9 +8,9 @@
 <section class="card">
   <div class="card-header"><div><h2>Roles de estimación</h2></div><a class="button button-primary" href="{% url 'estimacion_rol_nuevo' %}">＋ Nuevo rol</a></div>
   <div class="table-wrap"><table>
-    <thead><tr><th>Rol</th><th class="num">Nivel</th></tr></thead>
+    <thead><tr><th>Rol</th><th class="num">Nivel</th><th></th></tr></thead>
     <tbody>
-      {% for rol in roles %}<tr><td>{{ rol.nombre }}</td><td class="num">{{ rol.nivel }}</td></tr>{% empty %}<tr><td class="empty-cell" colspan="2">Sin roles registrados.</td></tr>{% endfor %}
+      {% for rol in roles %}<tr><td>{{ rol.nombre }}</td><td class="num">{{ rol.nivel }}</td><td><a class="button button-secondary button-small" href="{% url 'estimacion_rol_editar' rol.pk %}">Editar</a></td></tr>{% empty %}<tr><td class="empty-cell" colspan="3">Sin roles registrados.</td></tr>{% endfor %}
     </tbody>
   </table></div>
 </section>
@@ -18,9 +18,9 @@
 <section class="card">
   <div class="card-header"><div><h2>Expertos</h2></div><a class="button button-primary" href="{% url 'estimacion_experto_nuevo' %}">＋ Nuevo experto</a></div>
   <div class="table-wrap"><table>
-    <thead><tr><th>Nombre</th></tr></thead>
+    <thead><tr><th>Nombre</th><th></th></tr></thead>
     <tbody>
-      {% for experto in expertos %}<tr><td>{{ experto.nombre }}</td></tr>{% empty %}<tr><td class="empty-cell">Sin expertos registrados.</td></tr>{% endfor %}
+      {% for experto in expertos %}<tr><td>{{ experto.nombre }}</td><td><a class="button button-secondary button-small" href="{% url 'estimacion_experto_editar' experto.pk %}">Editar</a></td></tr>{% empty %}<tr><td class="empty-cell" colspan="2">Sin expertos registrados.</td></tr>{% endfor %}
     </tbody>
   </table></div>
 </section>
@@ -28,9 +28,9 @@
 <section class="card">
   <div class="card-header"><div><h2>Salarios de referencia</h2></div><a class="button button-primary" href="{% url 'estimacion_salario_nuevo' %}">＋ Nuevo salario</a></div>
   <div class="table-wrap"><table>
-    <thead><tr><th>Rol</th><th class="num">Salario bruto</th><th>Vigente desde</th><th>Vigente hasta</th></tr></thead>
+    <thead><tr><th>Rol</th><th class="num">Salario bruto</th><th>Vigente desde</th><th>Vigente hasta</th><th></th></tr></thead>
     <tbody>
-      {% for salario in salarios %}<tr><td>{{ salario.rol }}</td><td class="num">${{ salario.salario_bruto }}</td><td>{{ salario.vigente_desde|date:"d/m/Y" }}</td><td>{{ salario.vigente_hasta|date:"d/m/Y"|default:"—" }}</td></tr>{% empty %}<tr><td class="empty-cell" colspan="4">Sin salarios registrados.</td></tr>{% endfor %}
+      {% for salario in salarios %}<tr><td>{{ salario.rol }}</td><td class="num">${{ salario.salario_bruto }}</td><td>{{ salario.vigente_desde|date:"d/m/Y" }}</td><td>{{ salario.vigente_hasta|date:"d/m/Y"|default:"—" }}</td><td><a class="button button-secondary button-small" href="{% url 'estimacion_salario_editar' salario.pk %}">Editar</a></td></tr>{% empty %}<tr><td class="empty-cell" colspan="5">Sin salarios registrados.</td></tr>{% endfor %}
     </tbody>
   </table></div>
 </section>
@@ -91,6 +91,31 @@
     <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_catalogos' %}">Cancelar</a><button class="button button-primary" type="submit">Registrar parámetro</button></div>
   </form>
 </section></div>
+{% elif form_rol_editar %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Editar rol">
+  <div class="modal-header"><div><h2>Editar rol</h2></div><a class="modal-close" href="{% url 'estimacion_catalogos' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'estimacion_rol_editar' rol_editar.pk %}" novalidate>
+    {% csrf_token %}
+    {% if form_rol_editar.non_field_errors %}<div class="form-error">{{ form_rol_editar.non_field_errors }}</div>{% endif %}
+    <div class="modal-fields">
+      <div class="field"><label for="{{ form_rol_editar.nombre.id_for_label }}">{{ form_rol_editar.nombre.label }} *</label>{{ form_rol_editar.nombre }}{% for error in form_rol_editar.nombre.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+      <div class="field"><label for="{{ form_rol_editar.nivel.id_for_label }}">{{ form_rol_editar.nivel.label }} *</label>{{ form_rol_editar.nivel }}{% for error in form_rol_editar.nivel.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+    </div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_catalogos' %}">Cancelar</a><button class="button button-primary" type="submit">Guardar cambios</button></div>
+  </form>
+</section></div>
+{% elif form_experto_editar %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Editar experto">
+  <div class="modal-header"><div><h2>Editar experto</h2></div><a class="modal-close" href="{% url 'estimacion_catalogos' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'estimacion_experto_editar' experto_editar.pk %}" novalidate>
+    {% csrf_token %}
+    {% if form_experto_editar.non_field_errors %}<div class="form-error">{{ form_experto_editar.non_field_errors }}</div>{% endif %}
+    <div class="modal-fields">
+      <div class="field"><label for="{{ form_experto_editar.nombre.id_for_label }}">{{ form_experto_editar.nombre.label }} *</label>{{ form_experto_editar.nombre }}{% for error in form_experto_editar.nombre.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+    </div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_catalogos' %}">Cancelar</a><button class="button button-primary" type="submit">Guardar cambios</button></div>
+  </form>
+</section></div>
 {% elif form_parametro_editar %}
 <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Editar parámetro">
   <div class="modal-header"><div><h2>Editar parámetro</h2><p>{{ parametro_editar.clave }} · la clave no cambia; la vigencia no puede traslaparse con otra del mismo parámetro.</p></div><a class="modal-close" href="{% url 'estimacion_catalogos' %}" aria-label="Cerrar">×</a></div>
@@ -122,6 +147,21 @@
       <div class="field"><label for="id_vigente_hasta">{{ form_salario.vigente_hasta.label }}</label>{{ form_salario.vigente_hasta }}{% for error in form_salario.vigente_hasta.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
     </div>
     <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_catalogos' %}">Cancelar</a><button class="button button-primary" type="submit">Registrar salario</button></div>
+  </form>
+</section></div>
+{% elif form_salario_editar %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Editar salario">
+  <div class="modal-header"><div><h2>Editar salario de referencia</h2><p>La vigencia no puede traslaparse con otra del mismo rol.</p></div><a class="modal-close" href="{% url 'estimacion_catalogos' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'estimacion_salario_editar' salario_editar.pk %}" novalidate>
+    {% csrf_token %}
+    {% if form_salario_editar.non_field_errors %}<div class="form-error">{{ form_salario_editar.non_field_errors }}</div>{% endif %}
+    <div class="modal-fields">
+      <div class="field"><label for="id_rol">{{ form_salario_editar.rol.label }} *</label><select id="id_rol" name="rol">{% for r in roles %}<option value="{{ r.pk }}"{% if r.pk|stringformat:"s" == form_salario_editar.rol.value|stringformat:"s" %} selected{% endif %}>{{ r }}</option>{% endfor %}</select>{% for error in form_salario_editar.rol.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+      <div class="field"><label for="id_salario_bruto">{{ form_salario_editar.salario_bruto.label }} *</label>{{ form_salario_editar.salario_bruto }}{% for error in form_salario_editar.salario_bruto.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+      <div class="field"><label for="id_vigente_desde">{{ form_salario_editar.vigente_desde.label }} *</label>{{ form_salario_editar.vigente_desde }}{% for error in form_salario_editar.vigente_desde.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+      <div class="field"><label for="id_vigente_hasta">{{ form_salario_editar.vigente_hasta.label }}</label>{{ form_salario_editar.vigente_hasta }}{% for error in form_salario_editar.vigente_hasta.errors %}<span class="form-error">{{ error }}</span>{% endfor %}</div>
+    </div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_catalogos' %}">Cancelar</a><button class="button button-primary" type="submit">Guardar cambios</button></div>
   </form>
 </section></div>
 {% endif %}

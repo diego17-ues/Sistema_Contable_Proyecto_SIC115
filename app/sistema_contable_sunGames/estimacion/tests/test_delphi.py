@@ -313,3 +313,43 @@ class DelphiTests(TestCase):
                 self.general, parametro.pk, valor=Decimal("0.9"),
                 vigente_desde=date(2026, 1, 1),
             )
+
+    def test_actualizar_rol_y_experto(self):
+        rol = self.servicio.actualizar_rol(
+            self.admin, self.rol.pk, "Programador Sr", 4
+        )
+        self.assertEqual((rol.nombre, rol.nivel), ("Programador Sr", 4))
+        experto = self.servicio.actualizar_experto(
+            self.admin, self.experto1.pk, "Experto Editado"
+        )
+        self.assertEqual(experto.nombre, "Experto Editado")
+        with self.assertRaises(RolNoEncontradoError):
+            self.servicio.actualizar_rol(self.admin, 9999, "X", 1)
+        with self.assertRaises(RolNoAutorizadoError):
+            self.servicio.actualizar_experto(
+                self.general, self.experto1.pk, "X"
+            )
+
+    def test_actualizar_salario(self):
+        salario = self.servicio.crear_salario(
+            self.admin, self.rol.pk, Decimal("1500"),
+            date(2026, 1, 1), date(2026, 6, 30),
+        )
+        otro = self.servicio.crear_salario(
+            self.admin, self.rol.pk, Decimal("1700"),
+            date(2026, 7, 1), None,
+        )
+        actualizado = self.servicio.actualizar_salario(
+            self.admin, salario.pk, rol_id=self.rol.pk,
+            salario_bruto=Decimal("1600"),
+            vigente_desde=date(2026, 1, 1),
+            vigente_hasta=date(2026, 5, 31),
+        )
+        self.assertEqual(actualizado.salario_bruto, Decimal("1600.00"))
+        # Traslapar la otra vigencia del mismo rol se rechaza.
+        with self.assertRaises(ParametroInvalidoError):
+            self.servicio.actualizar_salario(
+                self.admin, otro.pk, rol_id=self.rol.pk,
+                salario_bruto=Decimal("1800"),
+                vigente_desde=date(2026, 2, 1),
+            )
