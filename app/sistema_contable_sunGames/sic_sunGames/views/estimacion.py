@@ -181,25 +181,36 @@ def juego_detalle(request, juego_id):
     )
 
 
-RONDA_UNICA = 1
+def _ronda_registro(juego):
+    """Ronda activa de captura: la última abierta, o la siguiente si la
+    anterior ya está cerrada (una ronda nueva por cada cierre Delphi)."""
+    numeros = [r.numero for r in juego.rondas.all()]
+    abiertas = [r.numero for r in juego.rondas.all() if not r.cerrada]
+    if abiertas:
+        return max(abiertas)
+    return max(numeros) + 1 if numeros else 1
 
 
 @login_required
 @require_http_methods(["GET", "POST"])
 def estimacion_nueva(request, juego_id):
-    """Matriz PERT: un experto y rol estiman todas las fases (ronda 1)."""
+    """Matriz PERT: un experto y rol estiman todas las fases."""
     servicio = crear_estimacion_service()
+    try:
+        juego = servicio.obtener_juego(request.user, juego_id)
+    except UsuarioError as error:
+        raise _sin_permiso(error) from error
+    fases = list(juego.fases.all())
+    ronda = _ronda_registro(juego)
     if request.method != "POST":
         return render(
             request, JUEGO_TEMPLATE,
             _contexto_juego(
                 request, juego_id, servicio,
-                form=EstimacionMatrizForm(
-                    fases=_fases_del_juego(request, servicio, juego_id)
-                ),
+                form=EstimacionMatrizForm(fases=fases),
+                ronda_registro=ronda,
             ),
         )
-    fases = _fases_del_juego(request, servicio, juego_id)
     form = EstimacionMatrizForm(request.POST, fases=fases)
     if form.is_valid():
         datos = form.cleaned_data
@@ -217,7 +228,7 @@ def estimacion_nueva(request, juego_id):
                 juego_id=juego_id,
                 rol_id=datos["rol"],
                 experto_id=datos["experto"],
-                ronda=RONDA_UNICA,
+                ronda=ronda,
                 matriz=matriz,
                 justificacion=datos["justificacion"],
             )
@@ -228,12 +239,16 @@ def estimacion_nueva(request, juego_id):
         else:
             messages.success(
                 request,
-                f"Estimación registrada para {len(matriz)} fases.",
+                f"Estimación registrada para {len(matriz)} fases "
+                f"en la ronda {ronda}.",
             )
             return redirect("estimacion_juego", juego_id=juego_id)
     return render(
         request, JUEGO_TEMPLATE,
-        _contexto_juego(request, juego_id, servicio, form=form),
+        _contexto_juego(
+            request, juego_id, servicio, form=form,
+            ronda_registro=ronda,
+        ),
     )
 
 

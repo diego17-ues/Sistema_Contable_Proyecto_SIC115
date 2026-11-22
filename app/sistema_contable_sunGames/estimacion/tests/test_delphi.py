@@ -167,6 +167,34 @@ class DelphiTests(TestCase):
         with self.assertRaises(RondaCerradaError):
             self.matriz(self.experto2)
 
+    def test_mismo_experto_puede_registrar_ronda_nueva(self):
+        self.matriz(self.experto1)
+        self.servicio.cerrar_ronda(
+            self.admin, self.juego.pk, 1, fecha=FECHA
+        )
+        creadas = self.matriz(self.experto1, ronda=2)
+        self.assertTrue(all(e.ronda == 2 for e in creadas))
+
+    def test_vista_registra_en_la_siguiente_ronda_tras_el_cierre(self):
+        datos = {
+            "rol": str(self.rol.pk),
+            "experto": str(self.experto1.pk),
+            "justificacion": "",
+        }
+        for fase in self.juego.fases.all():
+            datos[f"fase_{fase.pk}_optimista"] = "10"
+            datos[f"fase_{fase.pk}_moda"] = "20"
+            datos[f"fase_{fase.pk}_pesimista"] = "30"
+        self.client.force_login(self.admin)
+        url = f"/panel/estimacion/{self.juego.pk}/estimacion/"
+        self.assertEqual(self.client.post(url, datos).status_code, 302)
+        self.assertTrue(EstimacionExperto.objects.filter(ronda=1).exists())
+        self.servicio.cerrar_ronda(
+            self.admin, self.juego.pk, 1, fecha=FECHA
+        )
+        self.assertEqual(self.client.post(url, datos).status_code, 302)
+        self.assertTrue(EstimacionExperto.objects.filter(ronda=2).exists())
+
     def test_estimacion_invalida_rechazada(self):
         with self.assertRaises(EstimacionInvalidaError):
             self.servicio.registrar_estimacion(
