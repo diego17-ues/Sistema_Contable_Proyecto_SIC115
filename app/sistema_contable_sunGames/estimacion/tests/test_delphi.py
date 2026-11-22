@@ -9,6 +9,7 @@ from estimacion.exceptions import (
     EstimacionDuplicadaError,
     EstimacionInvalidaError,
     ParametroInvalidoError,
+    ParametroNoEncontradoError,
     RondaCerradaError,
     RolNoEncontradoError,
 )
@@ -275,3 +276,40 @@ class DelphiTests(TestCase):
             self.admin, "tasa_extra", Decimal("0.2"),
             date(2026, 7, 1), None,
         )
+
+    def test_actualizar_parametro(self):
+        parametro = self.servicio.crear_parametro(
+            self.admin, "tasa_extra", Decimal("0.1"),
+            date(2026, 1, 1), date(2026, 6, 30),
+        )
+        siguiente = self.servicio.crear_parametro(
+            self.admin, "tasa_extra", Decimal("0.5"),
+            date(2026, 7, 1), None,
+        )
+        actualizado = self.servicio.actualizar_parametro(
+            self.admin, parametro.pk, valor=Decimal("0.3"),
+            vigente_desde=date(2026, 2, 1),
+            vigente_hasta=date(2026, 5, 31),
+            verificado=True,
+        )
+        self.assertEqual(actualizado.valor, Decimal("0.300000"))
+        self.assertEqual(actualizado.clave, "tasa_extra")
+        self.assertTrue(actualizado.verificado)
+        # Traslapar otra vigencia del mismo parámetro se rechaza.
+        with self.assertRaises(ParametroInvalidoError):
+            self.servicio.actualizar_parametro(
+                self.admin, siguiente.pk, valor=Decimal("0.9"),
+                vigente_desde=date(2026, 3, 1),
+            )
+        # Parámetro inexistente.
+        with self.assertRaises(ParametroNoEncontradoError):
+            self.servicio.actualizar_parametro(
+                self.admin, 9999, valor=Decimal("1"),
+                vigente_desde=date(2026, 1, 1),
+            )
+        # Rol sin acceso no modifica.
+        with self.assertRaises(RolNoAutorizadoError):
+            self.servicio.actualizar_parametro(
+                self.general, parametro.pk, valor=Decimal("0.9"),
+                vigente_desde=date(2026, 1, 1),
+            )

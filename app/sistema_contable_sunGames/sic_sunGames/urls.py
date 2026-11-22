@@ -45,6 +45,7 @@ urlpatterns = [
     path("panel/estimacion/catalogos/rol/", estimacion.catalogo_rol, name="estimacion_rol_nuevo"),
     path("panel/estimacion/catalogos/experto/", estimacion.catalogo_experto, name="estimacion_experto_nuevo"),
     path("panel/estimacion/catalogos/parametro/", estimacion.catalogo_parametro, name="estimacion_parametro_nuevo"),
+    path("panel/estimacion/catalogos/parametro/<int:parametro_id>/editar/", estimacion.catalogo_parametro_editar, name="estimacion_parametro_editar"),
     path("panel/estimacion/catalogos/salario/", estimacion.catalogo_salario, name="estimacion_salario_nuevo"),
     path("panel/estimacion/<int:juego_id>/", estimacion.juego_detalle, name="estimacion_juego"),
     path("panel/estimacion/<int:juego_id>/estimacion/", estimacion.estimacion_nueva, name="estimacion_registrar"),

@@ -38,9 +38,9 @@
 <section class="card">
   <div class="card-header"><div><h2>Parámetros</h2></div><a class="button button-primary" href="{% url 'estimacion_parametro_nuevo' %}">＋ Nuevo parámetro</a></div>
   <div class="table-wrap"><table>
-    <thead><tr><th>Clave</th><th class="num">Valor</th><th>Vigente desde</th><th>Vigente hasta</th><th>Verificado</th></tr></thead>
+    <thead><tr><th>Clave</th><th class="num">Valor</th><th>Vigente desde</th><th>Vigente hasta</th><th>Verificado</th><th></th></tr></thead>
     <tbody>
-      {% for parametro in pagina %}<tr><td>{{ parametro.clave }}</td><td class="num">{{ parametro.valor }}</td><td>{{ parametro.vigente_desde|date:"d/m/Y" }}</td><td>{{ parametro.vigente_hasta|date:"d/m/Y"|default:"—" }}</td><td>{% if parametro.verificado %}<span class="tag tag-open">Sí</span>{% else %}<span class="tag">No</span>{% endif %}</td></tr>{% empty %}<tr><td class="empty-cell" colspan="5">Sin parámetros registrados.</td></tr>{% endfor %}
+      {% for parametro in pagina %}<tr><td>{{ parametro.clave }}</td><td class="num">{{ parametro.valor }}</td><td>{{ parametro.vigente_desde|date:"d/m/Y" }}</td><td>{{ parametro.vigente_hasta|date:"d/m/Y"|default:"—" }}</td><td>{% if parametro.verificado %}<span class="tag tag-open">Sí</span>{% else %}<span class="tag">No</span>{% endif %}</td><td><a class="button button-secondary button-small" href="{% url 'estimacion_parametro_editar' parametro.pk %}">Editar</a></td></tr>{% empty %}<tr><td class="empty-cell" colspan="6">Sin parámetros registrados.</td></tr>{% endfor %}
     </tbody>
   </table></div>
   {% include "sic_sunGames/paginacion.html" %}
@@ -89,6 +89,24 @@
       {% endfor %}
     </div>
     <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_catalogos' %}">Cancelar</a><button class="button button-primary" type="submit">Registrar parámetro</button></div>
+  </form>
+</section></div>
+{% elif form_parametro_editar %}
+<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Editar parámetro">
+  <div class="modal-header"><div><h2>Editar parámetro</h2><p>{{ parametro_editar.clave }} · la clave no cambia; la vigencia no puede traslaparse con otra del mismo parámetro.</p></div><a class="modal-close" href="{% url 'estimacion_catalogos' %}" aria-label="Cerrar">×</a></div>
+  <form class="modal-form" method="post" action="{% url 'estimacion_parametro_editar' parametro_editar.pk %}" novalidate>
+    {% csrf_token %}
+    {% if form_parametro_editar.non_field_errors %}<div class="form-error">{{ form_parametro_editar.non_field_errors }}</div>{% endif %}
+    <div class="modal-fields">
+      {% for campo in form_parametro_editar %}
+      <div class="field">
+        <label for="{{ campo.id_for_label }}">{{ campo.label }}{% if campo.field.required %} *{% endif %}</label>
+        {{ campo }}
+        {% for error in campo.errors %}<span class="form-error">{{ error }}</span>{% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    <div class="modal-actions"><a class="button button-secondary" href="{% url 'estimacion_catalogos' %}">Cancelar</a><button class="button button-primary" type="submit">Guardar cambios</button></div>
   </form>
 </section></div>
 {% elif form_salario %}

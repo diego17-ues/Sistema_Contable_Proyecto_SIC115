@@ -171,6 +171,14 @@ class ParametroForm(forms.Form):
         return datos
 
 
+class ParametroEdicionForm(ParametroForm):
+    """Edición de un parámetro: la clave no cambia."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        del self.fields["clave"]
+
+
 class SalarioForm(forms.Form):
     rol = forms.IntegerField(label="Rol", min_value=1)
     salario_bruto = forms.DecimalField(

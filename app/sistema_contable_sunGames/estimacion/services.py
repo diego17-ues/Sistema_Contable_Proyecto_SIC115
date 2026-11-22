@@ -165,6 +165,29 @@ class EstimacionService:
             )
         )
 
+    def obtener_parametro(self, actor, parametro_id):
+        self._verificar(actor)
+        return self._repositorio.obtener_parametro(parametro_id)
+
+    def actualizar_parametro(self, actor, parametro_id, *, valor,
+                             vigente_desde, vigente_hasta=None,
+                             verificado=False):
+        self._verificar(actor)
+        parametro = self._repositorio.obtener_parametro(parametro_id)
+        existentes = [
+            p for p in self._repositorio.parametros()
+            if p.clave == parametro.clave
+        ]
+        self._verificar_solape_vigencia(
+            existentes, vigente_desde, vigente_hasta,
+            excluir_id=parametro.pk,
+        )
+        parametro.valor = valor
+        parametro.vigente_desde = vigente_desde
+        parametro.vigente_hasta = vigente_hasta
+        parametro.verificado = verificado
+        return self._repositorio.guardar_parametro(parametro)
+
     def crear_salario(self, actor, rol_id, salario_bruto, vigente_desde,
                       vigente_hasta=None):
         self._verificar(actor)

@@ -21,6 +21,7 @@ from estimacion.forms import (
     EstimacionMatrizForm,
     ExpertoForm,
     JuegoForm,
+    ParametroEdicionForm,
     ParametroForm,
     RolForm,
     SalarioForm,
@@ -729,7 +730,7 @@ def _catalogo_form(request, clase_form, tipo):
     )
 
 
-def _render_catalogo(request, servicio, *, form=None, tipo=None):
+def _render_catalogo(request, servicio, *, form=None, tipo=None, **contexto_extra):
     try:
         parametros = servicio.parametros(request.user)
         salarios = servicio.salarios(request.user)
@@ -747,9 +748,11 @@ def _render_catalogo(request, servicio, *, form=None, tipo=None):
     clave = {
         "rol": "form_rol", "experto": "form_experto",
         "parametro": "form_parametro", "salario": "form_salario",
+        "parametro_editar": "form_parametro_editar",
     }.get(tipo)
     if clave:
         extras[clave] = form
+    extras.update(contexto_extra)
     return render(request, CATALOGOS_TEMPLATE, {**contexto, **extras})
 
 
@@ -782,6 +785,53 @@ def catalogo_parametro(request):
         )
     return _render_catalogo(
         request, servicio, form=ParametroForm(), tipo="parametro"
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def catalogo_parametro_editar(request, parametro_id):
+    servicio = crear_estimacion_service()
+    try:
+        parametro = servicio.obtener_parametro(request.user, parametro_id)
+    except UsuarioError as error:
+        raise _sin_permiso(error) from error
+    except EstimacionError as error:
+        messages.error(request, str(error))
+        return redirect("estimacion_catalogos")
+    initial = {
+        "valor": parametro.valor,
+        "vigente_desde": parametro.vigente_desde,
+        "vigente_hasta": parametro.vigente_hasta,
+        "verificado": parametro.verificado,
+    }
+    if request.method == "POST":
+        form = ParametroEdicionForm(request.POST)
+        if form.is_valid():
+            datos = form.cleaned_data
+            try:
+                servicio.actualizar_parametro(
+                    request.user, parametro_id,
+                    valor=datos["valor"],
+                    vigente_desde=datos["vigente_desde"],
+                    vigente_hasta=datos["vigente_hasta"] or None,
+                    verificado=datos["verificado"],
+                )
+            except UsuarioError as error:
+                raise _sin_permiso(error) from error
+            except EstimacionError as error:
+                form.add_error(None, str(error))
+            else:
+                messages.success(request, "Parámetro actualizado.")
+                return redirect("estimacion_catalogos")
+        return _render_catalogo(
+            request, servicio, form=form, tipo="parametro_editar",
+            parametro_editar=parametro,
+        )
+    return _render_catalogo(
+        request, servicio,
+        form=ParametroEdicionForm(initial=initial),
+        tipo="parametro_editar", parametro_editar=parametro,
     )
 
 

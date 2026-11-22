@@ -5,6 +5,7 @@ from .exceptions import (
     FaseNoEncontradaError,
     JuegoNoEncontradoError,
     ParametroInvalidoError,
+    ParametroNoEncontradoError,
     RolNoEncontradoError,
     RondaNoEncontradaError,
     SalarioNoEncontradoError,
@@ -205,6 +206,12 @@ class EstimacionRepository:
 
     def parametros(self):
         return ParametroVigente.objects.order_by("clave", "vigente_desde")
+
+    def obtener_parametro(self, parametro_id):
+        try:
+            return ParametroVigente.objects.get(pk=parametro_id)
+        except ParametroVigente.DoesNotExist as exc:
+            raise ParametroNoEncontradoError() from exc
 
     def nuevo_parametro(self, **campos):
         return ParametroVigente(**campos)
