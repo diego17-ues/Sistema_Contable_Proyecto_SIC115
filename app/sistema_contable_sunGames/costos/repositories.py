@@ -13,7 +13,6 @@ from libro_mayor.models import (
 from .models import (
     AsientoCosto,
     ConfiguracionCuentaCosto,
-    ParametrosCostosManoObra,
     CuentaIndirectaExcluida,
     FuenteIndirecta,
     Juego,
@@ -271,24 +270,18 @@ class CostosRepository:
     # ---- Configuración de cuentas ----
     def configuraciones(self):
         return ConfiguracionCuentaCosto.objects.select_related(
-            "cuenta_costo", "contrapartida_defecto"
-        ).prefetch_related("contrapartidas")
+            "cuenta_costo"
+        )
 
     def configuracion(self, elemento):
         return self.configuraciones().filter(elemento=elemento).first()
 
-    def guardar_configuracion(self, *, elemento, cuenta_costo, contrapartidas,
-                              contrapartida_defecto):
+    def guardar_configuracion(self, *, elemento, cuenta_costo):
         config, _ = ConfiguracionCuentaCosto.objects.update_or_create(
             elemento=elemento,
-            defaults={"cuenta_costo": cuenta_costo,
-                      "contrapartida_defecto": contrapartida_defecto},
+            defaults={"cuenta_costo": cuenta_costo},
         )
-        config.contrapartidas.set(contrapartidas)
         return config
-
-    def parametros_mano_obra(self):
-        return ParametrosCostosManoObra.objects.order_by("pk").first()
 
     def cuentas_posteables(self):
         return (Cuenta.objects.filter(activa=True)
@@ -393,7 +386,7 @@ class CostosRepository:
             periodo_indirecto=periodo,
         ).select_related(
             "orden", "orden__juego", "proceso", "fuente_indirecta",
-            "cuenta_costo", "contrapartida",
+            "cuenta_costo",
         ).prefetch_related("asientos").order_by(
             "fuente_indirecta_id", "orden_id", "pk"
         ))
@@ -401,14 +394,14 @@ class CostosRepository:
     # ---- Registros y asientos ----
     def registros_de_orden(self, orden):
         return (RegistroCosto.objects.filter(orden=orden)
-                .select_related("proceso", "cuenta_costo", "contrapartida")
+                .select_related("proceso", "cuenta_costo")
                 .select_related("fuente_indirecta", "periodo_indirecto")
                 .prefetch_related("asientos"))
 
     def obtener_registro(self, registro_id):
         return (RegistroCosto.objects
                 .select_related("orden", "orden__juego", "proceso",
-                                "cuenta_costo", "contrapartida")
+                                "cuenta_costo")
                 .filter(pk=registro_id).first())
 
     def registro_por_clave(self, clave):

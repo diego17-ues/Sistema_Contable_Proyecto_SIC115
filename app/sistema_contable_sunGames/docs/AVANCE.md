@@ -319,3 +319,19 @@ punto de acceso por rol.
   `docs/PROPUESTA_COMPARACION.md`; no implementado.
 - Costeo real por órdenes de trabajo: fuera de esta sesión.
 - Definiciones abiertas en `docs/PREGUNTAS.md`.
+
+## Costos: registros sin contrapartida (2026-11-22)
+
+- Los cargos de la orden acumulan solo en la cuenta de costo del
+  elemento; el movimiento del mayor es un debe único (sin haber a
+  contrapartida). La contrapartida del pago/pasivo la registra la
+  contabilidad general, no el módulo.
+- `ConfiguracionCuentaCosto` queda con una sola cuenta por elemento.
+- `RegistroCosto` pierde el campo `contrapartida`; en indirectos
+  automáticos la cuenta origen se deriva de `fuente_indirecta`.
+- Mano de obra acumula `horas × costo_hora` directo a la cuenta de
+  costo; se eliminó el desglose de retenciones/cargas (solo existía
+  para los haberes) y el modelo `ParametrosCostosManoObra`.
+- Migración `costos.0012_sin_contrapartida`.
+- Los indirectos por período mantienen debe 4103 / haber cuenta origen:
+  es la reclasificación del pool, no una contrapartida elegible.

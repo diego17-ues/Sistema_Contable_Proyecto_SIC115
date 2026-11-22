@@ -1,10 +1,11 @@
 """Servicios del subsistema de costos (órdenes de trabajo, Etapa 1).
 
 Reglas:
-- Cada registro de costo genera un asiento cuadrado en el Libro Mayor
-  mediante el repositorio de la contabilidad general (nunca se escribe
-  directo en sus tablas). Debe a la cuenta de costo del elemento y haber
-  a la contrapartida configurada.
+- Cada registro de costo acumula únicamente en la cuenta de costo del
+  elemento, mediante el repositorio de la contabilidad general (nunca se
+  escribe directo en sus tablas). No hay contrapartida: la orden solo
+  acumula en sus cuentas de costo. La contrapartida del pago o del
+  pasivo se registra en la contabilidad general.
 - Las cuentas salen de ``ConfiguracionCuentaCosto``; ningún código de
   cuenta, tarifa ni porcentaje vive en el código.
 - Los registros no se editan ni se borran: se anulan con contra-asiento.
@@ -692,7 +693,7 @@ class RegistroCostoService(CostosService):
 
     # ---- comandos ----
     def registrar_mano_obra(self, actor, *, orden_id, fecha, proceso_id,
-                            horas, costo_hora, contrapartida_id, clave):
+                            horas, costo_hora, clave):
         _verificar(actor)
         existente = self._repetido(clave, orden_id)
         if existente is not None:
@@ -718,14 +719,12 @@ class RegistroCostoService(CostosService):
             actor, elemento=Elemento.MANO_OBRA, orden_id=orden_id,
             fecha=fecha, proceso=proceso,
             descripcion=f"Mano de obra · {proceso.nombre}",
-            importe=importe,
-            contrapartida_id=contrapartida_id, clave=clave,
+            importe=importe, clave=clave,
             horas=horas, costo_hora=costo_hora,
         )
 
     def registrar_costo(self, actor, *, elemento, orden_id, fecha,
-                        proceso_id, descripcion, importe, contrapartida_id,
-                        clave):
+                        proceso_id, descripcion, importe, clave):
         """Costo directo o indirecto (proceso opcional)."""
         _verificar(actor)
         if elemento not in (Elemento.DIRECTO, Elemento.INDIRECTO):
@@ -747,8 +746,7 @@ class RegistroCostoService(CostosService):
         return self._registrar(
             actor, elemento=elemento, orden_id=orden_id, fecha=fecha,
             proceso=proceso, descripcion=descripcion,
-            importe=calculos.a_centavos(importe),
-            contrapartida_id=contrapartida_id, clave=clave,
+            importe=calculos.a_centavos(importe), clave=clave,
         )
 
     def anular(self, actor, *, registro_id, motivo, clave):
@@ -811,7 +809,7 @@ class RegistroCostoService(CostosService):
 
     # ---- auxiliares ----
     def _registrar(self, actor, *, elemento, orden_id, fecha, proceso,
-                   descripcion, importe, contrapartida_id, clave,
+                   descripcion, importe, clave,
                    horas=None, costo_hora=None):
         orden = self._orden(orden_id)
         if not orden.abierta:
@@ -823,37 +821,14 @@ class RegistroCostoService(CostosService):
         self._verificar_periodo(fecha)
         config = self._config(elemento)
         cuenta_costo = self._cuenta_valida(config.cuenta_costo)
-        contrapartida = (
-            self._cuenta_mano_obra("2106")
-            if elemento == Elemento.MANO_OBRA
-            else self._contrapartida(config, contrapartida_id)
-        )
-        lineas = None
-        if elemento == Elemento.MANO_OBRA:
-            parametros = self._repo.parametros_mano_obra()
-            if parametros is None:
-                raise ConfiguracionNoEncontradaError(
-                    "No están configurados los parámetros de mano de obra."
-                )
-            desglose = calculos.desglosar_mano_obra(importe, parametros)
-            importe = desglose["costo_total"]
-            lineas = calculos.lineas_mano_obra(
-                cuenta_costo, contrapartida,
-                self._cuenta_mano_obra("2104"),
-                self._cuenta_mano_obra("2107"),
-                self._cuenta_mano_obra("2105"), desglose,
-            )
-        else:
-            lineas = calculos.lineas_registro(
-                cuenta_costo, contrapartida, importe
-            )
+        lineas = calculos.linea_acumulacion(cuenta_costo, importe)
         try:
             with self._transaccion():
                 registro = self._repo.crear_registro(
                     orden=orden, elemento=elemento, fecha=fecha,
                     proceso=proceso, descripcion=descripcion[:200],
                     horas=horas, costo_hora=costo_hora, importe=importe,
-                    cuenta_costo=cuenta_costo, contrapartida=contrapartida,
+                    cuenta_costo=cuenta_costo,
                     clave_idempotencia=clave, usuario=actor,
                 )
                 self._asentar(
@@ -878,8 +853,6 @@ class RegistroCostoService(CostosService):
 
     def _asentar(self, actor, registro, lineas, *, fecha, tipo,
                  tipo_movimiento, concepto, clave):
-        if not calculos.cuadra(lineas):
-            raise AsientoDescuadradoError("El asiento no cuadra.")
         auxiliar = f"OT-{registro.orden_id}"
         try:
             transaccion = self._mayor.crear_transaccion(usuario=actor)
@@ -912,15 +885,6 @@ class RegistroCostoService(CostosService):
         raise ConfiguracionNoEncontradaError(
             "No se encontró el asiento original para revertir el registro."
         )
-
-    def _cuenta_mano_obra(self, codigo):
-        try:
-            cuenta = self._mayor.obtener_cuenta(codigo)
-        except LibroMayorError as exc:
-            raise CuentaNoValidaError(
-                f"La cuenta contable {codigo} no existe en el catálogo."
-            ) from exc
-        return self._cuenta_valida(cuenta)
 
     def _repetido(self, clave, orden_id):
         if not clave:
@@ -985,19 +949,6 @@ class RegistroCostoService(CostosService):
                 "La cuenta configurada no admite registros."
             )
         return cuenta
-
-    def _contrapartida(self, config, contrapartida_id):
-        permitidas = {c.pk: c for c in config.contrapartidas.all()}
-        if not contrapartida_id:
-            contrapartida_id = config.contrapartida_defecto_id
-        cuenta = permitidas.get(int(contrapartida_id))
-        if cuenta is None:
-            raise CuentaNoValidaError(
-                "La contrapartida no está permitida para este elemento.",
-                campo="contrapartida",
-            )
-        return self._cuenta_valida(cuenta)
-
 
 class CatalogoCostosService(CostosService):
     """Procesos y configuración de cuentas por elemento."""
@@ -1175,47 +1126,23 @@ class CatalogoCostosService(CostosService):
             )
         return cuenta
 
-    def guardar_configuracion(self, actor, *, elemento, cuenta_costo,
-                              contrapartidas, contrapartida_defecto):
+    def guardar_configuracion(self, actor, *, elemento, cuenta_costo):
         _verificar(actor)
         if elemento not in Elemento.values:
             raise DatosInsuficientesError("Elemento del costo no válido.")
-        contrapartidas = list(contrapartidas)
-        if elemento == Elemento.MANO_OBRA and (
-                len(contrapartidas) != 1
-                or contrapartida_defecto is None
-                or contrapartidas[0].codigo != "2106"
-                or contrapartida_defecto.codigo != "2106"):
+        if cuenta_costo is None or not cuenta_costo.activa:
             raise CuentaNoValidaError(
-                "La mano de obra se registra en la cuenta 2106 para sueldos "
-                "por pagar.", campo="contrapartidas",
-            )
-        if not contrapartidas:
-            raise DatosInsuficientesError(
-                "Selecciona al menos una contrapartida.",
-                campo="contrapartidas",
-            )
-        if contrapartida_defecto not in contrapartidas:
-            raise CuentaNoValidaError(
-                "La contrapartida por defecto debe estar entre las "
-                "permitidas.", campo="contrapartida_defecto",
-            )
-        if cuenta_costo in contrapartidas:
-            raise CuentaNoValidaError(
-                "La cuenta de costo no puede ser su propia contrapartida.",
-                campo="contrapartidas",
+                "La cuenta de costo no existe o está inactiva.",
+                campo="cuenta_costo",
             )
         with self._transaccion():
             config = self._repo.guardar_configuracion(
                 elemento=elemento, cuenta_costo=cuenta_costo,
-                contrapartidas=contrapartidas,
-                contrapartida_defecto=contrapartida_defecto,
             )
             self._auditar(
                 actor, Accion.CATALOGO_COSTOS,
                 f"Cuentas {Elemento(elemento).label}",
-                f"Debe {cuenta_costo.codigo} · haber "
-                + ", ".join(c.codigo for c in contrapartidas),
+                f"Cuenta de costo {cuenta_costo.codigo}",
             )
         return config
 
@@ -1428,9 +1355,9 @@ class AplicacionIndirectosService(CostosService):
         with self._transaccion():
             for registro in registros:
                 lineas = calculos.lineas_contrarias(
-                    calculos.lineas_registro(
-                        registro.cuenta_costo, registro.contrapartida,
-                        registro.importe,
+                    calculos.lineas_reclasificacion(
+                        registro.fuente_indirecta.cuenta_origen,
+                        registro.cuenta_costo, registro.importe,
                     )
                 )
                 clave = f"rev-indirecto-{periodo.pk}-{registro.pk}"
@@ -1511,12 +1438,11 @@ class AplicacionIndirectosService(CostosService):
             descripcion=descripcion[:200], horas=linea["horas"],
             costo_hora=None, importe=importe,
             cuenta_costo=cuenta_costo,
-            contrapartida=fuente.cuenta_origen,
             fuente_indirecta=fuente, periodo_indirecto=periodo,
             clave_idempotencia=clave, usuario=actor,
         )
-        lineas = calculos.lineas_registro(
-            cuenta_costo, fuente.cuenta_origen, importe
+        lineas = calculos.lineas_reclasificacion(
+            fuente.cuenta_origen, cuenta_costo, importe
         )
         if not calculos.cuadra(lineas):
             raise AsientoDescuadradoError(

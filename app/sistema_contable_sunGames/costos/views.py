@@ -473,7 +473,7 @@ def registro_nuevo(request, orden_id, tipo):
         return redirect("costos_orden", orden_id=orden_id)
     clase = ManoObraForm if elemento == Elemento.MANO_OBRA else CostoForm
     form = clase(request.POST if request.method == "POST" else None,
-                 procesos=procesos, configuracion=configuracion)
+                 procesos=procesos)
     if request.method == "POST" and form.is_valid():
         try:
             _registrar(servicio, request.user, orden_id, elemento,
@@ -496,7 +496,6 @@ def _registrar(servicio, actor, orden_id, elemento, datos):
     comunes = dict(
         orden_id=orden_id, fecha=datos["fecha"],
         proceso_id=_int(datos["proceso"]),
-        contrapartida_id=_int(datos.get("contrapartida")),
         clave=datos["clave"],
     )
     if elemento == Elemento.MANO_OBRA:
@@ -627,23 +626,16 @@ def configuracion_editar(request, elemento):
         _sin_permiso(error)
     inicial = None
     if actual is not None:
-        inicial = {
-            "cuenta_costo": str(actual.cuenta_costo_id),
-            "contrapartidas": [str(c.pk)
-                               for c in actual.contrapartidas.all()],
-            "contrapartida_defecto": str(actual.contrapartida_defecto_id),
-        }
+        inicial = {"cuenta_costo": str(actual.cuenta_costo_id)}
     form = ConfiguracionCuentaForm(
         request.POST if request.method == "POST" else None,
         initial=inicial, cuentas=cuentas,
     )
     if request.method == "POST" and form.is_valid():
-        cuenta_costo, contrapartidas, defecto = form.cuentas_elegidas()
         try:
             servicio.guardar_configuracion(
-                request.user, elemento=elemento, cuenta_costo=cuenta_costo,
-                contrapartidas=contrapartidas,
-                contrapartida_defecto=defecto,
+                request.user, elemento=elemento,
+                cuenta_costo=form.cuenta_elegida(),
             )
         except SIN_PERMISO as error:
             _sin_permiso(error)
