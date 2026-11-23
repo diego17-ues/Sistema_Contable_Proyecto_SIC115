@@ -2,7 +2,7 @@
 {% for campo in form.hidden_fields %}{{ campo }}{% endfor %}
 <div class="modal-fields">
   {% for campo in form.visible_fields %}
-  <div class="field{% if campo.name == 'descripcion' or campo.name == 'contrapartida' or campo.name == 'motivo' or campo.name == 'contrapartidas' %} full{% endif %}">
+  <div class="field{% if campo.name == 'descripcion' or campo.name == 'motivo' %} full{% endif %}">
     <label for="{{ campo.id_for_label }}">{{ campo.label }}{% if campo.field.required %} *{% endif %}</label>
     {{ campo }}
     {% if campo.help_text %}<small class="help">{{ campo.help_text }}</small>{% endif %}

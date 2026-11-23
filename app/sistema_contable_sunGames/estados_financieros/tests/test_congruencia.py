@@ -15,15 +15,18 @@ from django.db.models import Sum
 from django.test import SimpleTestCase, TestCase
 
 from costos import calculos
+from catalogo.models import Cuenta
 from costos.composition import (
+    crear_aplicacion_indirectos_service,
+    crear_catalogo_costos_service,
     crear_orden_service,
     crear_reclasificacion_service,
     crear_registro_service,
 )
 from costos.models import (
     AmortizacionVideojuego,
-    ConfiguracionCuentaCosto,
     Elemento,
+    FuenteIndirecta,
     ParametroAmortizacion,
     Proceso,
 )
@@ -31,7 +34,8 @@ from estados_financieros import calculo
 from estados_financieros.composition import crear_cierre_service
 from estados_financieros.models import EstadoFinancieroEmitido, TipoEstado
 from estados_financieros.tests.fakes import cuenta_con_saldo, periodo
-from libro_mayor.models import Movimiento, PeriodoContable
+from libro_mayor.models import Movimiento, PeriodoContable, TipoMovimiento
+from libro_mayor.repositories import TransaccionRepository
 from usuarios.models import Usuario
 from usuarios.roles import Rol
 from ventas.composition import crear_ventas_service
@@ -99,22 +103,27 @@ class CongruenciaIntegracionTests(TestCase):
             fecha_inicio=date(2026, 11, 1),
         )
         self.proceso = Proceso.objects.get(nombre="Programación")
-        self.config = {
-            c.elemento: c for c in ConfiguracionCuentaCosto.objects.all()
-        }
         ParametroAmortizacion.objects.update(modalidad="MENSUAL",
                                              vida_util_meses=48)
 
-    def contrapartida(self, elemento, codigo):
-        return self.config[elemento].contrapartidas.get(codigo=codigo).pk
+    def contabilidad_general(self, lineas, concepto="Contabilidad general"):
+        """Asiento que registra contabilidad general (fuera de costos)."""
+        mayor = TransaccionRepository()
+        transaccion = mayor.crear_transaccion(usuario=self.general)
+        for codigo, importe in lineas.items():
+            mayor.crear_movimiento(
+                transaccion=transaccion,
+                cuenta=Cuenta.objects.get(codigo=codigo),
+                fecha=date(2026, 11, 12), concepto=concepto,
+                referencia="CG", tipo=TipoMovimiento.DIARIO,
+                importe=D(importe),
+            )
 
-    def costo(self, elemento, importe, codigo, descripcion="Costo"):
+    def costo(self, elemento, importe, descripcion="Costo"):
         return self.registros.registrar_costo(
             self.costos, elemento=elemento, orden_id=self.orden.pk,
             fecha=date(2026, 11, 12), proceso_id=None,
-            descripcion=descripcion, importe=importe,
-            contrapartida_id=self.contrapartida(elemento, codigo),
-            clave=uuid.uuid4().hex,
+            descripcion=descripcion, importe=importe, clave=uuid.uuid4().hex,
         )
 
     def movimientos(self, registro):
@@ -126,35 +135,52 @@ class CongruenciaIntegracionTests(TestCase):
         return self.registros.registrar_mano_obra(
             self.costos, orden_id=self.orden.pk, fecha=date(2026, 11, 10),
             proceso_id=self.proceso.pk, horas="176", costo_hora="5.00",
-            contrapartida_id=None, clave=uuid.uuid4().hex,
+            clave=uuid.uuid4().hex,
         )
 
     def test_1_mano_de_obra_176_horas(self):
         registro = self.mano_obra()
-        lineas = self.movimientos(registro)
-        self.assertEqual(lineas["4101"], registro.importe)
-        self.assertLess(lineas["2106"], 0)
-        self.assertEqual(sum(lineas.values()), 0)
-        self.assertEqual(saldo("4101"), registro.importe)
-        self.assertGreaterEqual(registro.importe, D("880.00"))
+        self.assertEqual(registro.importe, D("880.00"))
+        self.assertEqual(self.movimientos(registro), {"4101": D("880.00")})
+        self.contabilidad_general({"2106": "-880.00"},
+                                  "Planilla por pagar")
+        self.assertEqual(saldo(*SERIE_41), D("880.00"))
+        self.assertEqual(saldo("2106"), D("-880.00"))
 
-    def test_2_costo_directo_contra_bancos(self):
-        registro = self.costo(Elemento.DIRECTO, "1200.00", "1103")
-        self.assertEqual(self.movimientos(registro),
-                         {"4102": D("1200.00"), "1103": D("-1200.00")})
+    def test_2_costo_directo_y_pago_en_bancos(self):
+        registro = self.costo(Elemento.DIRECTO, "1200.00")
+        self.assertEqual(self.movimientos(registro), {"4102": D("1200.00")})
+        self.contabilidad_general({"1103": "-1200.00"}, "Pago proveedor")
+        self.assertEqual(saldo("4102"), D("1200.00"))
+        self.assertEqual(saldo("1103"), D("-1200.00"))
 
-    def test_3_depreciacion_y_amortizacion_de_desarrollo_un_asiento(self):
-        depreciacion = self.costo(Elemento.INDIRECTO, "100.00", "1203",
+    def test_3_depreciacion_y_licencias_un_solo_asiento(self):
+        self.mano_obra()
+        self.contabilidad_general({"4207": "100.00", "1203": "-100.00"},
                                   "Depreciación equipo de desarrollo")
-        licencia = self.costo(Elemento.INDIRECTO, "50.00", "1205",
-                              "Amortización licencia del motor")
-        self.assertEqual(self.movimientos(depreciacion),
-                         {"4103": D("100.00"), "1203": D("-100.00")})
-        self.assertEqual(self.movimientos(licencia),
-                         {"4103": D("50.00"), "1205": D("-50.00")})
+        self.contabilidad_general({"4208": "50.00", "1205": "-50.00"},
+                                  "Amortización licencia del motor")
+        catalogo = crear_catalogo_costos_service()
+        for nombre, tipo, codigo in (
+                ("Equipo", FuenteIndirecta.Tipo.EQUIPO, "4207"),
+                ("Licencias", FuenteIndirecta.Tipo.LICENCIA, "4208")):
+            catalogo.crear_fuente_indirecta(
+                self.costos, nombre=nombre, tipo=tipo,
+                cuenta=Cuenta.objects.get(codigo=codigo),
+                exclusiva_desarrollo=True,
+            )
+        ejercicio = PeriodoContable.objects.get(nombre="Ejercicio 2026")
+        aplicacion = crear_aplicacion_indirectos_service()
+        aplicacion.aplicar(self.costos, ejercicio.pk)
+        aplicacion.aplicar(self.costos, ejercicio.pk)
+
+        self.assertEqual(saldo("4103"), D("150.00"))
         self.assertEqual(saldo("4207", "4208"), 0)
-        self.assertEqual(Movimiento.objects.filter(
-            cuenta__codigo="1203").count(), 1)
+        self.assertEqual(saldo("1203"), D("-100.00"))
+        self.assertEqual(saldo("1205"), D("-50.00"))
+        for codigo in ("1203", "1205"):
+            self.assertEqual(Movimiento.objects.filter(
+                cuenta__codigo=codigo).count(), 1)
 
     def vender_y_conciliar(self):
         ventas = crear_ventas_service()
@@ -178,8 +204,8 @@ class CongruenciaIntegracionTests(TestCase):
 
     def test_5_y_6_cierre_serie_41_cero_y_costo_ventas_igual_cuota(self):
         self.mano_obra()
-        self.costo(Elemento.DIRECTO, "1200.00", "1103")
-        self.costo(Elemento.INDIRECTO, "100.00", "1203")
+        self.costo(Elemento.DIRECTO, "1200.00")
+        self.contabilidad_general({"2106": "-880.00", "1103": "-1200.00"})
         self.vender_y_conciliar()
         base = saldo(*SERIE_41)
         with mock.patch("costos.services.timezone.localdate",

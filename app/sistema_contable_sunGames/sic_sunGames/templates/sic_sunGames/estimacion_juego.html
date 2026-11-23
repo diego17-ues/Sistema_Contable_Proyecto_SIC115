@@ -23,11 +23,11 @@
           <td><span class="tag">{{ grupo.clasificacion }}</span></td>
           <td>{{ grupo.rol }}</td>
           <td class="num">{{ grupo.expertos }}</td>
-          <td class="num">{{ grupo.horas_E }}</td>
-          <td class="num">{{ grupo.sigma }}</td>
-          <td class="num">{{ grupo.media }}</td>
-          <td class="num">{{ grupo.mediana }}</td>
-          <td class="num">{{ grupo.coeficiente_variacion }}</td>
+          <td class="num">{{ grupo.horas_E|floatformat:"2g" }}</td>
+          <td class="num">{{ grupo.sigma|floatformat:"2g" }}</td>
+          <td class="num">{{ grupo.media|floatformat:"2g" }}</td>
+          <td class="num">{{ grupo.mediana|floatformat:"2g" }}</td>
+          <td class="num">{{ grupo.coeficiente_variacion|floatformat:"2g" }}</td>
           <td>{% if grupo.requiere_nueva_ronda %}<span class="tag">Nueva ronda</span>{% else %}<span class="tag tag-open">Consolidada</span>{% endif %}</td>
         </tr>
         {% empty %}
@@ -49,9 +49,9 @@
           <td>{{ e.fase.nombre }}</td>
           <td>{{ e.rol }}</td>
           <td>{{ e.experto.nombre }}</td>
-          <td class="num">{{ e.optimista }}</td>
-          <td class="num">{{ e.moda }}</td>
-          <td class="num">{{ e.pesimista }}</td>
+          <td class="num">{{ e.optimista|floatformat:"2g" }}</td>
+          <td class="num">{{ e.moda|floatformat:"2g" }}</td>
+          <td class="num">{{ e.pesimista|floatformat:"2g" }}</td>
           <td>{{ e.justificacion|default:"—"|truncatechars:60 }}</td>
           <td class="num">
             {% if e.eliminada %}
@@ -83,7 +83,7 @@
       <thead><tr><th>Tipo</th><th>Concepto</th><th class="num">Monto</th></tr></thead>
       <tbody>
         {% for costo in costos_fabricacion %}
-        <tr><td>{{ costo.get_tipo_display }}</td><td>{{ costo.concepto }}</td><td class="num">${{ costo.monto }}</td></tr>
+        <tr><td>{{ costo.get_tipo_display }}</td><td>{{ costo.concepto }}</td><td class="num">${{ costo.monto|floatformat:"2g" }}</td></tr>
         {% empty %}
         <tr><td class="empty-cell" colspan="3">Sin costos de fabricación registrados.</td></tr>
         {% endfor %}
@@ -105,7 +105,7 @@
           <td>{{ version.fecha|date:"d/m/Y H:i" }}</td>
           <td>{{ version.autor.nombre_completo }}</td>
           <td class="num">{{ version.lineas.count }}</td>
-          <td class="num">${{ version.total_estimado }}</td>
+          <td class="num">${{ version.total_estimado|floatformat:"2g" }}</td>
           <td class="num">
             {% if version.eliminada %}
             <form method="post" action="{% url 'estimacion_version_restaurar' version.pk %}" class="inline-form" onsubmit="return confirm('¿Restaurar esta versión?');">{% csrf_token %}<button class="text-button" type="submit">Restaurar</button></form>
@@ -137,10 +137,10 @@
         <thead><tr><th>Fase</th><th>Clasificación</th><th>Rol</th><th class="num">Horas E</th><th class="num">σ</th><th class="num">Tarifa</th><th class="num">Costo mano de obra</th></tr></thead>
         <tbody>
           {% for linea in version.lineas.all %}
-          <tr><td>{{ linea.fase.nombre }}</td><td>{{ linea.fase.get_clasificacion_display }}</td><td>{{ linea.rol }}</td><td class="num">{{ linea.horas_E }}</td><td class="num">{{ linea.sigma }}</td><td class="num">{{ linea.tarifa }}</td><td class="num">${{ linea.costo_mano_obra }}</td></tr>
+          <tr><td>{{ linea.fase.nombre }}</td><td>{{ linea.fase.get_clasificacion_display }}</td><td>{{ linea.rol }}</td><td class="num">{{ linea.horas_E|floatformat:"2g" }}</td><td class="num">{{ linea.sigma|floatformat:"2g" }}</td><td class="num">{{ linea.tarifa|floatformat:"2g" }}</td><td class="num">${{ linea.costo_mano_obra|floatformat:"2g" }}</td></tr>
           {% endfor %}
-          {% for costo in version.costos_directos.all %}<tr><td colspan="6">Directo: {{ costo.concepto }}</td><td class="num">${{ costo.monto }}</td></tr>{% endfor %}
-          {% for costo in version.costos_indirectos.all %}<tr><td colspan="6">Indirecto: {{ costo.departamento }}</td><td class="num">${{ costo.monto }}</td></tr>{% endfor %}
+          {% for costo in version.costos_directos.all %}<tr><td colspan="6">Directo: {{ costo.concepto }}</td><td class="num">${{ costo.monto|floatformat:"2g" }}</td></tr>{% endfor %}
+          {% for costo in version.costos_indirectos.all %}<tr><td colspan="6">Indirecto: {{ costo.departamento }}</td><td class="num">${{ costo.monto|floatformat:"2g" }}</td></tr>{% endfor %}
         </tbody>
       </table>
     </div>
@@ -174,7 +174,7 @@
 </section></div>
 {% elif form %}
 <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="Registrar estimación">
-  <div class="modal-header"><div><h2>Registrar estimación</h2></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
+  <div class="modal-header"><div><h2>Registrar estimación{% if ronda_registro %} · ronda {{ ronda_registro }}{% endif %}</h2></div><a class="modal-close" href="{% url 'estimacion_juego' juego.pk %}" aria-label="Cerrar">×</a></div>
   <form class="modal-form" method="post" action="{% url 'estimacion_registrar' juego.pk %}" novalidate>
     {% csrf_token %}
     {% if form.non_field_errors %}<div class="form-error">{{ form.non_field_errors }}</div>{% endif %}

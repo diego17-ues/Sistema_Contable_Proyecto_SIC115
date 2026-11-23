@@ -142,11 +142,11 @@ class Proceso(models.Model):
 
 
 class ConfiguracionCuentaCosto(models.Model):
-    """Cuentas del catálogo por elemento del costo.
+    """Cuenta del catálogo por elemento del costo.
 
-    Cuenta de costo (debe), contrapartidas permitidas (haber) y la
-    contrapartida por defecto. Sin configuración el elemento queda
-    bloqueado.
+    Los cargos de la orden se acumulan únicamente en la cuenta de costo
+    configurada; no hay contrapartida. Sin configuración el elemento
+    queda bloqueado.
     """
 
     elemento = models.CharField(
@@ -155,93 +155,12 @@ class ConfiguracionCuentaCosto(models.Model):
     cuenta_costo = models.ForeignKey(
         Cuenta, on_delete=models.PROTECT, related_name="config_costo_debe"
     )
-    contrapartidas = models.ManyToManyField(
-        Cuenta, related_name="config_costo_haber",
-        verbose_name="contrapartidas permitidas",
-    )
-    contrapartida_defecto = models.ForeignKey(
-        Cuenta, on_delete=models.PROTECT,
-        related_name="config_costo_defecto",
-    )
 
     class Meta:
         ordering = ["elemento"]
 
     def __str__(self):
         return f"{self.get_elemento_display()} → {self.cuenta_costo.codigo}"
-
-
-class ParametrosCostosManoObra(models.Model):
-    """Tasas parametrizables para calcular el costo de la mano de obra."""
-
-    isss_patronal = models.DecimalField(
-        "ISSS patronal (%)", max_digits=5, decimal_places=2,
-        default="7.50",
-    )
-    isss_empleado = models.DecimalField(
-        "ISSS empleado (%)", max_digits=5, decimal_places=2,
-        default="3.00",
-    )
-    isss_tope_mensual = models.DecimalField(
-        "Base máxima mensual ISSS", max_digits=10, decimal_places=2,
-        default="1000.00",
-    )
-    afp_patronal = models.DecimalField(
-        "AFP patronal (%)", max_digits=5, decimal_places=2,
-        default="7.75",
-    )
-    afp_empleado = models.DecimalField(
-        "AFP empleado (%)", max_digits=5, decimal_places=2,
-        default="7.25",
-    )
-    incaf_patronal = models.DecimalField(
-        "INCAF patronal (%)", max_digits=5, decimal_places=2,
-        default="1.00",
-    )
-    renta_tramo_1_hasta = models.DecimalField(
-        max_digits=10, decimal_places=2, default="550.00",
-    )
-    renta_tramo_2_hasta = models.DecimalField(
-        max_digits=10, decimal_places=2, default="895.24",
-    )
-    renta_tramo_2_porcentaje = models.DecimalField(
-        max_digits=5, decimal_places=2, default="10.00",
-    )
-    renta_tramo_2_exceso = models.DecimalField(
-        max_digits=10, decimal_places=2, default="550.00",
-    )
-    renta_tramo_2_cuota = models.DecimalField(
-        max_digits=10, decimal_places=2, default="17.67",
-    )
-    renta_tramo_3_hasta = models.DecimalField(
-        max_digits=10, decimal_places=2, default="2038.10",
-    )
-    renta_tramo_3_porcentaje = models.DecimalField(
-        max_digits=5, decimal_places=2, default="20.00",
-    )
-    renta_tramo_3_exceso = models.DecimalField(
-        max_digits=10, decimal_places=2, default="895.24",
-    )
-    renta_tramo_3_cuota = models.DecimalField(
-        max_digits=10, decimal_places=2, default="60.00",
-    )
-    renta_tramo_4_porcentaje = models.DecimalField(
-        max_digits=5, decimal_places=2, default="30.00",
-    )
-    renta_tramo_4_exceso = models.DecimalField(
-        max_digits=10, decimal_places=2, default="2038.10",
-    )
-    renta_tramo_4_cuota = models.DecimalField(
-        max_digits=10, decimal_places=2, default="288.57",
-    )
-    actualizado_en = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        verbose_name = "parámetros de mano de obra"
-        verbose_name_plural = "parámetros de mano de obra"
-
-    def __str__(self):
-        return "Parámetros de mano de obra"
 
 
 class FuenteIndirecta(models.Model):
@@ -341,10 +260,6 @@ class RegistroCosto(models.Model):
     )
     cuenta_costo = models.ForeignKey(
         Cuenta, on_delete=models.PROTECT, related_name="registros_costo_debe"
-    )
-    contrapartida = models.ForeignKey(
-        Cuenta, on_delete=models.PROTECT,
-        related_name="registros_costo_haber",
     )
     fuente_indirecta = models.ForeignKey(
         FuenteIndirecta, on_delete=models.PROTECT, null=True, blank=True,

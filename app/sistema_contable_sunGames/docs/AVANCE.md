@@ -320,6 +320,23 @@ punto de acceso por rol.
 - Costeo real por órdenes de trabajo: fuera de esta sesión.
 - Definiciones abiertas en `docs/PREGUNTAS.md`.
 
+## Costos: registros sin contrapartida (2026-11-22)
+
+- Los cargos de la orden acumulan solo en la cuenta de costo del
+  elemento; el movimiento del mayor es un debe único (sin haber a
+  contrapartida). La contrapartida del pago/pasivo la registra la
+  contabilidad general, no el módulo.
+- `ConfiguracionCuentaCosto` queda con una sola cuenta por elemento.
+- `RegistroCosto` pierde el campo `contrapartida`; en indirectos
+  automáticos la cuenta origen se deriva de `fuente_indirecta`.
+- Mano de obra acumula `horas × costo_hora` directo a la cuenta de
+  costo; se eliminó el desglose de retenciones/cargas (solo existía
+  para los haberes) y el modelo `ParametrosCostosManoObra`.
+- Migración `costos.0012_sin_contrapartida`.
+- Los indirectos por período mantienen debe 4103 / haber cuenta origen:
+  es la reclasificación del pool, no una contrapartida elegible.
+
+
 ## Estados financieros congruentes por período (costo de ventas, amortización, depreciación)
 
 - Estado de Resultados: la serie 41 capitalizable (4101, 4102, 4103) ya
@@ -343,8 +360,9 @@ punto de acceso por rol.
   vez por venta (`Venta.transaccion_cobro`). TODO CU-08.3: la diferencia
   entre liquidación real y registrada queda pendiente porque el formato
   de liquidación de Steam no está definido.
-- Migraciones: costos 0012 y 0013 (agrega 1203 y 1205 como
-  contrapartidas de CIF), ventas 0004.
-- Pruebas: `estados_financieros/tests/test_congruencia.py`. Las 14
-  pruebas de costos/ventas/estados que ya fallaban en `2fc2cac` siguen
-  igual; no se modificaron.
+- La depreciación de equipo y la amortización de licencias se registran
+  una sola vez en contabilidad general (Debe 4207/4208 · Haber 1203/1205)
+  y entran a la serie 41 por la aplicación de indirectos (Debe 4103 ·
+  Haber 4207/4208); el módulo de costos no las recalcula.
+- Migraciones: costos 0013 y 0014, ventas 0004.
+- Pruebas: `estados_financieros/tests/test_congruencia.py`.

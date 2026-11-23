@@ -27,17 +27,15 @@
   <div class="card-header"><div><h2>Cuentas por elemento del costo</h2></div></div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Elemento</th><th>Cuenta de costo</th><th>Contrapartidas</th><th>Por defecto</th><th></th></tr></thead>
+      <thead><tr><th>Elemento</th><th>Cuenta de costo</th><th></th></tr></thead>
       <tbody>
         {% for valor, nombre, config in elementos %}
         <tr>
           <td><strong>{{ nombre }}</strong></td>
           {% if config %}
           <td>{{ config.cuenta_costo.codigo }} · {{ config.cuenta_costo.denominacion }}</td>
-          <td>{% for c in config.contrapartidas.all %}{{ c.codigo }} {{ c.denominacion }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td>
-          <td>{{ config.contrapartida_defecto.codigo }}</td>
           {% else %}
-          <td colspan="3"><span class="tag tag-warn">Sin configurar · bloqueado</span></td>
+          <td><span class="tag tag-warn">Sin configurar · bloqueado</span></td>
           {% endif %}
           <td class="num"><a class="text-button" href="{% url 'costos_configuracion_editar' valor %}">Configurar</a></td>
         </tr>

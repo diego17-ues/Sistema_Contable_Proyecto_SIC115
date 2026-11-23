@@ -1,0 +1,58 @@
+@startuml
+title Sistema Contable SunGames — Diagrama de despliegue
+
+left to right direction
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam nodeBorderColor #294C69
+skinparam componentBorderColor #547A9C
+skinparam ArrowColor #294C69
+
+node "Equipo del usuario" <<device>> as CLIENT {
+  artifact "Navegador web" as BROWSER
+}
+
+cloud "Railway" as RAILWAY {
+  node "Servicio web SunGames\nContenedor Linux / Python" as APP_SERVICE {
+    artifact "Django\nAplicación SunGames" as DJANGO_APP
+    component "Gunicorn\nWSGI web workers" as GUNICORN
+    component "WhiteNoise\nArchivos estáticos" as STATIC
+    component "iniciar_sistema\nSupervisor de procesos" as SUPERVISOR
+    component "simular_ventas --continuo\nScheduler integrado" as SCHEDULER
+    artifact "simulador_steam\nGeneración y envío de ventas" as SIMULATOR
+  }
+
+  database "Servicio PostgreSQL" as POSTGRES {
+    artifact "Base de datos\nusuarios, catálogo, libro mayor,\nventas, costos, cierres y bitácora" as DATA
+  }
+}
+
+cloud "Cron externo opcional" as CRON {
+  component "POST /api/steam/simular/\nAuthorization: Bearer token" as CRON_CALL
+}
+
+BROWSER --> GUNICORN : HTTPS
+GUNICORN --> DJANGO_APP : WSGI
+GUNICORN --> STATIC : solicita CSS / JS / imágenes
+STATIC --> BROWSER : HTTPS
+SUPERVISOR --> GUNICORN : inicia y supervisa
+SUPERVISOR --> SCHEDULER : inicia y supervisa
+SCHEDULER --> SIMULATOR : ejecuta ciclo
+SIMULATOR --> DJANGO_APP : HTTP local\nwebhook de ventas
+DJANGO_APP --> POSTGRES : SQL mediante psycopg
+CRON_CALL --> DJANGO_APP : HTTPS autenticado\ncuando se configure
+
+note bottom of APP_SERVICE
+  Railway arranca el servicio con
+  python manage.py iniciar_sistema --railway.
+  Gunicorn y el scheduler viven en el mismo servicio;
+  no se requiere Redis ni un servicio scheduler adicional.
+end note
+
+note bottom of POSTGRES
+  Las credenciales se inyectan como variables de entorno.
+  Las migraciones se ejecutan en el pre-deploy.
+end note
+
+@enduml

@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('libro_mayor', '0005_periodo_estado'),
-        ('costos', '0011_parametros_costos_mano_obra'),
+        ('costos', '0012_sin_contrapartida'),
     ]
 
     operations = [

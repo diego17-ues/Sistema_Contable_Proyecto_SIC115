@@ -21,6 +21,7 @@ from estimacion.forms import (
     EstimacionMatrizForm,
     ExpertoForm,
     JuegoForm,
+    ParametroEdicionForm,
     ParametroForm,
     RolForm,
     SalarioForm,
@@ -180,25 +181,36 @@ def juego_detalle(request, juego_id):
     )
 
 
-RONDA_UNICA = 1
+def _ronda_registro(juego):
+    """Ronda activa de captura: la última abierta, o la siguiente si la
+    anterior ya está cerrada (una ronda nueva por cada cierre Delphi)."""
+    numeros = [r.numero for r in juego.rondas.all()]
+    abiertas = [r.numero for r in juego.rondas.all() if not r.cerrada]
+    if abiertas:
+        return max(abiertas)
+    return max(numeros) + 1 if numeros else 1
 
 
 @login_required
 @require_http_methods(["GET", "POST"])
 def estimacion_nueva(request, juego_id):
-    """Matriz PERT: un experto y rol estiman todas las fases (ronda 1)."""
+    """Matriz PERT: un experto y rol estiman todas las fases."""
     servicio = crear_estimacion_service()
+    try:
+        juego = servicio.obtener_juego(request.user, juego_id)
+    except UsuarioError as error:
+        raise _sin_permiso(error) from error
+    fases = list(juego.fases.all())
+    ronda = _ronda_registro(juego)
     if request.method != "POST":
         return render(
             request, JUEGO_TEMPLATE,
             _contexto_juego(
                 request, juego_id, servicio,
-                form=EstimacionMatrizForm(
-                    fases=_fases_del_juego(request, servicio, juego_id)
-                ),
+                form=EstimacionMatrizForm(fases=fases),
+                ronda_registro=ronda,
             ),
         )
-    fases = _fases_del_juego(request, servicio, juego_id)
     form = EstimacionMatrizForm(request.POST, fases=fases)
     if form.is_valid():
         datos = form.cleaned_data
@@ -216,7 +228,7 @@ def estimacion_nueva(request, juego_id):
                 juego_id=juego_id,
                 rol_id=datos["rol"],
                 experto_id=datos["experto"],
-                ronda=RONDA_UNICA,
+                ronda=ronda,
                 matriz=matriz,
                 justificacion=datos["justificacion"],
             )
@@ -227,12 +239,16 @@ def estimacion_nueva(request, juego_id):
         else:
             messages.success(
                 request,
-                f"Estimación registrada para {len(matriz)} fases.",
+                f"Estimación registrada para {len(matriz)} fases "
+                f"en la ronda {ronda}.",
             )
             return redirect("estimacion_juego", juego_id=juego_id)
     return render(
         request, JUEGO_TEMPLATE,
-        _contexto_juego(request, juego_id, servicio, form=form),
+        _contexto_juego(
+            request, juego_id, servicio, form=form,
+            ronda_registro=ronda,
+        ),
     )
 
 
@@ -700,6 +716,80 @@ def catalogo_experto(request):
     return _catalogo_form(request, ExpertoForm, "experto")
 
 
+@login_required
+@require_http_methods(["GET", "POST"])
+def catalogo_rol_editar(request, rol_id):
+    servicio = crear_estimacion_service()
+    try:
+        rol = servicio.obtener_rol(request.user, rol_id)
+    except UsuarioError as error:
+        raise _sin_permiso(error) from error
+    except EstimacionError as error:
+        messages.error(request, str(error))
+        return redirect("estimacion_catalogos")
+    if request.method == "POST":
+        form = RolForm(request.POST)
+        if form.is_valid():
+            try:
+                servicio.actualizar_rol(
+                    request.user, rol_id,
+                    form.cleaned_data["nombre"],
+                    form.cleaned_data["nivel"],
+                )
+            except UsuarioError as error:
+                raise _sin_permiso(error) from error
+            except EstimacionError as error:
+                form.add_error(None, str(error))
+            else:
+                messages.success(request, "Rol actualizado.")
+                return redirect("estimacion_catalogos")
+        return _render_catalogo(
+            request, servicio, form=form, tipo="rol_editar",
+            rol_editar=rol,
+        )
+    return _render_catalogo(
+        request, servicio,
+        form=RolForm(initial={"nombre": rol.nombre, "nivel": rol.nivel}),
+        tipo="rol_editar", rol_editar=rol,
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def catalogo_experto_editar(request, experto_id):
+    servicio = crear_estimacion_service()
+    try:
+        experto = servicio.obtener_experto(request.user, experto_id)
+    except UsuarioError as error:
+        raise _sin_permiso(error) from error
+    except EstimacionError as error:
+        messages.error(request, str(error))
+        return redirect("estimacion_catalogos")
+    if request.method == "POST":
+        form = ExpertoForm(request.POST)
+        if form.is_valid():
+            try:
+                servicio.actualizar_experto(
+                    request.user, experto_id, form.cleaned_data["nombre"]
+                )
+            except UsuarioError as error:
+                raise _sin_permiso(error) from error
+            except EstimacionError as error:
+                form.add_error(None, str(error))
+            else:
+                messages.success(request, "Experto actualizado.")
+                return redirect("estimacion_catalogos")
+        return _render_catalogo(
+            request, servicio, form=form, tipo="experto_editar",
+            experto_editar=experto,
+        )
+    return _render_catalogo(
+        request, servicio,
+        form=ExpertoForm(initial={"nombre": experto.nombre}),
+        tipo="experto_editar", experto_editar=experto,
+    )
+
+
 def _catalogo_form(request, clase_form, tipo):
     servicio = crear_estimacion_service()
     if request.method == "POST":
@@ -729,7 +819,7 @@ def _catalogo_form(request, clase_form, tipo):
     )
 
 
-def _render_catalogo(request, servicio, *, form=None, tipo=None):
+def _render_catalogo(request, servicio, *, form=None, tipo=None, **contexto_extra):
     try:
         parametros = servicio.parametros(request.user)
         salarios = servicio.salarios(request.user)
@@ -747,9 +837,14 @@ def _render_catalogo(request, servicio, *, form=None, tipo=None):
     clave = {
         "rol": "form_rol", "experto": "form_experto",
         "parametro": "form_parametro", "salario": "form_salario",
+        "rol_editar": "form_rol_editar",
+        "experto_editar": "form_experto_editar",
+        "parametro_editar": "form_parametro_editar",
+        "salario_editar": "form_salario_editar",
     }.get(tipo)
     if clave:
         extras[clave] = form
+    extras.update(contexto_extra)
     return render(request, CATALOGOS_TEMPLATE, {**contexto, **extras})
 
 
@@ -787,6 +882,53 @@ def catalogo_parametro(request):
 
 @login_required
 @require_http_methods(["GET", "POST"])
+def catalogo_parametro_editar(request, parametro_id):
+    servicio = crear_estimacion_service()
+    try:
+        parametro = servicio.obtener_parametro(request.user, parametro_id)
+    except UsuarioError as error:
+        raise _sin_permiso(error) from error
+    except EstimacionError as error:
+        messages.error(request, str(error))
+        return redirect("estimacion_catalogos")
+    initial = {
+        "valor": parametro.valor,
+        "vigente_desde": parametro.vigente_desde,
+        "vigente_hasta": parametro.vigente_hasta,
+        "verificado": parametro.verificado,
+    }
+    if request.method == "POST":
+        form = ParametroEdicionForm(request.POST)
+        if form.is_valid():
+            datos = form.cleaned_data
+            try:
+                servicio.actualizar_parametro(
+                    request.user, parametro_id,
+                    valor=datos["valor"],
+                    vigente_desde=datos["vigente_desde"],
+                    vigente_hasta=datos["vigente_hasta"] or None,
+                    verificado=datos["verificado"],
+                )
+            except UsuarioError as error:
+                raise _sin_permiso(error) from error
+            except EstimacionError as error:
+                form.add_error(None, str(error))
+            else:
+                messages.success(request, "Parámetro actualizado.")
+                return redirect("estimacion_catalogos")
+        return _render_catalogo(
+            request, servicio, form=form, tipo="parametro_editar",
+            parametro_editar=parametro,
+        )
+    return _render_catalogo(
+        request, servicio,
+        form=ParametroEdicionForm(initial=initial),
+        tipo="parametro_editar", parametro_editar=parametro,
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
 def catalogo_salario(request):
     servicio = crear_estimacion_service()
     if request.method == "POST":
@@ -813,4 +955,50 @@ def catalogo_salario(request):
         )
     return _render_catalogo(
         request, servicio, form=SalarioForm(), tipo="salario"
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def catalogo_salario_editar(request, salario_id):
+    servicio = crear_estimacion_service()
+    try:
+        salario = servicio.obtener_salario(request.user, salario_id)
+    except UsuarioError as error:
+        raise _sin_permiso(error) from error
+    except EstimacionError as error:
+        messages.error(request, str(error))
+        return redirect("estimacion_catalogos")
+    if request.method == "POST":
+        form = SalarioForm(request.POST)
+        if form.is_valid():
+            datos = form.cleaned_data
+            try:
+                servicio.actualizar_salario(
+                    request.user, salario_id,
+                    rol_id=datos["rol"],
+                    salario_bruto=datos["salario_bruto"],
+                    vigente_desde=datos["vigente_desde"],
+                    vigente_hasta=datos["vigente_hasta"] or None,
+                )
+            except UsuarioError as error:
+                raise _sin_permiso(error) from error
+            except EstimacionError as error:
+                form.add_error(None, str(error))
+            else:
+                messages.success(request, "Salario actualizado.")
+                return redirect("estimacion_catalogos")
+        return _render_catalogo(
+            request, servicio, form=form, tipo="salario_editar",
+            salario_editar=salario,
+        )
+    return _render_catalogo(
+        request, servicio,
+        form=SalarioForm(initial={
+            "rol": salario.rol_id,
+            "salario_bruto": salario.salario_bruto,
+            "vigente_desde": salario.vigente_desde,
+            "vigente_hasta": salario.vigente_hasta,
+        }),
+        tipo="salario_editar", salario_editar=salario,
     )

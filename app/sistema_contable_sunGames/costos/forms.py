@@ -109,8 +109,8 @@ class OrdenEdicionForm(OrdenForm):
 
 
 class _RegistroForm(ClaveForm):
-    def __init__(self, *args, procesos=(), configuracion=None,
-                 proceso_obligatorio=False, **kwargs):
+    def __init__(self, *args, procesos=(), proceso_obligatorio=False,
+                 **kwargs):
         super().__init__(*args, **kwargs)
         self.procesos = list(procesos)
         vacio = "— Seleccione —" if proceso_obligatorio else "— Sin proceso —"
@@ -118,25 +118,14 @@ class _RegistroForm(ClaveForm):
         self.fields["proceso"].choices = [("", vacio)] + [
             (p.pk, p.nombre) for p in self.procesos
         ]
-        contrapartidas = (list(configuracion.contrapartidas.all())
-                          if configuracion else [])
-        self.fields["contrapartida"].choices = [
-            (c.pk, _cuenta(c)) for c in contrapartidas
-        ]
-        if configuracion and not self.is_bound:
-            self.initial.setdefault(
-                "contrapartida", configuracion.contrapartida_defecto_id
-            )
 
     fecha = _fecha(label="Fecha")
     proceso = forms.ChoiceField(label="Proceso")
-    contrapartida = forms.ChoiceField(label="Contrapartida (haber)")
 
 
 class ManoObraForm(_RegistroForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, proceso_obligatorio=True, **kwargs)
-        self.fields.pop("contrapartida")
 
     horas = _decimal(10, 2, label="Horas")
     costo_hora = _decimal(
@@ -149,8 +138,7 @@ class ManoObraForm(_RegistroForm):
 class CostoForm(_RegistroForm):
     descripcion = forms.CharField(label="Descripción", max_length=200)
     importe = _decimal(14, 2, label="Monto (USD)")
-    field_order = ["fecha", "proceso", "descripcion", "importe",
-                   "contrapartida", "clave"]
+    field_order = ["fecha", "proceso", "descripcion", "importe", "clave"]
 
 
 class AnularForm(ClaveForm):
@@ -176,29 +164,14 @@ class ConfiguracionCuentaForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.cuentas = {str(c.pk): c for c in cuentas}
         opciones = [(pk, _cuenta(c)) for pk, c in self.cuentas.items()]
-        vacio = [("", "— Seleccione —")]
-        self.fields["cuenta_costo"].choices = vacio + opciones
-        self.fields["contrapartidas"].choices = opciones
-        self.fields["contrapartida_defecto"].choices = (
+        self.fields["cuenta_costo"].choices = (
             [("", "— Seleccione —")] + opciones
         )
 
-    cuenta_costo = forms.ChoiceField(label="Cuenta de costo (debe)")
-    contrapartidas = forms.MultipleChoiceField(
-        label="Contrapartidas permitidas (haber)",
-        widget=forms.SelectMultiple(attrs={"size": "6"}),
-    )
-    contrapartida_defecto = forms.ChoiceField(
-        label="Contrapartida por defecto"
-    )
+    cuenta_costo = forms.ChoiceField(label="Cuenta de costo")
 
-    def cuentas_elegidas(self):
-        datos = self.cleaned_data
-        return (
-            self.cuentas[datos["cuenta_costo"]],
-            [self.cuentas[pk] for pk in datos["contrapartidas"]],
-            self.cuentas[datos["contrapartida_defecto"]],
-        )
+    def cuenta_elegida(self):
+        return self.cuentas[self.cleaned_data["cuenta_costo"]]
 
 
 class FuenteIndirectaForm(forms.Form):

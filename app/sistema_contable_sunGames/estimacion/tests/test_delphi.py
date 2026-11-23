@@ -9,6 +9,7 @@ from estimacion.exceptions import (
     EstimacionDuplicadaError,
     EstimacionInvalidaError,
     ParametroInvalidoError,
+    ParametroNoEncontradoError,
     RondaCerradaError,
     RolNoEncontradoError,
 )
@@ -166,6 +167,34 @@ class DelphiTests(TestCase):
         with self.assertRaises(RondaCerradaError):
             self.matriz(self.experto2)
 
+    def test_mismo_experto_puede_registrar_ronda_nueva(self):
+        self.matriz(self.experto1)
+        self.servicio.cerrar_ronda(
+            self.admin, self.juego.pk, 1, fecha=FECHA
+        )
+        creadas = self.matriz(self.experto1, ronda=2)
+        self.assertTrue(all(e.ronda == 2 for e in creadas))
+
+    def test_vista_registra_en_la_siguiente_ronda_tras_el_cierre(self):
+        datos = {
+            "rol": str(self.rol.pk),
+            "experto": str(self.experto1.pk),
+            "justificacion": "",
+        }
+        for fase in self.juego.fases.all():
+            datos[f"fase_{fase.pk}_optimista"] = "10"
+            datos[f"fase_{fase.pk}_moda"] = "20"
+            datos[f"fase_{fase.pk}_pesimista"] = "30"
+        self.client.force_login(self.admin)
+        url = f"/panel/estimacion/{self.juego.pk}/estimacion/"
+        self.assertEqual(self.client.post(url, datos).status_code, 302)
+        self.assertTrue(EstimacionExperto.objects.filter(ronda=1).exists())
+        self.servicio.cerrar_ronda(
+            self.admin, self.juego.pk, 1, fecha=FECHA
+        )
+        self.assertEqual(self.client.post(url, datos).status_code, 302)
+        self.assertTrue(EstimacionExperto.objects.filter(ronda=2).exists())
+
     def test_estimacion_invalida_rechazada(self):
         with self.assertRaises(EstimacionInvalidaError):
             self.servicio.registrar_estimacion(
@@ -275,3 +304,80 @@ class DelphiTests(TestCase):
             self.admin, "tasa_extra", Decimal("0.2"),
             date(2026, 7, 1), None,
         )
+
+    def test_actualizar_parametro(self):
+        parametro = self.servicio.crear_parametro(
+            self.admin, "tasa_extra", Decimal("0.1"),
+            date(2026, 1, 1), date(2026, 6, 30),
+        )
+        siguiente = self.servicio.crear_parametro(
+            self.admin, "tasa_extra", Decimal("0.5"),
+            date(2026, 7, 1), None,
+        )
+        actualizado = self.servicio.actualizar_parametro(
+            self.admin, parametro.pk, valor=Decimal("0.3"),
+            vigente_desde=date(2026, 2, 1),
+            vigente_hasta=date(2026, 5, 31),
+            verificado=True,
+        )
+        self.assertEqual(actualizado.valor, Decimal("0.300000"))
+        self.assertEqual(actualizado.clave, "tasa_extra")
+        self.assertTrue(actualizado.verificado)
+        # Traslapar otra vigencia del mismo parámetro se rechaza.
+        with self.assertRaises(ParametroInvalidoError):
+            self.servicio.actualizar_parametro(
+                self.admin, siguiente.pk, valor=Decimal("0.9"),
+                vigente_desde=date(2026, 3, 1),
+            )
+        # Parámetro inexistente.
+        with self.assertRaises(ParametroNoEncontradoError):
+            self.servicio.actualizar_parametro(
+                self.admin, 9999, valor=Decimal("1"),
+                vigente_desde=date(2026, 1, 1),
+            )
+        # Rol sin acceso no modifica.
+        with self.assertRaises(RolNoAutorizadoError):
+            self.servicio.actualizar_parametro(
+                self.general, parametro.pk, valor=Decimal("0.9"),
+                vigente_desde=date(2026, 1, 1),
+            )
+
+    def test_actualizar_rol_y_experto(self):
+        rol = self.servicio.actualizar_rol(
+            self.admin, self.rol.pk, "Programador Sr", 4
+        )
+        self.assertEqual((rol.nombre, rol.nivel), ("Programador Sr", 4))
+        experto = self.servicio.actualizar_experto(
+            self.admin, self.experto1.pk, "Experto Editado"
+        )
+        self.assertEqual(experto.nombre, "Experto Editado")
+        with self.assertRaises(RolNoEncontradoError):
+            self.servicio.actualizar_rol(self.admin, 9999, "X", 1)
+        with self.assertRaises(RolNoAutorizadoError):
+            self.servicio.actualizar_experto(
+                self.general, self.experto1.pk, "X"
+            )
+
+    def test_actualizar_salario(self):
+        salario = self.servicio.crear_salario(
+            self.admin, self.rol.pk, Decimal("1500"),
+            date(2026, 1, 1), date(2026, 6, 30),
+        )
+        otro = self.servicio.crear_salario(
+            self.admin, self.rol.pk, Decimal("1700"),
+            date(2026, 7, 1), None,
+        )
+        actualizado = self.servicio.actualizar_salario(
+            self.admin, salario.pk, rol_id=self.rol.pk,
+            salario_bruto=Decimal("1600"),
+            vigente_desde=date(2026, 1, 1),
+            vigente_hasta=date(2026, 5, 31),
+        )
+        self.assertEqual(actualizado.salario_bruto, Decimal("1600.00"))
+        # Traslapar la otra vigencia del mismo rol se rechaza.
+        with self.assertRaises(ParametroInvalidoError):
+            self.servicio.actualizar_salario(
+                self.admin, otro.pk, rol_id=self.rol.pk,
+                salario_bruto=Decimal("1800"),
+                vigente_desde=date(2026, 2, 1),
+            )
