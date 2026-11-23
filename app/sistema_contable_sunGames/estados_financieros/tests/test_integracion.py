@@ -260,6 +260,10 @@ class CierreIntegracionTests(TestCase):
                             'type="application/json">'
                             '"CERRADO_PROVISIONAL"</script>',
                         )
+                        if usuario is self.costos:
+                            # El indicador de período no se muestra al
+                            # Contador de Costos (index.html).
+                            continue
                         self.assertContains(
                             respuesta, "Período cerrado provisionalmente"
                         )

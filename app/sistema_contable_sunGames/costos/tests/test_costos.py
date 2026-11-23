@@ -350,7 +350,7 @@ class BaseCostos(TestCase):
 class RegistroElementosTests(BaseCostos):
     def test_administrador_puede_crear_orden_y_registrar_costos(self):
         admin = Usuario.objects.create(
-            username="admin-costos", nombre_completo="Administrador",
+            username="admcost", nombre_completo="Administrador",
             rol=Rol.ADMINISTRADOR, activo=True,
         )
         orden = self.ordenes.crear_orden(

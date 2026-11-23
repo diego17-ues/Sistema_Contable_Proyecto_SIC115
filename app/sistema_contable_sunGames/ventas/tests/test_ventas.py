@@ -659,4 +659,4 @@ class EstadoConexionUiTests(SimpleTestCase):
 
         self.assertNotRegex(panel, r"<(input|select|textarea)\b")
         self.assertNotIn("data-action=\"steam-check\"", panel)
-        self.assertIn("Solo lectura", panel)
+        self.assertIn("Estado de conexión", panel)
