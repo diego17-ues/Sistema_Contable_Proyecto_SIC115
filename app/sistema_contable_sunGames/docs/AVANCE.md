@@ -380,3 +380,10 @@ punto de acceso por rol.
 - Mano de obra sigue siendo horas × costo por hora, sin desglose.
 - Migración `costos.0015_contrapartida_registros` (campos nulos para los
   registros anteriores y semilla de contrapartidas).
+
+## Estados sin cuentas en cero
+
+- Balance de comprobación, hoja de trabajo, Balance General, Estado de
+  Resultados, Cambios en el Patrimonio y la nota de depreciación y
+  amortización omiten las cuentas con saldo cero (servidor y pantalla).
+  Los totales y la utilidad del ejercicio se siguen mostrando.

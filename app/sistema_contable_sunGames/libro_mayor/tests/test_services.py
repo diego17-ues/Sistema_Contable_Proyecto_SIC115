@@ -330,6 +330,16 @@ class BalanceComprobacionTest(LibroMayorTestCase):
         self.assertTrue(despues.balanceado)
         self.assertEqual(despues.filas[1].haber, Decimal("13.00"))
 
+    def test_cuenta_con_saldo_cero_no_aparece(self):
+        self.registrar("1101", [linea(debe="50.00"), linea(haber="50.00")])
+        self.registrar("5101", [linea(haber="100.00")])
+
+        balance = self.servicio.balance_comprobacion(self.contador, FECHA)
+
+        self.assertEqual(
+            [fila.cuenta.codigo for fila in balance.filas], ["5101"]
+        )
+
     def test_sin_movimientos_no_hay_filas(self):
         balance = self.servicio.balance_comprobacion(self.contador, FECHA)
         self.assertEqual(balance.filas, ())

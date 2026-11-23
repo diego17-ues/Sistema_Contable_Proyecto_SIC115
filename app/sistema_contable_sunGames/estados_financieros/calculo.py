@@ -45,7 +45,13 @@ def _del_rubro(saldos, rubro):
     return [cuenta for cuenta in saldos if cuenta.rubro.codigo == rubro]
 
 
+def _con_saldo(cuentas):
+    """Solo las cuentas que aportan al estado (saldo distinto de cero)."""
+    return [cuenta for cuenta in cuentas if cuenta.saldo]
+
+
 def _seccion_por_subtipo(filas, titulo, cuentas, signo, extra=None):
+    cuentas = _con_saldo(cuentas)
     filas.append(fila("seccion", titulo))
     total = CERO
     for (_, nombre), grupo in groupby(
@@ -95,7 +101,7 @@ def balance_general(periodo, saldos, saldos_ejercicio=None):
     )
     filas.append(fila("seccion", "PATRIMONIO"))
     patrimonio = CERO
-    for cuenta in _del_rubro(saldos, c.PATRIMONIO):
+    for cuenta in _con_saldo(_del_rubro(saldos, c.PATRIMONIO)):
         filas.append(fila("cuenta", cuenta.denominacion, -cuenta.saldo,
                           cuenta.codigo))
         patrimonio -= cuenta.saldo
@@ -126,7 +132,8 @@ def balance_general(periodo, saldos, saldos_ejercicio=None):
 
 def estado_resultados(periodo, saldos):
     """Por función, con los saldos del rango del período."""
-    resultados = [cuenta for cuenta in saldos if c.es_resultado(cuenta)]
+    resultados = [cuenta for cuenta in _con_saldo(saldos)
+                  if c.es_resultado(cuenta)]
 
     def egresos(subtipo, excluir=frozenset()):
         return [
@@ -205,6 +212,8 @@ def _depreciacion_amortizacion(filas, saldos):
     total = CERO
     for codigo, texto in c.DEPRECIACION_AMORTIZACION:
         importe = -por_codigo.get(codigo, CERO)
+        if not importe:
+            continue
         filas.append(fila("cuenta", texto, importe, codigo))
         total += importe
     filas.append(fila("subtotal", "Total depreciación y amortización",

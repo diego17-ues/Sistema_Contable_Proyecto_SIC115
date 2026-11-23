@@ -7,6 +7,7 @@ cuota de amortización, y estados/balanza que cuadran.
 """
 
 import uuid
+from types import SimpleNamespace
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from unittest import mock
@@ -30,7 +31,7 @@ from costos.models import (
     ParametroAmortizacion,
     Proceso,
 )
-from estados_financieros import calculo
+from estados_financieros import calculo, hoja_trabajo
 from estados_financieros.composition import crear_cierre_service
 from estados_financieros.models import EstadoFinancieroEmitido, TipoEstado
 from estados_financieros.tests.fakes import cuenta_con_saldo, periodo
@@ -67,6 +68,33 @@ class CalculoCongruenteTests(SimpleTestCase):
         balance = calculo.balance_general(periodo(), saldos)
         self.assertTrue(balance["cuadra"], balance["diferencia"])
         self.assertIn("4101", {f["codigo"] for f in balance["filas"]})
+
+    def test_cuentas_sin_saldo_no_aparecen(self):
+        datos = {"1101": "500", "1102": "0", "2101": "-500",
+                 "2102": "0", "5101": "-100", "5102": "0", "4104": "100"}
+        saldos = [cuenta_con_saldo(c, s) for c, s in sorted(datos.items())]
+        for estado in (calculo.balance_general(periodo(), saldos),
+                       calculo.estado_resultados(periodo(), saldos)):
+            codigos = {f["codigo"] for f in estado["filas"]}
+            self.assertFalse({"1102", "2102", "5102"} & codigos)
+        self.assertIn("1101", {f["codigo"] for f in
+                               calculo.balance_general(periodo(),
+                                                       saldos)["filas"]})
+
+        def cuenta(codigo, apertura, debe, haber):
+            return SimpleNamespace(
+                codigo=codigo, denominacion=codigo,
+                rubro=SimpleNamespace(codigo=codigo[0]),
+                naturaleza=SimpleNamespace(nombre="Deudora"),
+                apertura=Decimal(apertura), debe=Decimal(debe),
+                haber=Decimal(haber), ajuste_debe=None, ajuste_haber=None,
+            )
+        hoja = hoja_trabajo.construir(
+            date(2026, 1, 1), date(2026, 1, 31),
+            [cuenta("1101", "0", "100", "0"),
+             cuenta("1102", "50", "0", "-50")],
+        )
+        self.assertEqual([f["code"] for f in hoja["rows"]], ["1101"])
 
     def test_cuota_por_modalidad(self):
         base = D("4800.00")

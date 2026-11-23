@@ -52,7 +52,8 @@ def _fila_cuenta(cuenta):
 
 
 def construir(desde, hasta, cuentas):
-    filas = [_fila_cuenta(cuenta) for cuenta in cuentas]
+    filas = [fila for fila in map(_fila_cuenta, cuentas)
+             if any(fila[clave] for clave in CLAVES)]
     resultado = sum((f["periodNet"] for f in filas
                      if f["group"] in ("Ingreso", "Egreso")), CERO)
     if resultado:

@@ -478,7 +478,7 @@
     return accounts.filter(account => account.status === 'Activa' || ledgerRows.some(row => row.code === account.code)).map(account => {
       const net = ledgerRows.filter(row => row.code === account.code && row.date <= asOf).reduce((sum, row) => sum + (row.side === 'Cargo' ? row.amount : -row.amount), 0);
       return { ...account, debit: Math.max(net, 0), credit: Math.max(-net, 0) };
-    });
+    }).filter(row => Math.abs(row.debit - row.credit) > 0.005);
   }
 
   function trialBalancePage() {
@@ -781,8 +781,8 @@
     const emitido = state.closedStatements?.resultados;
     if (emitido) return emittedStatement(emitido, 'Estado de Resultados');
     const sheet = state.worksheet;
-    const incomeRows = sheet.rows.filter(row => row.code && row.group === 'Ingreso').map(row => ({ label: `${row.code} · ${row.name}`, amount: -row.periodNet, kind: 'detail' }));
-    const expenseRows = sheet.rows.filter(row => row.code && row.group === 'Egreso').map(row => ({ label: `${row.code} · ${row.name}`, amount: row.periodNet, kind: 'detail' }));
+    const incomeRows = sheet.rows.filter(row => row.code && row.group === 'Ingreso').map(row => ({ label: `${row.code} · ${row.name}`, amount: -row.periodNet, kind: 'detail' })).filter(row => Math.abs(row.amount) > 0.005);
+    const expenseRows = sheet.rows.filter(row => row.code && row.group === 'Egreso').map(row => ({ label: `${row.code} · ${row.name}`, amount: row.periodNet, kind: 'detail' })).filter(row => Math.abs(row.amount) > 0.005);
     const incomeTotal = incomeRows.reduce((sum, row) => sum + row.amount, 0);
     const expenseTotal = expenseRows.reduce((sum, row) => sum + row.amount, 0);
     const finalResult = incomeTotal - expenseTotal;
@@ -800,7 +800,7 @@
     const sheet = state.worksheet;
     const balances = sheet.rows.filter(row => row.code && ['Activo', 'Pasivo', 'Patrimonio'].includes(row.group));
     const result = sheet.rows.find(row => row.name === 'Resultado del período');
-    const groupRows = (group, sign) => balances.filter(row => row.group === group).map(row => ({ label: `${row.code} · ${row.name}`, amount: (row.balanceCredit - row.balanceDebit) * sign, kind: 'detail' }));
+    const groupRows = (group, sign) => balances.filter(row => row.group === group).map(row => ({ label: `${row.code} · ${row.name}`, amount: (row.balanceCredit - row.balanceDebit) * sign, kind: 'detail' })).filter(row => Math.abs(row.amount) > 0.005);
     const assets = groupRows('Activo', -1);
     const liabilities = groupRows('Pasivo', 1);
     const equity = groupRows('Patrimonio', 1);
@@ -821,7 +821,7 @@
 
   function changesStatement() {
     const sheet = state.worksheet;
-    const rows = sheet.rows.filter(row => row.code && row.group === 'Patrimonio').map(row => {
+    const rows = sheet.rows.filter(row => row.code && row.group === 'Patrimonio' && [row.openingNet, row.periodCredit, row.periodDebit, row.balanceCredit - row.balanceDebit].some(v => Math.abs(v || 0) > 0.005)).map(row => {
       const opening = -(row.openingNet || 0);
       const increases = row.periodCredit;
       const decreases = row.periodDebit;
