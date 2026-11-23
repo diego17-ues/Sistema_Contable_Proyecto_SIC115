@@ -44,6 +44,7 @@ from usuarios.models import Usuario
 from usuarios.roles import Rol
 from ventas.composition import crear_ventas_service
 from ventas.exceptions import PeriodoYaConciliadoError, VentasError
+from ventas.models import Venta
 
 D = Decimal
 NOVIEMBRE = (date(2026, 11, 1), date(2026, 11, 30))
@@ -382,6 +383,17 @@ class CongruenciaIntegracionTests(TestCase):
         )
         ventas.contabilizar(self.general, "STM-C2")
         self.assertEqual(saldo("1104"), D("13.99"))
+        venta = Venta.objects.get(identificador="STM-C2")
+        plantilla = Movimiento.objects.get(
+            transaccion_id=venta.transaccion_id, cuenta__codigo="1104").pk
+        for codigo, importe in (("1104", D("6.00")), ("1101", D("-6.00"))):
+            movimiento = Movimiento.objects.get(pk=plantilla)
+            movimiento.pk = None
+            movimiento.cuenta = movimiento.cuenta.__class__.objects.get(
+                codigo=codigo)
+            movimiento.importe = importe
+            movimiento.save()
+        self.assertEqual(saldo("1104"), D("19.99"))
 
         crear_cierre_service().cerrar_rango(
             self.general, *NOVIEMBRE, confirmacion="CONFIRMAR",
@@ -389,7 +401,7 @@ class CongruenciaIntegracionTests(TestCase):
         )
 
         self.assertEqual(saldo("1104"), 0)
-        self.assertEqual(saldo("1103"), D("13.99"))
+        self.assertEqual(saldo("1103"), D("19.99"))
         self.assertEqual(saldo("5101"), D("-19.99"))
         with self.assertRaises(VentasError):
             ventas.conciliar(self.general, *NOVIEMBRE)

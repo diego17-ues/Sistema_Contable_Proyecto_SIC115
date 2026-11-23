@@ -231,7 +231,8 @@ class VentasService:
         ventas = [venta for venta in
                   self._repositorio.ventas_en_periodo(desde, hasta)
                   if venta.estado == EstadoVenta.REGISTRADA
-                  and not venta.transaccion_cobro_id and venta.neto > CERO]
+                  and not venta.transaccion_cobro_id
+                  and self._por_cobrar(venta) > CERO]
         if not ventas:
             return None
         for venta in ventas:
@@ -273,7 +274,7 @@ class VentasService:
             )
         por_cobrar = [venta for venta in ventas
                       if not venta.transaccion_cobro_id
-                      and venta.neto > CERO]
+                      and self._por_cobrar(venta) > CERO]
         if not por_cobrar:
             raise ConciliacionNoPermitidaError(
                 "No hay ventas contabilizadas por cobrar en el período."
@@ -289,21 +290,32 @@ class VentasService:
             )
         return por_cobrar
 
-    @staticmethod
-    def _importes(ventas):
+    def _por_cobrar(self, venta):
+        """Lo que la venta cargó a la cuenta por cobrar en su asiento."""
+        return self._repositorio.importe_por_cobrar(
+            venta, self._config.cuenta_por_cobrar
+        )
+
+    def _importes(self, ventas):
         total = sum((venta.total for venta in ventas), CERO)
         comision = sum((venta.comision for venta in ventas), CERO)
-        return total, total - comision, comision
+        neto = sum((self._por_cobrar(venta) for venta in ventas), CERO)
+        return total, neto, comision
 
     def _cobrar(self, actor, venta):
-        """Debe Bancos / Haber Cuentas por cobrar a plataformas (neto)."""
+        """Debe Bancos / Haber Cuentas por cobrar a plataformas.
+
+        Cobra lo que la venta cargó a la cuenta por cobrar, así 1104 queda
+        saldada aunque la venta se haya asentado con un esquema anterior.
+        """
         if venta.transaccion_cobro_id:
             return
+        importe_cobro = self._por_cobrar(venta)
         try:
             transaccion = self._mayor.crear_transaccion(usuario=actor)
             for codigo, importe in (
-                    (self._config.cuenta_bancos, venta.neto),
-                    (self._config.cuenta_por_cobrar, -venta.neto)):
+                    (self._config.cuenta_bancos, importe_cobro),
+                    (self._config.cuenta_por_cobrar, -importe_cobro)):
                 self._mayor.crear_movimiento(
                     transaccion=transaccion, cuenta=self._cuenta(codigo),
                     fecha=venta.fecha,

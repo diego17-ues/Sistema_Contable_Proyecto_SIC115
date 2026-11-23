@@ -1,5 +1,9 @@
+from decimal import Decimal
+
 from django.db import DatabaseError, IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Q, Sum
+
+from libro_mayor.models import Movimiento
 
 from .exceptions import (
     ContabilizacionError,
@@ -82,6 +86,14 @@ class VentaRepository:
             return ConciliacionVentas.objects.create(**datos)
         except DatabaseError as exc:
             raise ContabilizacionError() from exc
+
+    def importe_por_cobrar(self, venta, codigo_cuenta):
+        if not venta.transaccion_id:
+            return venta.neto
+        return Movimiento.objects.filter(
+            transaccion_id=venta.transaccion_id,
+            cuenta__codigo=codigo_cuenta,
+        ).aggregate(t=Sum("importe"))["t"] or Decimal("0.00")
 
     def marcar_cobrada(self, venta, transaccion_mayor):
         venta.transaccion_cobro = transaccion_mayor

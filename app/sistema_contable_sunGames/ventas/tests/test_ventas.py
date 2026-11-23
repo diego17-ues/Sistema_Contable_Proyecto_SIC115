@@ -96,6 +96,9 @@ class RepoEnMemoria:
     def bloquear_conciliacion(self):
         pass
 
+    def importe_por_cobrar(self, venta, codigo_cuenta):
+        return venta.neto
+
     def conciliacion_que_se_solapa(self, desde, hasta):
         return next((c for c in getattr(self, "conciliaciones", [])
                      if c.desde <= hasta and c.hasta >= desde), None)
