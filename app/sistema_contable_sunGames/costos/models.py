@@ -512,3 +512,88 @@ class ReclasificacionCosto(models.Model):
     def __str__(self):
         return (f"{self.get_tipo_display()} · OT-{self.orden_id} · "
                 f"${self.importe}")
+
+
+class ParametroAmortizacion(models.Model):
+    """Política de amortización de videojuegos terminados (editable).
+
+    La cuota del período se carga a Costo de ventas y se abona a la
+    amortización acumulada de videojuegos.
+    """
+
+    MODALIDAD_ANUAL = "ANUAL"
+    MODALIDAD_MENSUAL = "MENSUAL"
+    MODALIDAD_DIARIA = "DIARIA"
+    MODALIDADES = [
+        (MODALIDAD_ANUAL, "Anual"),
+        (MODALIDAD_MENSUAL, "Mensual"),
+        (MODALIDAD_DIARIA, "Diaria"),
+    ]
+
+    modalidad = models.CharField(
+        "modalidad", max_length=8, choices=MODALIDADES,
+        default=MODALIDAD_MENSUAL,
+    )
+    vida_util_meses = models.PositiveIntegerField(
+        "vida útil (meses)", validators=[MinValueValidator(1)],
+    )
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "parámetro de amortización"
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(vida_util_meses__gt=0),
+                name="amortizacion_vida_util_positiva",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.get_modalidad_display()} · {self.vida_util_meses} m"
+
+
+class AmortizacionVideojuego(models.Model):
+    """Cuota de amortización asentada por orden y período (o su reversión).
+
+    Debe Costo de ventas / Haber Amortización acumulada de videojuegos.
+    """
+
+    periodo = models.ForeignKey(
+        PeriodoContable, on_delete=models.PROTECT,
+        related_name="amortizaciones_videojuegos",
+    )
+    orden = models.ForeignKey(
+        OrdenTrabajo, on_delete=models.PROTECT,
+        related_name="amortizaciones",
+    )
+    transaccion = models.OneToOneField(
+        Transaccion, on_delete=models.PROTECT,
+        related_name="amortizacion_videojuego",
+    )
+    importe = models.DecimalField(
+        "cuota", max_digits=DINERO_MAX, decimal_places=2,
+        validators=[MinValueValidator(0.01)],
+    )
+    base = models.DecimalField("base amortizable", max_digits=DINERO_MAX,
+                               decimal_places=2)
+    modalidad = models.CharField("modalidad", max_length=8)
+    desde = models.DateField("amortizado desde")
+    hasta = models.DateField("amortizado hasta")
+    revierte = models.OneToOneField(
+        "self", on_delete=models.PROTECT, null=True, blank=True,
+        related_name="reversion",
+    )
+    clave_idempotencia = models.CharField(
+        "clave de idempotencia", max_length=100, unique=True,
+    )
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+        constraints = [
+            models.CheckConstraint(check=models.Q(importe__gt=0),
+                                   name="amortizacion_importe_positivo"),
+        ]
+
+    def __str__(self):
+        return f"Amortización OT-{self.orden_id} · ${self.importe}"

@@ -42,6 +42,7 @@ class ConfiguracionVentas:
     cuenta_comision: str = "4302"
     cuenta_ingreso_juego: str = "5101"
     cuenta_ingreso_dlc: str = "5102"
+    cuenta_bancos: str = "1103"
     minutos_conectado: int = 5
 
 
@@ -190,10 +191,13 @@ class VentasService:
             comision = CERO
             errores = []
             ventas_conciliadas = []
+            cobros_pendientes = 0
             for venta in ventas:
                 try:
                     if venta.estado != EstadoVenta.REGISTRADA:
                         self.contabilizar(actor, venta.identificador)
+                    if not self._cobrar(actor, venta):
+                        cobros_pendientes += 1
                 except VentasError as error:
                     errores.append({
                         "id": venta.identificador,
@@ -214,6 +218,7 @@ class VentasService:
                 detalle=(f"Conciliadas: {conciliadas}; total: {total:.2f}; "
                          f"cuentas por cobrar: {total - comision:.2f}; "
                          f"comisión: {comision:.2f}; "
+                         f"cobros en período cerrado: {cobros_pendientes}; "
                          f"errores: {len(errores)}"),
             )
             return ResumenConciliacion(
@@ -223,32 +228,63 @@ class VentasService:
                 )),
             )
 
+    def _cobrar(self, actor, venta):
+        """Traslada el neto conciliado de la cuenta por cobrar a Bancos.
+
+        Debe Bancos / Haber Cuentas por cobrar a plataformas, una sola vez
+        por venta. Devuelve ``False`` si el período de la venta está
+        cerrado (el cobro no se asienta en un período cerrado).
+        """
+        if venta.transaccion_cobro_id or venta.neto <= CERO:
+            return True
+        try:
+            if self._mayor.periodo_de(venta.fecha).cerrado:
+                return False
+            lineas = [
+                (self._cuenta(self._config.cuenta_bancos), venta.neto),
+                (self._cuenta(self._config.cuenta_por_cobrar), -venta.neto),
+            ]
+            transaccion = self._mayor.crear_transaccion(usuario=actor)
+            for cuenta, importe in lineas:
+                self._mayor.crear_movimiento(
+                    transaccion=transaccion, cuenta=cuenta,
+                    fecha=venta.fecha,
+                    concepto=(f"Cobro conciliado Steam "
+                              f"{venta.identificador}")[:200],
+                    referencia=f"COBRO {venta.identificador}"[:40],
+                    tipo=TipoMovimiento.COMPROBANTE_INGRESO,
+                    importe=importe,
+                )
+        except LibroMayorError as exc:
+            raise ContabilizacionError(str(exc)) from exc
+        self._repositorio.marcar_cobrada(venta, transaccion)
+        return True
+
     def _cuentas_afectadas(self, ventas):
-        """Resume los movimientos existentes por cuenta y lado contable."""
-        importes = {}
+        """Resume los movimientos por cuenta y lado contable, incluido el
+        cobro conciliado (Debe Bancos / Haber cuenta por cobrar)."""
+        debe, haber = {}, {}
+
+        def sumar(codigo, importe):
+            lado = debe if importe > CERO else haber
+            lado[codigo] = lado.get(codigo, CERO) + abs(importe)
+
         for venta in ventas:
             cuenta_ingreso = (
                 self._config.cuenta_ingreso_dlc
                 if venta.tipo_producto == TipoProducto.DLC
                 else self._config.cuenta_ingreso_juego
             )
-            importes[self._config.cuenta_por_cobrar] = (
-                importes.get(self._config.cuenta_por_cobrar, CERO)
-                + venta.neto
-            )
+            sumar(self._config.cuenta_por_cobrar, venta.neto)
             if venta.comision:
-                importes[self._config.cuenta_comision] = (
-                    importes.get(self._config.cuenta_comision, CERO)
-                    + venta.comision
-                )
-            importes[cuenta_ingreso] = (
-                importes.get(cuenta_ingreso, CERO) - venta.total
-            )
+                sumar(self._config.cuenta_comision, venta.comision)
+            sumar(cuenta_ingreso, -venta.total)
+            if venta.neto > CERO:
+                sumar(self._config.cuenta_bancos, venta.neto)
+                sumar(self._config.cuenta_por_cobrar, -venta.neto)
 
         filas = []
-        for codigo, importe in importes.items():
-            if not importe:
-                continue
+        for codigo in dict.fromkeys([*debe, *haber]):
             try:
                 cuenta = self._mayor.obtener_cuenta(codigo)
                 denominacion = getattr(cuenta, "denominacion", codigo)
@@ -257,8 +293,8 @@ class VentasService:
             filas.append({
                 "codigo": codigo,
                 "denominacion": denominacion,
-                "debe": importe if importe > CERO else CERO,
-                "haber": abs(importe) if importe < CERO else CERO,
+                "debe": debe.get(codigo, CERO),
+                "haber": haber.get(codigo, CERO),
             })
         return filas
 

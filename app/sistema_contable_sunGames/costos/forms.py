@@ -327,3 +327,15 @@ class EstimacionRefForm(forms.Form):
         help_text=("Elige la versión que corresponde a esta orden. Solo "
                    "aparecen versiones no rechazadas y sin otra orden."),
     )
+
+
+class AmortizacionForm(forms.Form):
+    modalidad = forms.ChoiceField(
+        label="Modalidad",
+        choices=[("ANUAL", "Anual"), ("MENSUAL", "Mensual"),
+                 ("DIARIA", "Diaria")],
+    )
+    vida_util_meses = forms.IntegerField(
+        label="Vida útil (meses)", min_value=1,
+        widget=forms.NumberInput(attrs={"min": "1", "step": "1"}),
+    )

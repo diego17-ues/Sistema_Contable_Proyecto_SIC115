@@ -87,6 +87,10 @@ class RepoEnMemoria:
         venta.transaccion_id = transaccion.pk
         return venta
 
+    def marcar_cobrada(self, venta, transaccion):
+        venta.transaccion_cobro_id = transaccion.pk
+        return venta
+
     def obtener(self, identificador):
         return self.ventas[identificador]
 
@@ -185,8 +189,8 @@ class VentasServiceTests(SimpleTestCase):
         self.assertEqual(afectadas["4302"]["debe"], Decimal("12.00"))
         self.assertEqual(afectadas["5101"]["haber"], Decimal("39.98"))
         self.assertEqual(segundo.conciliadas, 1)
-        self.assertEqual(len(mayor.movimientos), 3)
-        self.assertEqual(mayor.transacciones, 1)
+        self.assertEqual(len(mayor.movimientos), 5)
+        self.assertEqual(mayor.transacciones, 2)
         self.assertEqual(venta.estado, EstadoVenta.REGISTRADA)
 
     def test_conciliacion_repite_evento_sin_duplicar_asiento(self):
@@ -202,8 +206,8 @@ class VentasServiceTests(SimpleTestCase):
 
         self.assertEqual(segunda.conciliadas, 1)
         self.assertEqual(segunda.total, primera.total)
-        self.assertEqual(len(mayor.movimientos), 3)
-        self.assertEqual(mayor.transacciones, 1)
+        self.assertEqual(len(mayor.movimientos), 5)
+        self.assertEqual(mayor.transacciones, 2)
         self.assertEqual(venta.estado, EstadoVenta.REGISTRADA)
 
     def test_administrador_tambien_puede_contabilizar(self):
@@ -522,8 +526,8 @@ class VentasIntegracionTests(TestCase):
         )
         self.assertEqual(segunda.status_code, 200, segunda.content)
         self.assertEqual(segunda.json()["conciliadas"], 1)
-        self.assertEqual(Movimiento.objects.count(), 3)
-        self.assertEqual(Transaccion.objects.count(), 1)
+        self.assertEqual(Movimiento.objects.count(), 5)
+        self.assertEqual(Transaccion.objects.count(), 2)
         self.assertEqual(RegistroBitacora.objects.filter(
             accion=Accion.CONCILIACION_VENTAS
         ).count(), 2)

@@ -56,6 +56,11 @@ class Venta(models.Model):
         Transaccion, on_delete=models.PROTECT, null=True, blank=True,
         related_name="venta",
     )
+    transaccion_cobro = models.OneToOneField(
+        Transaccion, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="venta_cobrada",
+        help_text="Conciliación: Debe Bancos / Haber Cuentas por cobrar.",
+    )
     fecha_recepcion = models.DateTimeField("recibida", auto_now_add=True)
 
     class Meta:

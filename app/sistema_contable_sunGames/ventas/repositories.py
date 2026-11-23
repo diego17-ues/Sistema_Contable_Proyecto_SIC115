@@ -61,6 +61,13 @@ class VentaRepository:
             fecha_recepcion__lte=hasta,
         ).exists()
 
+    def marcar_cobrada(self, venta, transaccion_mayor):
+        venta.transaccion_cobro = transaccion_mayor
+        try:
+            venta.save(update_fields=["transaccion_cobro"])
+        except DatabaseError as exc:
+            raise ContabilizacionError() from exc
+
     def marcar_registrada(self, venta, transaccion_mayor):
         venta.estado = EstadoVenta.REGISTRADA
         venta.transaccion = transaccion_mayor

@@ -11,8 +11,10 @@ from libro_mayor.models import (
 )
 
 from .models import (
+    AmortizacionVideojuego,
     AsientoCosto,
     ConfiguracionCuentaCosto,
+    ParametroAmortizacion,
     ParametrosCostosManoObra,
     CuentaIndirectaExcluida,
     FuenteIndirecta,
@@ -133,10 +135,10 @@ class CostosRepository:
         registros = RegistroCosto.objects.filter(
             estado=RegistroCosto.ESTADO_VIGENTE,
             fecha__lte=hasta,
-            cuenta_costo__codigo__in=("4101", "4102"),
         )
-        if periodo is not None:
-            registros = registros.filter(fecha__gte=periodo.fecha_inicio)
+        # Pendiente acumulado hasta la fecha: se descuentan los traslados
+        # activos de cualquier período, para que cierres mensuales, anuales
+        # o solapados no capitalicen dos veces el mismo costo.
         if orden is not None:
             registros = registros.filter(orden=orden)
         filas = list(registros.values(
@@ -157,10 +159,6 @@ class CostosRepository:
                 revierte__isnull=True,
                 reversion__isnull=True,
             )
-            if periodo is not None:
-                reclasificaciones = reclasificaciones.filter(
-                    periodo=periodo
-                )
             ya_reclasificado = (
                 reclasificaciones.aggregate(total=Sum("importe"))["total"]
                 or 0
@@ -209,6 +207,69 @@ class CostosRepository:
             revierte__isnull=True,
             reversion__isnull=True,
         ).exists()
+
+    # ---- Amortización de videojuegos terminados ----
+    def parametro_amortizacion(self):
+        return ParametroAmortizacion.objects.order_by("pk").first()
+
+    def guardar_parametro_amortizacion(self, *, modalidad, vida_util_meses):
+        parametro = self.parametro_amortizacion() or ParametroAmortizacion()
+        parametro.modalidad = modalidad
+        parametro.vida_util_meses = vida_util_meses
+        parametro.save()
+        return parametro
+
+    def ordenes_terminadas_amortizables(self, hasta):
+        """Por orden: base en 1107 (traslados activos) y fecha de inicio."""
+        traslados = ReclasificacionCosto.objects.filter(
+            cuenta_destino__codigo="1107",
+            revierte__isnull=True, reversion__isnull=True,
+        ).annotate(fecha=Min("transaccion__movimientos__fecha"))
+        ordenes = {}
+        for traslado in traslados.order_by("orden_id", "pk"):
+            if traslado.fecha > hasta:
+                continue
+            fila = ordenes.setdefault(traslado.orden_id, {
+                "orden_id": traslado.orden_id, "base": 0,
+                "inicio": traslado.fecha,
+            })
+            fila["base"] += traslado.importe
+            fila["inicio"] = min(fila["inicio"], traslado.fecha)
+        return list(ordenes.values())
+
+    def amortizado_activo(self, orden_id, *, excluir_periodo=None):
+        qs = AmortizacionVideojuego.objects.filter(
+            orden_id=orden_id, revierte__isnull=True,
+            reversion__isnull=True,
+        )
+        if excluir_periodo is not None:
+            qs = qs.exclude(periodo=excluir_periodo)
+        return qs.aggregate(t=Sum("importe"))["t"]
+
+    def ultima_amortizacion_hasta(self, orden_id):
+        return AmortizacionVideojuego.objects.filter(
+            orden_id=orden_id, revierte__isnull=True,
+            reversion__isnull=True,
+        ).aggregate(h=Max("hasta"))["h"]
+
+    def amortizacion_activa(self, periodo, orden_id):
+        return AmortizacionVideojuego.objects.filter(
+            periodo=periodo, orden_id=orden_id, revierte__isnull=True,
+            reversion__isnull=True,
+        ).first()
+
+    def amortizaciones_activas(self, periodo):
+        return list(AmortizacionVideojuego.objects.filter(
+            periodo=periodo, revierte__isnull=True, reversion__isnull=True,
+        ).select_related("orden"))
+
+    def siguiente_ciclo_amortizacion(self, periodo, orden_id):
+        return AmortizacionVideojuego.objects.filter(
+            periodo=periodo, orden_id=orden_id, revierte__isnull=True,
+        ).count() + 1
+
+    def crear_amortizacion(self, **datos):
+        return AmortizacionVideojuego.objects.create(**datos)
 
     def crear_reclasificacion(self, **datos):
         return ReclasificacionCosto.objects.create(**datos)

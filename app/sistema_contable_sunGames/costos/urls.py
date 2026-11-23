@@ -17,6 +17,8 @@ urlpatterns = [
          views.evaluar_rentabilidad, name="costos_evaluar_rentabilidad"),
     path("nueva/", views.orden_nueva, name="costos_orden_nueva"),
     path("catalogos/", views.catalogos, name="costos_catalogos"),
+    path("catalogos/amortizacion/", views.amortizacion_editar,
+         name="costos_amortizacion_editar"),
     path("catalogos/proceso/nuevo/", views.proceso_nuevo,
          name="costos_proceso_nuevo"),
     path("catalogos/proceso/<int:proceso_id>/", views.proceso_editar,

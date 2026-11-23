@@ -14,6 +14,7 @@ Reglas:
 """
 
 from contextlib import nullcontext
+from datetime import timedelta
 from decimal import Decimal
 
 from django.db import IntegrityError
@@ -91,6 +92,8 @@ class ReclasificacionCostoService(CostosService):
 
     CUENTA_PROCESO = "1106"
     CUENTA_TERMINADO = "1107"
+    CUENTA_COSTO_VENTAS = "4104"
+    CUENTA_AMORTIZACION = "1108"
 
     def __init__(self, repositorio, mayor, bitacora, transaccion=nullcontext):
         super().__init__(repositorio, bitacora, transaccion)
@@ -126,9 +129,85 @@ class ReclasificacionCostoService(CostosService):
                        f"{cuenta_origen.pk}"),
                 fecha=periodo.fecha_fin,
             )
+        self.amortizar_periodo(actor, periodo)
+
+    def amortizar_periodo(self, actor, periodo):
+        """Cuota del período de cada videojuego terminado (una sola vez).
+
+        Debe Costo de ventas / Haber Amortización acumulada de videojuegos,
+        según la modalidad configurada. El tramo empieza después de lo ya
+        amortizado, así un cierre anual no repite meses de cierres
+        provisionales previos.
+        """
+        parametro = self._repo.parametro_amortizacion()
+        if parametro is None:
+            return []
+        creadas = []
+        for fila in self._repo.ordenes_terminadas_amortizables(
+                periodo.fecha_fin):
+            if self._repo.amortizacion_activa(periodo, fila["orden_id"]):
+                continue
+            ultima = self._repo.ultima_amortizacion_hasta(fila["orden_id"])
+            desde = max(fila["inicio"], periodo.fecha_inicio)
+            if ultima is not None:
+                desde = max(desde, ultima + timedelta(days=1))
+            cuota = calculos.cuota_amortizacion(
+                base=fila["base"],
+                acumulado=self._repo.amortizado_activo(fila["orden_id"]),
+                vida_util_meses=parametro.vida_util_meses,
+                modalidad=parametro.modalidad, desde=desde,
+                hasta=periodo.fecha_fin,
+            )
+            if cuota <= 0:
+                continue
+            orden = self._repo.obtener_orden(fila["orden_id"],
+                                             incluir_eliminada=True)
+            ciclo = self._repo.siguiente_ciclo_amortizacion(periodo,
+                                                            orden.pk)
+            creadas.append(self._asentar_amortizacion(
+                actor, periodo=periodo, orden=orden, importe=cuota,
+                base=fila["base"], modalidad=parametro.modalidad,
+                desde=desde, hasta=periodo.fecha_fin,
+                clave=f"amortiza-{periodo.pk}-{orden.pk}-{ciclo}",
+            ))
+        return creadas
+
+    def _asentar_amortizacion(self, actor, *, periodo, orden, importe, base,
+                              modalidad, desde, hasta, clave, revierte=None):
+        signo = -1 if revierte else 1
+        transaccion = self._mayor.crear_transaccion(usuario=actor)
+        concepto = (f"{'Reversión de a' if revierte else 'A'}mortización "
+                    f"videojuego OT-{orden.pk}")[:200]
+        referencia = f"OT-{orden.pk} · {clave}"[:40]
+        try:
+            for codigo, importe_linea in (
+                    (self.CUENTA_COSTO_VENTAS, signo * importe),
+                    (self.CUENTA_AMORTIZACION, -signo * importe)):
+                self._mayor.crear_movimiento(
+                    transaccion=transaccion, cuenta=self._cuenta(codigo),
+                    fecha=periodo.fecha_fin, concepto=concepto,
+                    referencia=referencia, tipo=TipoMovimiento.DIARIO,
+                    importe=importe_linea,
+                )
+        except LibroMayorError as exc:
+            raise PeriodoNoAbiertoError(str(exc)) from exc
+        return self._repo.crear_amortizacion(
+            periodo=periodo, orden=orden, transaccion=transaccion,
+            importe=importe, base=base, modalidad=modalidad, desde=desde,
+            hasta=hasta, revierte=revierte, clave_idempotencia=clave,
+        )
 
     def revertir_cierre(self, actor, periodo):
         """Revierte las reclasificaciones que afectan el período reabierto."""
+        for amortizacion in self._repo.amortizaciones_activas(periodo):
+            self._asentar_amortizacion(
+                actor, periodo=periodo, orden=amortizacion.orden,
+                importe=amortizacion.importe, base=amortizacion.base,
+                modalidad=amortizacion.modalidad,
+                desde=amortizacion.desde, hasta=amortizacion.hasta,
+                clave=f"reversion-amortiza-{amortizacion.pk}",
+                revierte=amortizacion,
+            )
         cierres = list(self._repo.traslados_costo(
             periodo=periodo, tipo=ReclasificacionCosto.TIPO_CIERRE,
             solo_activos=True,
@@ -1001,6 +1080,29 @@ class RegistroCostoService(CostosService):
 
 class CatalogoCostosService(CostosService):
     """Procesos y configuración de cuentas por elemento."""
+
+    def parametro_amortizacion(self, actor):
+        _verificar(actor)
+        return self._repo.parametro_amortizacion()
+
+    def guardar_parametro_amortizacion(self, actor, *, modalidad,
+                                       vida_util_meses):
+        _verificar(actor)
+        if not vida_util_meses or int(vida_util_meses) <= 0:
+            raise DatosInsuficientesError(
+                "La vida útil debe ser mayor que cero.",
+                campo="vida_util_meses",
+            )
+        with self._transaccion():
+            parametro = self._repo.guardar_parametro_amortizacion(
+                modalidad=modalidad, vida_util_meses=int(vida_util_meses),
+            )
+            self._auditar(
+                actor, Accion.CATALOGO_COSTOS, "Amortización de videojuegos",
+                f"{parametro.get_modalidad_display()} · "
+                f"{parametro.vida_util_meses} meses",
+            )
+        return parametro
 
     def procesos(self, actor):
         _verificar(actor)

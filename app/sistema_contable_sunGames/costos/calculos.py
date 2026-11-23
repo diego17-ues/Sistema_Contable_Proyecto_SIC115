@@ -214,3 +214,33 @@ def resumir(registros, elementos):
     procesos = sorted(por_proceso.values(),
                       key=lambda f: (f["proceso"] is None, f["proceso"] or ""))
     return por_elemento, procesos, sum(por_elemento.values(), CERO)
+
+
+def cuota_amortizacion(*, base, acumulado, vida_util_meses, modalidad,
+                       desde, hasta):
+    """Cuota de amortización lineal del tramo [desde, hasta].
+
+    - DIARIA: base × días / días de vida útil (meses × 365 / 12).
+    - MENSUAL: base × meses tocados por el tramo / vida útil en meses.
+    - ANUAL: base × 12 / vida útil por cada 31/12 incluido en el tramo.
+    Nunca supera el saldo pendiente (base − acumulado).
+    """
+    base, acumulado = Decimal(base), Decimal(acumulado or 0)
+    pendiente = base - acumulado
+    if desde > hasta or pendiente <= 0:
+        return CERO
+    vida = Decimal(vida_util_meses)
+    if modalidad == "DIARIA":
+        dias = Decimal((hasta - desde).days + 1)
+        cuota = base * dias * 12 / (vida * 365)
+    elif modalidad == "ANUAL":
+        cierres = sum(
+            1 for anio in range(desde.year, hasta.year + 1)
+            if desde <= desde.replace(year=anio, month=12, day=31) <= hasta
+        )
+        cuota = base * 12 * cierres / vida
+    else:
+        meses = ((hasta.year - desde.year) * 12
+                 + hasta.month - desde.month + 1)
+        cuota = base * meses / vida
+    return min(a_centavos(cuota), pendiente)

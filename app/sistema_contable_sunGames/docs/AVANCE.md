@@ -319,3 +319,32 @@ punto de acceso por rol.
   `docs/PROPUESTA_COMPARACION.md`; no implementado.
 - Costeo real por órdenes de trabajo: fuera de esta sesión.
 - Definiciones abiertas en `docs/PREGUNTAS.md`.
+
+## Estados financieros congruentes por período (costo de ventas, amortización, depreciación)
+
+- Estado de Resultados: la serie 41 capitalizable (4101, 4102, 4103) ya
+  no es gasto del período; el costo de ventas es solo 4104. Se agrega la
+  nota «Depreciación y amortización del período» (abonos netos a 1108,
+  1203 y 1205).
+- Balance General: la serie 41 aún no trasladada se presenta en el
+  activo; la utilidad del ejercicio (desde el 1 de enero hasta el fin del
+  período) se separa de resultados acumulados, de modo que cuadra con
+  cualquier período cerrado (mensual, provisional o anual).
+- Cierre: el pendiente de capitalizar se calcula acumulado y descuenta
+  traslados de cualquier período (antes un cierre mensual después de una
+  finalización registrada en el ejercicio anual capitalizaba dos veces).
+  Se trasladan 4101, 4102 y 4103.
+- Amortización de videojuegos terminados al cierre: Debe 4104 / Haber
+  1108, modalidad anual, mensual o diaria configurable en Costos ·
+  Catálogos (`ParametroAmortizacion`, por defecto mensual a 48 meses).
+  Cada tramo empieza donde terminó el anterior, así que períodos
+  solapados no repiten cuotas; reabrir el cierre revierte la cuota.
+- Conciliación de ventas: asienta el cobro Debe 1103 / Haber 1104 una sola
+  vez por venta (`Venta.transaccion_cobro`). TODO CU-08.3: la diferencia
+  entre liquidación real y registrada queda pendiente porque el formato
+  de liquidación de Steam no está definido.
+- Migraciones: costos 0012 y 0013 (agrega 1203 y 1205 como
+  contrapartidas de CIF), ventas 0004.
+- Pruebas: `estados_financieros/tests/test_congruencia.py`. Las 14
+  pruebas de costos/ventas/estados que ya fallaban en `2fc2cac` siguen
+  igual; no se modificaron.

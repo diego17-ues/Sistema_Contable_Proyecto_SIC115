@@ -49,6 +49,11 @@ def _verificar(actor, roles):
         raise RolNoAutorizadoError()
 
 
+def inicio_ejercicio(fecha):
+    """Ejercicio fiscal calendario (El Salvador): 1 de enero."""
+    return fecha.replace(month=1, day=1)
+
+
 def _validar_rango(desde, hasta):
     if not desde or not hasta or desde > hasta:
         raise RangoInvalidoError(campo="desde")
@@ -100,7 +105,11 @@ class EstadosFinancierosService:
             )
         if tipo == TipoEstado.BALANCE_GENERAL:
             return calculo.balance_general(
-                periodo, self._repositorio.saldos(hasta=periodo.fecha_fin)
+                periodo, self._repositorio.saldos(hasta=periodo.fecha_fin),
+                self._repositorio.saldos(
+                    desde=inicio_ejercicio(periodo.fecha_fin),
+                    hasta=periodo.fecha_fin,
+                ),
             )
         if tipo == TipoEstado.ESTADO_RESULTADOS:
             return calculo.estado_resultados(periodo, self._repositorio.saldos(

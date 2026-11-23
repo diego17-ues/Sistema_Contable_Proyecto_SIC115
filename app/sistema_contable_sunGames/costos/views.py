@@ -23,6 +23,7 @@ from .composition import (
 )
 from .exceptions import CostosError
 from .forms import (
+    AmortizacionForm,
     AplicarIndirectosForm,
     AnularForm,
     ConfiguracionCuentaForm,
@@ -554,10 +555,14 @@ def _render_catalogos(request, **extra):
         cuentas_fuentes = servicio.cuentas_fuentes_disponibles(request.user)
         cuentas_excluidas = servicio.cuentas_indirectas_excluidas(request.user)
         cuentas_activas = servicio.cuentas(request.user)
+        amortizacion = servicio.parametro_amortizacion(request.user)
     except SIN_PERMISO as error:
         _sin_permiso(error)
     contexto = _contexto(request)
     contexto.update(
+        amortizacion=amortizacion,
+        amortizacion_modalidades=[("ANUAL", "Anual"), ("MENSUAL", "Mensual"),
+                                  ("DIARIA", "Diaria")],
         procesos=procesos,
         fuentes_indirectas=fuentes_indirectas,
         cuentas_fuentes=cuentas_fuentes,
@@ -573,6 +578,27 @@ def _render_catalogos(request, **extra):
 @login_required
 def catalogos(request):
     return _render_catalogos(request)
+
+
+@login_required
+@require_POST
+def amortizacion_editar(request):
+    form = AmortizacionForm(request.POST)
+    if form.is_valid():
+        try:
+            crear_catalogo_costos_service().guardar_parametro_amortizacion(
+                request.user, **form.cleaned_data
+            )
+        except SIN_PERMISO as error:
+            _sin_permiso(error)
+        except CostosError as error:
+            messages.error(request, str(error))
+        else:
+            messages.success(request, "Amortización de videojuegos "
+                                      "actualizada.")
+    else:
+        messages.error(request, "Revisa la modalidad y la vida útil.")
+    return redirect("costos_catalogos")
 
 
 @login_required
