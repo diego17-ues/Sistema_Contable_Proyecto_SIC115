@@ -130,6 +130,9 @@ def balance_general(periodo, saldos, saldos_ejercicio=None):
     }
 
 
+MENOS, MAS = "(−) ", "(+) "
+
+
 def estado_resultados(periodo, saldos):
     """Por función, con los saldos del rango del período."""
     resultados = [cuenta for cuenta in _con_saldo(saldos)
@@ -147,10 +150,12 @@ def estado_resultados(periodo, saldos):
     especiales = c.INGRESOS_ORDINARIOS | c.INGRESOS_FINANCIEROS
     filas = []
 
-    def bloque(titulo, cuentas, siempre=False):
+    def bloque(titulo, cuentas, siempre=False, operacion=""):
+        """Sección firmada: los egresos restan (negativo) y los ingresos
+        suman; ``operacion`` rotula si la sección se suma o se resta."""
         if not cuentas and not siempre:
             return CERO
-        filas.append(fila("seccion", titulo))
+        filas.append(fila("seccion", f"{operacion}{titulo}"))
         total = CERO
         for cuenta in cuentas:
             filas.append(fila("cuenta", cuenta.denominacion, -cuenta.saldo,
@@ -162,20 +167,27 @@ def estado_resultados(periodo, saldos):
     bruta = bloque(
         "Ingresos de actividades ordinarias",
         [x for x in ingresos if x.codigo in c.INGRESOS_ORDINARIOS], True,
-    ) + bloque("Costo de ventas", egresos(c.COSTO_VENTAS), True)
+    ) + bloque(
+        "Costo de ventas", egresos(c.COSTO_VENTAS), True, operacion=MENOS,
+    )
     filas.append(fila("total", "Utilidad (pérdida) bruta", bruta))
     operacion = bruta + bloque(
-        "Gastos de administración", egresos(c.GASTOS_ADMINISTRACION)
-    ) + bloque("Gastos de venta", egresos(c.GASTOS_VENTA))
+        "Gastos de administración", egresos(c.GASTOS_ADMINISTRACION),
+        operacion=MENOS,
+    ) + bloque("Gastos de venta", egresos(c.GASTOS_VENTA), operacion=MENOS)
     filas.append(fila("total", "Utilidad (pérdida) de operación", operacion))
     antes = operacion + sum((
         bloque("Ingresos financieros",
-               [x for x in ingresos if x.codigo in c.INGRESOS_FINANCIEROS]),
-        bloque("Gastos financieros", egresos(c.GASTOS_FINANCIEROS)),
+               [x for x in ingresos if x.codigo in c.INGRESOS_FINANCIEROS],
+               operacion=MAS),
+        bloque("Gastos financieros", egresos(c.GASTOS_FINANCIEROS),
+               operacion=MENOS),
         bloque("Otros ingresos",
-               [x for x in ingresos if x.codigo not in especiales]),
+               [x for x in ingresos if x.codigo not in especiales],
+               operacion=MAS),
         bloque("Otros gastos",
-               egresos(c.OTROS_EGRESOS, excluir=c.IMPUESTO_RENTA)),
+               egresos(c.OTROS_EGRESOS, excluir=c.IMPUESTO_RENTA),
+               operacion=MENOS),
     ), CERO)
     filas.append(fila(
         "total", "Utilidad (pérdida) antes de impuesto sobre la renta", antes
@@ -183,6 +195,7 @@ def estado_resultados(periodo, saldos):
     impuesto = bloque(
         "Impuesto sobre la renta",
         [x for x in resultados if x.codigo in c.IMPUESTO_RENTA],
+        operacion=MENOS,
     )
     filas.append(fila("resultado", "Utilidad (pérdida) del período",
                       antes + impuesto))

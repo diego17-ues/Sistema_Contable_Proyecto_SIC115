@@ -14,7 +14,8 @@ SUBTIPOS = {
     "11": "Activo corriente", "12": "Activo no corriente",
     "21": "Pasivo corriente", "22": "Pasivo no corriente",
     "31": "Patrimonio", "41": "Costos de desarrollo",
-    "42": "Gastos de administración", "44": "Gastos financieros",
+    "42": "Gastos de administración", "43": "Gastos de venta",
+    "44": "Gastos financieros",
     "45": "Otros egresos", "51": "Ingresos",
 }
 # Suma cero: Activo 2,200 = Pasivo 700 + Patrimonio 1,000 + utilidad 500.
@@ -95,6 +96,10 @@ class EstadosRepositoryEnMemoria:
 
     def agregados_hoja(self, desde, hasta):
         return []
+
+    def nuevo_periodo(self, *, nombre, desde, hasta):
+        return PeriodoContable(nombre=nombre, fecha_inicio=desde,
+                               fecha_fin=hasta)
 
     def ajustes(self, desde, hasta):
         return []

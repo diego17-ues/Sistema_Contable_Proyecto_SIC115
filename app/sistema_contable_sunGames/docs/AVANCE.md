@@ -387,3 +387,13 @@ punto de acceso por rol.
   Resultados, Cambios en el Patrimonio y la nota de depreciación y
   amortización omiten las cuentas con saldo cero (servidor y pantalla).
   Los totales y la utilidad del ejercicio se siguen mostrando.
+
+## Estado de Resultados completo
+
+- Por función: ingresos ordinarios netos de descuentos (5103), (−) costo
+  de ventas (4104), (−) gastos de administración y de venta, (+/−)
+  financieros y otros, (−) impuesto sobre la renta (4503) = utilidad del
+  período. La serie 41 capitalizable no se resta.
+- La pantalla del período abierto usa el mismo cálculo del servidor
+  (`statements` en la API de la hoja de trabajo) para el Estado de
+  Resultados y el Balance General, en lugar del cálculo propio de app.js.

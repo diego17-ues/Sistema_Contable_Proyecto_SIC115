@@ -32,7 +32,10 @@ from costos.models import (
     Proceso,
 )
 from estados_financieros import calculo, hoja_trabajo
-from estados_financieros.composition import crear_cierre_service
+from estados_financieros.composition import (
+    crear_cierre_service,
+    crear_estados_financieros_service,
+)
 from estados_financieros.models import EstadoFinancieroEmitido, TipoEstado
 from estados_financieros.tests.fakes import cuenta_con_saldo, periodo
 from libro_mayor.models import Movimiento, PeriodoContable, TipoMovimiento
@@ -96,6 +99,31 @@ class CalculoCongruenteTests(SimpleTestCase):
         )
         self.assertEqual([f["code"] for f in hoja["rows"]], ["1101"])
 
+    def test_estado_de_resultados_resta_todo_de_los_ingresos(self):
+        datos = {"5101": "-1500", "5103": "100", "4104": "300",
+                 "4201": "400", "4301": "50", "5104": "-20", "4401": "30",
+                 "5105": "-10", "4501": "5", "4503": "150", "4101": "999"}
+        saldos = [cuenta_con_saldo(c, s) for c, s in sorted(datos.items())]
+        filas = calculo.estado_resultados(periodo(), saldos)["filas"]
+        por_texto = {f["texto"]: f["importe"] for f in filas}
+        esperado = {
+            "Total ingresos de actividades ordinarias": "1400.00",
+            "Total costo de ventas": "-300.00",
+            "Utilidad (pérdida) bruta": "1100.00",
+            "Total gastos de administración": "-400.00",
+            "Total gastos de venta": "-50.00",
+            "Utilidad (pérdida) de operación": "650.00",
+            "Utilidad (pérdida) antes de impuesto sobre la renta": "645.00",
+            "Total impuesto sobre la renta": "-150.00",
+            "Utilidad (pérdida) del período": "495.00",
+        }
+        for texto, importe in esperado.items():
+            self.assertEqual(por_texto[texto], importe, texto)
+        secciones = [f["texto"] for f in filas if f["clase"] == "seccion"]
+        self.assertIn("(−) Costo de ventas", secciones)
+        self.assertIn("(+) Otros ingresos", secciones)
+        self.assertNotIn("4101", {f["codigo"] for f in filas})
+
     def test_cuota_por_modalidad(self):
         base = D("4800.00")
         nov = dict(base=base, acumulado=0, vida_util_meses=48,
@@ -146,6 +174,22 @@ class CongruenciaIntegracionTests(TestCase):
                 referencia="CG", tipo=TipoMovimiento.DIARIO,
                 importe=D(importe),
             )
+
+    def test_pantalla_usa_el_mismo_estado_de_resultados(self):
+        self.contabilidad_general({"1103": "1000", "5101": "-1000"})
+        self.contabilidad_general({"4104": "200", "1107": "-200"})
+        self.contabilidad_general({"4201": "100", "1103": "-100"})
+        hoja = crear_estados_financieros_service().hoja_trabajo(
+            self.general, date(2026, 11, 1), date(2026, 11, 30)
+        )
+        resultados = hoja["statements"]["resultados"]["filas"]
+        utilidad = [f for f in resultados if f["clase"] == "resultado"][0]
+        self.assertEqual(utilidad["importe"], "700.00")
+        balance = hoja["statements"]["balance"]
+        self.assertTrue(balance["cuadra"], balance["diferencia"])
+        ejercicio = [f for f in balance["filas"]
+                     if f["texto"] == "Utilidad (pérdida) del ejercicio"][0]
+        self.assertEqual(ejercicio["importe"], "700.00")
 
     def costo(self, elemento, importe, descripcion="Costo"):
         return self.registros.registrar_costo(

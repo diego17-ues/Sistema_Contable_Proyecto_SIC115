@@ -180,7 +180,27 @@ class EstadosFinancierosService:
     def hoja_trabajo(self, actor, desde, hasta):
         _verificar(actor, ROLES_CONSULTA)
         _validar_rango(desde, hasta)
-        return self._construir_hoja_trabajo(desde, hasta)
+        hoja = self._construir_hoja_trabajo(desde, hasta)
+        hoja["statements"] = self._estados_rango(desde, hasta)
+        return hoja
+
+    def _estados_rango(self, desde, hasta):
+        """Estado de Resultados y Balance del rango con el mismo cálculo
+        que se emite al cerrar, para que la pantalla no use otro."""
+        periodo = self._repositorio.nuevo_periodo(
+            nombre=f"{desde:%d/%m/%Y}–{hasta:%d/%m/%Y}", desde=desde,
+            hasta=hasta,
+        )
+        return {
+            "resultados": calculo.estado_resultados(
+                periodo, self._repositorio.saldos(desde=desde, hasta=hasta)
+            ),
+            "balance": calculo.balance_general(
+                periodo, self._repositorio.saldos(hasta=hasta),
+                self._repositorio.saldos(desde=inicio_ejercicio(hasta),
+                                         hasta=hasta),
+            ),
+        }
 
     def cierre_activo(self, actor):
         """Devuelve el cierre más reciente y sus documentos de consulta."""
