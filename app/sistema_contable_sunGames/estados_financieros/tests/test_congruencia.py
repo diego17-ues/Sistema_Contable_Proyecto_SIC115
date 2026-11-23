@@ -321,3 +321,50 @@ class CongruenciaIntegracionTests(TestCase):
         self.assertEqual(diciembre.desde, date(2026, 12, 1))
         self.assertEqual(diciembre.importe, cuota)
         self.assertEqual(saldo("4104"), -saldo("1108"))
+
+    def test_cierre_provisional_lleva_a_proceso_y_reabrir_lo_regresa(self):
+        self.mano_obra()
+        self.costo(Elemento.DIRECTO, "1200.00")
+        self.costo(Elemento.INDIRECTO, "50.00")
+        por_cuenta = {c: saldo(c) for c in SERIE_41}
+        total = sum(por_cuenta.values())
+        contrapartidas = {c: saldo(c) for c in ("2106", "1103", "1203")}
+        cierre = crear_cierre_service()
+
+        def cerrar():
+            cierre.cerrar_rango(self.general, *NOVIEMBRE,
+                                confirmacion="CONFIRMAR", motivo="Cierre")
+
+        cerrar()
+        self.assertEqual(saldo(*SERIE_41), 0)
+        self.assertEqual(saldo("1106"), total)
+        self.assertEqual(saldo("1107"), 0)
+
+        admin = Usuario.objects.create(
+            username="admin", nombre_completo="Admin",
+            rol=Rol.ADMINISTRADOR, activo=True,
+        )
+        admin.set_password("Clave-2026")
+        admin.save()
+        periodo_cerrado = PeriodoContable.objects.get(
+            fecha_inicio=NOVIEMBRE[0], fecha_fin=NOVIEMBRE[1])
+        cierre.reabrir(admin, periodo_cerrado.pk, contrasena="Clave-2026",
+                       motivo="Ajuste")
+        self.assertEqual({c: saldo(c) for c in SERIE_41}, por_cuenta)
+        self.assertEqual(saldo("1106"), 0)
+
+        cerrar()
+        self.assertEqual(saldo("1106"), total)
+        self.assertEqual(saldo(*SERIE_41), 0)
+        cierre.reabrir(admin, periodo_cerrado.pk, contrasena="Clave-2026",
+                       motivo="Otro ajuste")
+        with mock.patch("costos.services.timezone.localdate",
+                        return_value=date(2026, 11, 15)):
+            self.ordenes.finalizar(self.costos, self.orden.pk)
+        self.assertEqual(saldo("1106"), 0)
+        self.assertEqual(saldo(*SERIE_41), 0)
+        self.assertEqual(saldo("1107"), total)
+        self.assertEqual({c: saldo(c) for c in contrapartidas},
+                         contrapartidas)
+        self.assertEqual(saldo(*Movimiento.objects.values_list(
+            "cuenta__codigo", flat=True).distinct()), 0)
