@@ -130,7 +130,7 @@ def balance_general(periodo, saldos, saldos_ejercicio=None):
     }
 
 
-MENOS, MAS = "(−) ", "(+) "
+MENOS, MAS = "(-) ", "(+) "
 
 
 def estado_resultados(periodo, saldos):

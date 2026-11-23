@@ -390,9 +390,9 @@ punto de acceso por rol.
 
 ## Estado de Resultados completo
 
-- Por función: ingresos ordinarios netos de descuentos (5103), (−) costo
-  de ventas (4104), (−) gastos de administración y de venta, (+/−)
-  financieros y otros, (−) impuesto sobre la renta (4503) = utilidad del
+- Por función: ingresos ordinarios netos de descuentos (5103), (-) costo
+  de ventas (4104), (-) gastos de administración y de venta, (+/-)
+  financieros y otros, (-) impuesto sobre la renta (4503) = utilidad del
   período. La serie 41 capitalizable no se resta.
 - La pantalla del período abierto usa el mismo cálculo del servidor
   (`statements` en la API de la hoja de trabajo) para el Estado de

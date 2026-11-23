@@ -120,7 +120,7 @@ class CalculoCongruenteTests(SimpleTestCase):
         for texto, importe in esperado.items():
             self.assertEqual(por_texto[texto], importe, texto)
         secciones = [f["texto"] for f in filas if f["clase"] == "seccion"]
-        self.assertIn("(−) Costo de ventas", secciones)
+        self.assertIn("(-) Costo de ventas", secciones)
         self.assertIn("(+) Otros ingresos", secciones)
         self.assertNotIn("4101", {f["codigo"] for f in filas})
 
