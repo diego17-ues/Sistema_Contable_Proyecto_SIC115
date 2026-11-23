@@ -366,3 +366,17 @@ punto de acceso por rol.
   Haber 4207/4208); el módulo de costos no las recalcula.
 - Migraciones: costos 0013 y 0014, ventas 0004.
 - Pruebas: `estados_financieros/tests/test_congruencia.py`.
+
+## Costos: contrapartidas que cuadran con Videojuegos terminados
+
+- Cada registro de costo vuelve a ser un asiento cuadrado: Debe serie 41
+  · Haber contrapartida configurada por elemento (mano de obra 2106,
+  directos 1103, indirectos 1203; editables en Costos · Catálogos). Los
+  indirectos automáticos guardan como contrapartida su cuenta de origen.
+- Al finalizar la orden la serie 41 pasa a 1107; las contrapartidas
+  (p. ej. 2106 Sueldos y prestaciones por pagar) conservan su saldo hasta
+  que contabilidad general registre el pago, por lo que 1107 queda
+  respaldado sin descuadre.
+- Mano de obra sigue siendo horas × costo por hora, sin desglose.
+- Migración `costos.0015_contrapartida_registros` (campos nulos para los
+  registros anteriores y semilla de contrapartidas).

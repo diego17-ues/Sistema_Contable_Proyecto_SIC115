@@ -144,9 +144,9 @@ class Proceso(models.Model):
 class ConfiguracionCuentaCosto(models.Model):
     """Cuenta del catálogo por elemento del costo.
 
-    Los cargos de la orden se acumulan únicamente en la cuenta de costo
-    configurada; no hay contrapartida. Sin configuración el elemento
-    queda bloqueado.
+    Debe a la cuenta de costo (serie 41) y haber a la contrapartida
+    (2106 sueldos por pagar, Bancos o acumulada), que conserva su saldo
+    hasta el pago. Sin configuración el elemento queda bloqueado.
     """
 
     elemento = models.CharField(
@@ -154,6 +154,10 @@ class ConfiguracionCuentaCosto(models.Model):
     )
     cuenta_costo = models.ForeignKey(
         Cuenta, on_delete=models.PROTECT, related_name="config_costo_debe"
+    )
+    contrapartida = models.ForeignKey(
+        Cuenta, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="config_costo_haber", verbose_name="contrapartida",
     )
 
     class Meta:
@@ -260,6 +264,10 @@ class RegistroCosto(models.Model):
     )
     cuenta_costo = models.ForeignKey(
         Cuenta, on_delete=models.PROTECT, related_name="registros_costo_debe"
+    )
+    contrapartida = models.ForeignKey(
+        Cuenta, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="registros_costo_haber",
     )
     fuente_indirecta = models.ForeignKey(
         FuenteIndirecta, on_delete=models.PROTECT, null=True, blank=True,

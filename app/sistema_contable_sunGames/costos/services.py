@@ -900,14 +900,23 @@ class RegistroCostoService(CostosService):
         self._verificar_periodo(fecha)
         config = self._config(elemento)
         cuenta_costo = self._cuenta_valida(config.cuenta_costo)
-        lineas = calculos.linea_acumulacion(cuenta_costo, importe)
+        if config.contrapartida is None:
+            raise ConfiguracionNoEncontradaError(
+                f"Configura la contrapartida de {Elemento(elemento).label} "
+                "en Costos · Catálogos."
+            )
+        contrapartida = self._cuenta_valida(config.contrapartida)
+        lineas = calculos.lineas_registro(cuenta_costo, contrapartida,
+                                          importe)
+        if not calculos.cuadra(lineas):
+            raise AsientoDescuadradoError("El asiento no cuadra.")
         try:
             with self._transaccion():
                 registro = self._repo.crear_registro(
                     orden=orden, elemento=elemento, fecha=fecha,
                     proceso=proceso, descripcion=descripcion[:200],
                     horas=horas, costo_hora=costo_hora, importe=importe,
-                    cuenta_costo=cuenta_costo,
+                    cuenta_costo=cuenta_costo, contrapartida=contrapartida,
                     clave_idempotencia=clave, usuario=actor,
                 )
                 self._asentar(
@@ -1228,7 +1237,8 @@ class CatalogoCostosService(CostosService):
             )
         return cuenta
 
-    def guardar_configuracion(self, actor, *, elemento, cuenta_costo):
+    def guardar_configuracion(self, actor, *, elemento, cuenta_costo,
+                              contrapartida):
         _verificar(actor)
         if elemento not in Elemento.values:
             raise DatosInsuficientesError("Elemento del costo no válido.")
@@ -1237,14 +1247,25 @@ class CatalogoCostosService(CostosService):
                 "La cuenta de costo no existe o está inactiva.",
                 campo="cuenta_costo",
             )
+        if contrapartida is None or not contrapartida.activa:
+            raise CuentaNoValidaError(
+                "La contrapartida no existe o está inactiva.",
+                campo="contrapartida",
+            )
+        if contrapartida == cuenta_costo:
+            raise CuentaNoValidaError(
+                "La cuenta de costo no puede ser su propia contrapartida.",
+                campo="contrapartida",
+            )
         with self._transaccion():
             config = self._repo.guardar_configuracion(
                 elemento=elemento, cuenta_costo=cuenta_costo,
+                contrapartida=contrapartida,
             )
             self._auditar(
                 actor, Accion.CATALOGO_COSTOS,
                 f"Cuentas {Elemento(elemento).label}",
-                f"Cuenta de costo {cuenta_costo.codigo}",
+                f"Debe {cuenta_costo.codigo} · haber {contrapartida.codigo}",
             )
         return config
 
@@ -1539,7 +1560,7 @@ class AplicacionIndirectosService(CostosService):
             fecha=periodo.fecha_fin, proceso=fuente.proceso,
             descripcion=descripcion[:200], horas=linea["horas"],
             costo_hora=None, importe=importe,
-            cuenta_costo=cuenta_costo,
+            cuenta_costo=cuenta_costo, contrapartida=fuente.cuenta_origen,
             fuente_indirecta=fuente, periodo_indirecto=periodo,
             clave_idempotencia=clave, usuario=actor,
         )

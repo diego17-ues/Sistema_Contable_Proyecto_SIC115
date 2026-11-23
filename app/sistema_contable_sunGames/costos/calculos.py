@@ -21,6 +21,12 @@ def linea_acumulacion(cuenta_costo, importe):
     return [(cuenta_costo, a_centavos(importe))]
 
 
+def lineas_registro(cuenta_costo, contrapartida, importe):
+    """Debe a la cuenta de costo y haber a la contrapartida."""
+    importe = a_centavos(importe)
+    return [(cuenta_costo, importe), (contrapartida, -importe)]
+
+
 def distribuir_por_horas(pool, horas_por_orden):
     """Distribuye un pool proporcional a las horas de cada orden.
 

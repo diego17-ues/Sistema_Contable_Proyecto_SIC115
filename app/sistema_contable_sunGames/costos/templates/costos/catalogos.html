@@ -33,7 +33,7 @@
         <tr>
           <td><strong>{{ nombre }}</strong></td>
           {% if config %}
-          <td>{{ config.cuenta_costo.codigo }} · {{ config.cuenta_costo.denominacion }}</td>
+          <td>{{ config.cuenta_costo.codigo }} · {{ config.cuenta_costo.denominacion }}<br><small>Haber: {% if config.contrapartida %}{{ config.contrapartida.codigo }} · {{ config.contrapartida.denominacion }}{% else %}sin contrapartida · bloqueado{% endif %}</small></td>
           {% else %}
           <td><span class="tag tag-warn">Sin configurar · bloqueado</span></td>
           {% endif %}

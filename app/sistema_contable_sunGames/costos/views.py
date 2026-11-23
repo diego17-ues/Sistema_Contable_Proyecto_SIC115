@@ -652,7 +652,8 @@ def configuracion_editar(request, elemento):
         _sin_permiso(error)
     inicial = None
     if actual is not None:
-        inicial = {"cuenta_costo": str(actual.cuenta_costo_id)}
+        inicial = {"cuenta_costo": str(actual.cuenta_costo_id),
+                   "contrapartida": str(actual.contrapartida_id or "")}
     form = ConfiguracionCuentaForm(
         request.POST if request.method == "POST" else None,
         initial=inicial, cuentas=cuentas,
@@ -662,6 +663,7 @@ def configuracion_editar(request, elemento):
             servicio.guardar_configuracion(
                 request.user, elemento=elemento,
                 cuenta_costo=form.cuenta_elegida(),
+                contrapartida=form.contrapartida_elegida(),
             )
         except SIN_PERMISO as error:
             _sin_permiso(error)

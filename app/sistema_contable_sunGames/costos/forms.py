@@ -164,14 +164,21 @@ class ConfiguracionCuentaForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.cuentas = {str(c.pk): c for c in cuentas}
         opciones = [(pk, _cuenta(c)) for pk, c in self.cuentas.items()]
-        self.fields["cuenta_costo"].choices = (
-            [("", "— Seleccione —")] + opciones
-        )
+        vacio = [("", "— Seleccione —")]
+        self.fields["cuenta_costo"].choices = vacio + opciones
+        self.fields["contrapartida"].choices = vacio + opciones
 
-    cuenta_costo = forms.ChoiceField(label="Cuenta de costo")
+    cuenta_costo = forms.ChoiceField(label="Cuenta de costo (debe)")
+    contrapartida = forms.ChoiceField(
+        label="Contrapartida (haber)",
+        help_text="Conserva su saldo hasta el pago (p. ej. 2106).",
+    )
 
     def cuenta_elegida(self):
         return self.cuentas[self.cleaned_data["cuenta_costo"]]
+
+    def contrapartida_elegida(self):
+        return self.cuentas[self.cleaned_data["contrapartida"]]
 
 
 class FuenteIndirectaForm(forms.Form):

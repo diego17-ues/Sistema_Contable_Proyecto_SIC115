@@ -141,16 +141,15 @@ class CongruenciaIntegracionTests(TestCase):
     def test_1_mano_de_obra_176_horas(self):
         registro = self.mano_obra()
         self.assertEqual(registro.importe, D("880.00"))
-        self.assertEqual(self.movimientos(registro), {"4101": D("880.00")})
-        self.contabilidad_general({"2106": "-880.00"},
-                                  "Planilla por pagar")
+        self.assertEqual(self.movimientos(registro),
+                         {"4101": D("880.00"), "2106": D("-880.00")})
         self.assertEqual(saldo(*SERIE_41), D("880.00"))
         self.assertEqual(saldo("2106"), D("-880.00"))
 
-    def test_2_costo_directo_y_pago_en_bancos(self):
+    def test_2_costo_directo_contra_bancos(self):
         registro = self.costo(Elemento.DIRECTO, "1200.00")
-        self.assertEqual(self.movimientos(registro), {"4102": D("1200.00")})
-        self.contabilidad_general({"1103": "-1200.00"}, "Pago proveedor")
+        self.assertEqual(self.movimientos(registro),
+                         {"4102": D("1200.00"), "1103": D("-1200.00")})
         self.assertEqual(saldo("4102"), D("1200.00"))
         self.assertEqual(saldo("1103"), D("-1200.00"))
 
@@ -205,7 +204,6 @@ class CongruenciaIntegracionTests(TestCase):
     def test_5_y_6_cierre_serie_41_cero_y_costo_ventas_igual_cuota(self):
         self.mano_obra()
         self.costo(Elemento.DIRECTO, "1200.00")
-        self.contabilidad_general({"2106": "-880.00", "1103": "-1200.00"})
         self.vender_y_conciliar()
         base = saldo(*SERIE_41)
         with mock.patch("costos.services.timezone.localdate",
@@ -218,6 +216,8 @@ class CongruenciaIntegracionTests(TestCase):
         cuota = (base / 48).quantize(D("0.01"))
         self.assertEqual(saldo(*SERIE_41), 0)
         self.assertEqual(saldo("1107"), base)
+        # La contrapartida conserva su saldo hasta el pago de la planilla.
+        self.assertEqual(saldo("2106"), D("-880.00"))
         self.assertEqual(saldo("4104"), cuota)
         self.assertEqual(saldo("1108"), -cuota)
         self.assertEqual(AmortizacionVideojuego.objects.get().importe, cuota)

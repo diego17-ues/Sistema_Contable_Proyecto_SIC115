@@ -331,16 +331,18 @@ class CostosRepository:
     # ---- Configuración de cuentas ----
     def configuraciones(self):
         return ConfiguracionCuentaCosto.objects.select_related(
-            "cuenta_costo"
+            "cuenta_costo", "contrapartida"
         )
 
     def configuracion(self, elemento):
         return self.configuraciones().filter(elemento=elemento).first()
 
-    def guardar_configuracion(self, *, elemento, cuenta_costo):
+    def guardar_configuracion(self, *, elemento, cuenta_costo,
+                              contrapartida):
         config, _ = ConfiguracionCuentaCosto.objects.update_or_create(
             elemento=elemento,
-            defaults={"cuenta_costo": cuenta_costo},
+            defaults={"cuenta_costo": cuenta_costo,
+                      "contrapartida": contrapartida},
         )
         return config
 
