@@ -444,6 +444,9 @@ class CierrePeriodoService:
     def _emitir_y_cerrar(self, actor, periodo, motivo):
         if periodo.pk is None:
             self._repositorio.guardar_periodo(periodo)
+        if self._ventas is not None:
+            self._ventas.conciliar_cierre(actor, periodo.fecha_inicio,
+                                          periodo.fecha_fin)
         if self._costos is not None:
             self._costos.trasladar_cierre(actor, periodo)
         for tipo, datos in self._estados.calcular_todos(periodo).items():

@@ -209,7 +209,13 @@ class CostosRepository:
 
     # ---- Amortización de videojuegos terminados ----
     def parametro_amortizacion(self):
-        return ParametroAmortizacion.objects.order_by("pk").first()
+        """Parámetro guardado o, si la base se vació, el de la migración
+        0014 (mensual a 48 meses) para que el cierre siempre amortice."""
+        return (ParametroAmortizacion.objects.order_by("pk").first()
+                or ParametroAmortizacion(
+                    modalidad=ParametroAmortizacion.MODALIDAD_MENSUAL,
+                    vida_util_meses=48,
+                ))
 
     def guardar_parametro_amortizacion(self, *, modalidad, vida_util_meses):
         parametro = self.parametro_amortizacion() or ParametroAmortizacion()

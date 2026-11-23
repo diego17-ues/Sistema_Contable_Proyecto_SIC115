@@ -6,7 +6,13 @@ from .exceptions import (
     VentaDuplicadaError,
     VentaNoEncontradaError,
 )
-from .models import ConexionSteam, EstadoVenta, OrigenVenta, Venta
+from .models import (
+    ConciliacionVentas,
+    ConexionSteam,
+    EstadoVenta,
+    OrigenVenta,
+    Venta,
+)
 
 
 def _rango_fecha_hora(desde, hasta):
@@ -60,6 +66,22 @@ class VentaRepository:
             fecha_recepcion__gte=desde,
             fecha_recepcion__lte=hasta,
         ).exists()
+
+    def bloquear_conciliacion(self):
+        """Serializa las conciliaciones concurrentes (fila única)."""
+        ConexionSteam.objects.get_or_create(pk=1)
+        ConexionSteam.objects.select_for_update().get(pk=1)
+
+    def conciliacion_que_se_solapa(self, desde, hasta):
+        return ConciliacionVentas.objects.filter(
+            desde__lte=hasta, hasta__gte=desde
+        ).order_by("desde").first()
+
+    def crear_conciliacion(self, **datos):
+        try:
+            return ConciliacionVentas.objects.create(**datos)
+        except DatabaseError as exc:
+            raise ContabilizacionError() from exc
 
     def marcar_cobrada(self, venta, transaccion_mayor):
         venta.transaccion_cobro = transaccion_mayor

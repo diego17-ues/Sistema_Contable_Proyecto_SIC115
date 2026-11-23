@@ -43,6 +43,7 @@ from libro_mayor.repositories import TransaccionRepository
 from usuarios.models import Usuario
 from usuarios.roles import Rol
 from ventas.composition import crear_ventas_service
+from ventas.exceptions import PeriodoYaConciliadoError, VentasError
 
 D = Decimal
 NOVIEMBRE = (date(2026, 11, 1), date(2026, 11, 30))
@@ -261,8 +262,10 @@ class CongruenciaIntegracionTests(TestCase):
             fecha_hora=datetime(2026, 11, 3, 15, tzinfo=timezone.utc),
             comision=D("12.00"),
         )
+        ventas.contabilizar(self.general, "STM-C1")
         resumen = ventas.conciliar(self.general, *NOVIEMBRE)
-        ventas.conciliar(self.general, *NOVIEMBRE)
+        with self.assertRaises(PeriodoYaConciliadoError):
+            ventas.conciliar(self.general, *NOVIEMBRE)
         return resumen
 
     def test_4_cobro_conciliado_baja_cxc_y_sube_bancos(self):
@@ -368,3 +371,38 @@ class CongruenciaIntegracionTests(TestCase):
                          contrapartidas)
         self.assertEqual(saldo(*Movimiento.objects.values_list(
             "cuenta__codigo", flat=True).distinct()), 0)
+
+    def test_cierre_concilia_cxc_a_bancos(self):
+        ventas = crear_ventas_service()
+        ventas.recibir(
+            identificador="STM-C2", titulo="Neo Drift", tipo_producto="JUEGO",
+            cantidad=1, precio_unitario=D("19.99"), moneda="USD", pais="SV",
+            fecha_hora=datetime(2026, 11, 5, 15, tzinfo=timezone.utc),
+            comision=D("6.00"),
+        )
+        ventas.contabilizar(self.general, "STM-C2")
+        self.assertEqual(saldo("1104"), D("13.99"))
+
+        crear_cierre_service().cerrar_rango(
+            self.general, *NOVIEMBRE, confirmacion="CONFIRMAR",
+            motivo="Cierre de noviembre",
+        )
+
+        self.assertEqual(saldo("1104"), 0)
+        self.assertEqual(saldo("1103"), D("13.99"))
+        self.assertEqual(saldo("5101"), D("-19.99"))
+        with self.assertRaises(VentasError):
+            ventas.conciliar(self.general, *NOVIEMBRE)
+
+    def test_cierre_amortiza_aunque_se_haya_vaciado_el_parametro(self):
+        ParametroAmortizacion.objects.all().delete()
+        self.costo(Elemento.DIRECTO, "4800.00")
+        with mock.patch("costos.services.timezone.localdate",
+                        return_value=date(2026, 11, 15)):
+            self.ordenes.finalizar(self.costos, self.orden.pk)
+        crear_cierre_service().cerrar_rango(
+            self.general, *NOVIEMBRE, confirmacion="CONFIRMAR",
+            motivo="Cierre de noviembre",
+        )
+        self.assertEqual(saldo("4104"), D("100.00"))
+        self.assertEqual(saldo("1108"), D("-100.00"))

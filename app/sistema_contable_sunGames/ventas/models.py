@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -102,6 +103,32 @@ class Venta(models.Model):
     @property
     def fecha(self):
         return timezone.localdate(self.fecha_hora)
+
+
+class ConciliacionVentas(models.Model):
+    """Período conciliado (CU-08.3): cobro de 1104 a Bancos, una sola vez."""
+
+    desde = models.DateField("desde")
+    hasta = models.DateField("hasta")
+    ventas = models.PositiveIntegerField("ventas cobradas")
+    importe = models.DecimalField("importe cobrado", max_digits=14,
+                                  decimal_places=2)
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name="conciliaciones_ventas",
+    )
+    fecha_registro = models.DateTimeField("registrada", auto_now_add=True)
+
+    class Meta:
+        ordering = ["-desde", "-id"]
+        verbose_name = "conciliación de ventas"
+        verbose_name_plural = "conciliaciones de ventas"
+        constraints = [
+            models.CheckConstraint(check=models.Q(hasta__gte=models.F("desde")),
+                                   name="conciliacion_rango_valido"),
+            models.CheckConstraint(check=models.Q(importe__gt=0),
+                                   name="conciliacion_importe_positivo"),
+        ]
 
 
 class ConexionSteam(models.Model):

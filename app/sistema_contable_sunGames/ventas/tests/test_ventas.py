@@ -29,11 +29,13 @@ from usuarios.models import Usuario
 from usuarios.roles import Rol
 from usuarios.tests.fakes import crear_usuario
 from ventas.exceptions import (
+    ConciliacionNoPermitidaError,
     EventoInvalidoError,
     MonedaNoAdmitidaError,
+    PeriodoYaConciliadoError,
     VentaDuplicadaError,
 )
-from ventas.models import EstadoVenta, Venta
+from ventas.models import ConciliacionVentas, EstadoVenta, Venta
 from ventas.repositories import VentaRepository
 from ventas.services import VentasService
 
@@ -90,6 +92,17 @@ class RepoEnMemoria:
     def marcar_cobrada(self, venta, transaccion):
         venta.transaccion_cobro_id = transaccion.pk
         return venta
+
+    def bloquear_conciliacion(self):
+        pass
+
+    def conciliacion_que_se_solapa(self, desde, hasta):
+        return next((c for c in getattr(self, "conciliaciones", [])
+                     if c.desde <= hasta and c.hasta >= desde), None)
+
+    def crear_conciliacion(self, **datos):
+        self.conciliaciones = [*getattr(self, "conciliaciones", []),
+                               SimpleNamespace(**datos)]
 
     def obtener(self, identificador):
         return self.ventas[identificador]
@@ -168,47 +181,47 @@ class VentasServiceTests(SimpleTestCase):
 
         self.assertEqual(self.servicio.estado_conexion().estado, "Conectado")
 
-    def test_conciliacion_contabiliza_una_vez_por_evento(self):
+    def test_conciliacion_traslada_cxc_a_bancos_una_sola_vez(self):
         venta = self.recibir()
         mayor = MayorEnMemoria()
         servicio = VentasService(self.repo, mayor, self.bitacora,
                                  reloj=lambda: AHORA)
         actor = crear_usuario("contador", Rol.CONTADOR_GENERAL)
         desde, hasta = date(2026, 11, 1), date(2026, 11, 30)
+        servicio.contabilizar(actor, venta.identificador)
+        mayor.movimientos.clear()
 
-        primero = servicio.conciliar(actor, desde, hasta)
-        segundo = servicio.conciliar(actor, desde, hasta)
+        resumen = servicio.conciliar(actor, desde, hasta)
 
-        self.assertEqual(primero.conciliadas, 1)
-        self.assertEqual(primero.total, Decimal("39.98"))
-        self.assertEqual(primero.cuentas_por_cobrar, Decimal("27.98"))
-        self.assertEqual(primero.comision, Decimal("12.00"))
-        afectadas = {fila["codigo"]: fila
-                     for fila in primero.cuentas_afectadas}
-        self.assertEqual(afectadas["1104"]["debe"], Decimal("27.98"))
-        self.assertEqual(afectadas["4302"]["debe"], Decimal("12.00"))
-        self.assertEqual(afectadas["5101"]["haber"], Decimal("39.98"))
-        self.assertEqual(segundo.conciliadas, 1)
-        self.assertEqual(len(mayor.movimientos), 5)
-        self.assertEqual(mayor.transacciones, 2)
-        self.assertEqual(venta.estado, EstadoVenta.REGISTRADA)
+        self.assertEqual(resumen.conciliadas, 1)
+        self.assertEqual(resumen.cuentas_por_cobrar, Decimal("27.98"))
+        self.assertEqual(
+            {(m["cuenta"].codigo, m["importe"]) for m in mayor.movimientos},
+            {("1103", Decimal("27.98")), ("1104", Decimal("-27.98"))},
+        )
+        afectadas = {f["codigo"]: f for f in resumen.cuentas_afectadas}
+        self.assertEqual(set(afectadas), {"1103", "1104"})
+        self.assertEqual(afectadas["1103"]["debe"], Decimal("27.98"))
+        self.assertEqual(afectadas["1104"]["haber"], Decimal("27.98"))
+        for rango in ((desde, hasta), (date(2026, 11, 15),
+                                       date(2026, 12, 15))):
+            with self.subTest(rango=rango), \
+                    self.assertRaises(PeriodoYaConciliadoError):
+                servicio.conciliar(actor, *rango)
+        self.assertEqual(len(mayor.movimientos), 2)
 
-    def test_conciliacion_repite_evento_sin_duplicar_asiento(self):
-        venta = self.recibir()
+    def test_conciliacion_exige_ventas_contabilizadas(self):
+        self.recibir()
         mayor = MayorEnMemoria()
         servicio = VentasService(self.repo, mayor, self.bitacora,
                                  reloj=lambda: AHORA)
         actor = crear_usuario("contador", Rol.CONTADOR_GENERAL)
-        desde, hasta = date(2026, 11, 1), date(2026, 11, 30)
 
-        primera = servicio.conciliar(actor, desde, hasta)
-        segunda = servicio.conciliar(actor, desde, hasta)
-
-        self.assertEqual(segunda.conciliadas, 1)
-        self.assertEqual(segunda.total, primera.total)
-        self.assertEqual(len(mayor.movimientos), 5)
-        self.assertEqual(mayor.transacciones, 2)
-        self.assertEqual(venta.estado, EstadoVenta.REGISTRADA)
+        with self.assertRaises(ConciliacionNoPermitidaError):
+            servicio.conciliar(actor, date(2026, 11, 1), date(2026, 11, 30))
+        with self.assertRaises(ConciliacionNoPermitidaError):
+            servicio.conciliar(actor, date(2026, 12, 1), date(2026, 12, 31))
+        self.assertEqual(mayor.movimientos, [])
 
     def test_administrador_tambien_puede_contabilizar(self):
         self.recibir()
@@ -498,89 +511,75 @@ class VentasIntegracionTests(TestCase):
         self.assertTrue(Movimiento.objects.filter(cuenta__codigo="5102")
                         .exists())
 
-    def test_conciliar_una_vez_por_evento_y_auditar(self):
+    def test_conciliar_cobra_una_vez_por_periodo_y_auditar(self):
         self.enviar(evento())
         self.client.force_login(self.contador)
+        self.assertEqual(self.contabilizar().status_code, 200)
         rango = {"desde": "2026-11-01", "hasta": "2026-11-30"}
 
         vista_previa = self.conciliar("get", **rango)
         primera = self.conciliar(**rango)
         segunda = self.conciliar(**rango)
+        otra_vista = self.conciliar("get", desde="2026-11-03",
+                                    hasta="2026-11-03")
 
         self.assertEqual(vista_previa.status_code, 200)
         self.assertEqual(vista_previa.json()["cuentasPorCobrar"], "27.98")
-        self.assertEqual(vista_previa.json()["comision"], "12.00")
         afectadas = {
             fila["codigo"]: fila
             for fila in vista_previa.json()["cuentasAfectadas"]
         }
-        self.assertEqual(afectadas["1104"]["debe"], "27.98")
-        self.assertEqual(afectadas["4302"]["debe"], "12.00")
-        self.assertEqual(afectadas["5101"]["haber"], "39.98")
+        self.assertEqual(set(afectadas), {"1103", "1104"})
+        self.assertEqual(afectadas["1103"]["debe"], "27.98")
+        self.assertEqual(afectadas["1104"]["haber"], "27.98")
         self.assertEqual(primera.status_code, 200, primera.content)
         self.assertEqual(primera.json()["conciliadas"], 1)
-        self.assertEqual(primera.json()["total"], "39.98")
         self.assertEqual(
             primera.json()["cuentasAfectadas"],
             vista_previa.json()["cuentasAfectadas"],
         )
-        self.assertEqual(segunda.status_code, 200, segunda.content)
-        self.assertEqual(segunda.json()["conciliadas"], 1)
-        self.assertEqual(Movimiento.objects.count(), 5)
+        self.assertEqual(segunda.status_code, 422)
+        self.assertIn("ya fue conciliado", segunda.json()["error"])
+        self.assertEqual(otra_vista.status_code, 422)
         self.assertEqual(Transaccion.objects.count(), 2)
-        self.assertEqual(RegistroBitacora.objects.filter(
+        saldos = {codigo: sum(Movimiento.objects.filter(
+            cuenta__codigo=codigo).values_list("importe", flat=True))
+            for codigo in ("1103", "1104")}
+        self.assertEqual(saldos, {"1103": Decimal("27.98"),
+                                  "1104": Decimal("0.00")})
+        self.assertEqual(ConciliacionVentas.objects.count(), 1)
+        resultados = list(RegistroBitacora.objects.filter(
             accion=Accion.CONCILIACION_VENTAS
-        ).count(), 2)
+        ).order_by("pk").values_list("resultado", flat=True))
+        self.assertEqual(resultados, [Resultado.EXITOSO,
+                                      Resultado.RECHAZADO])
 
-    def test_conciliar_permite_evento_contabilizado_en_periodo_cerrado(self):
+    def test_conciliar_rechaza_periodo_cerrado(self):
         self.enviar(evento())
         self.client.force_login(self.contador)
         self.assertEqual(self.contabilizar().status_code, 200)
         periodo = PeriodoContable.objects.get(nombre="Ejercicio 2026")
         periodo.estado = EstadoPeriodo.CIERRE_PROVISIONAL
         periodo.save()
-
-        vista_previa = self.conciliar(
-            "get", desde="2026-11-01", hasta="2026-11-30"
-        )
         movimientos_antes = Movimiento.objects.count()
-        respuesta = self.conciliar(
-            desde="2026-11-01", hasta="2026-11-30"
-        )
-        segunda = self.conciliar(
-            desde="2026-11-01", hasta="2026-11-30"
-        )
 
-        self.assertEqual(vista_previa.status_code, 200)
-        self.assertEqual(respuesta.status_code, 200, respuesta.content)
-        self.assertEqual(respuesta.json()["conciliadas"], 1)
-        self.assertEqual(segunda.status_code, 200, segunda.content)
-        self.assertEqual(segunda.json()["conciliadas"], 1)
+        respuesta = self.conciliar(desde="2026-11-01", hasta="2026-11-30")
+
+        self.assertEqual(respuesta.status_code, 422)
         self.assertEqual(Movimiento.objects.count(), movimientos_antes)
-        self.assertEqual(Transaccion.objects.count(), 1)
-        self.assertEqual(Venta.objects.get().estado, EstadoVenta.REGISTRADA)
-        self.assertEqual(RegistroBitacora.objects.filter(
-            accion=Accion.CONCILIACION_VENTAS
-        ).count(), 2)
+        self.assertFalse(ConciliacionVentas.objects.exists())
 
-    def test_conciliar_no_contabiliza_evento_pendiente_en_periodo_cerrado(self):
+    def test_conciliar_rechaza_ventas_pendientes(self):
         self.enviar(evento())
         self.client.force_login(self.contador)
-        periodo = PeriodoContable.objects.get(nombre="Ejercicio 2026")
-        periodo.estado = EstadoPeriodo.CIERRE_PROVISIONAL
-        periodo.save()
 
         vista_previa = self.conciliar(
             "get", desde="2026-11-01", hasta="2026-11-30"
         )
-        respuesta = self.conciliar(
-            desde="2026-11-01", hasta="2026-11-30"
-        )
+        respuesta = self.conciliar(desde="2026-11-01", hasta="2026-11-30")
 
-        self.assertEqual(vista_previa.status_code, 200)
-        self.assertEqual(respuesta.status_code, 200, respuesta.content)
-        self.assertEqual(respuesta.json()["conciliadas"], 0)
-        self.assertEqual(len(respuesta.json()["errores"]), 1)
+        self.assertEqual(vista_previa.status_code, 422)
+        self.assertIn("sin contabilizar", respuesta.json()["error"])
         self.assertFalse(Movimiento.objects.exists())
         self.assertEqual(Venta.objects.get().estado, EstadoVenta.PENDIENTE)
         self.assertEqual(RegistroBitacora.objects.get(

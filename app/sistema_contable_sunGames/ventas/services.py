@@ -22,9 +22,11 @@ from usuarios.exceptions import RolNoAutorizadoError, UsuarioInactivoError
 from usuarios.roles import Rol
 
 from .exceptions import (
+    ConciliacionNoPermitidaError,
     ContabilizacionError,
     EventoInvalidoError,
     MonedaNoAdmitidaError,
+    PeriodoYaConciliadoError,
     RangoConciliacionInvalidoError,
     VentaDuplicadaError,
     VentasError,
@@ -172,82 +174,138 @@ class VentasService:
         return self._repositorio.contar_pendientes(desde, hasta)
 
     def previsualizar_conciliacion(self, actor, desde, hasta):
+        """CU-08.3: cobro que se registraría (Debe Bancos / Haber 1104)."""
         self._verificar(actor, self.ROLES_REGISTRO)
-        ventas = self._ventas_para_conciliar(desde, hasta)
-        total = sum((venta.total for venta in ventas), CERO)
-        comision = sum((venta.comision for venta in ventas), CERO)
+        ventas = self._ventas_por_cobrar(desde, hasta)
+        total, neto, comision = self._importes(ventas)
         return VistaPreviaConciliacion(
-            len(ventas), total, total - comision, comision,
-            tuple(self._cuentas_afectadas(ventas)),
+            len(ventas), total, neto, comision,
+            tuple(self._cuentas_afectadas(neto)),
         )
 
     def conciliar(self, actor, desde, hasta):
-        """Conciliación repetible; eventos ya registrados no duplican asientos."""
-        self._verificar(actor, self.ROLES_REGISTRO)
-        ventas = self._ventas_para_conciliar(desde, hasta)
-        with self._transaccion():
-            conciliadas = 0
-            total = CERO
-            comision = CERO
-            errores = []
-            ventas_conciliadas = []
-            cobros_pendientes = 0
-            for venta in ventas:
-                try:
-                    if venta.estado != EstadoVenta.REGISTRADA:
-                        self.contabilizar(actor, venta.identificador)
-                    if not self._cobrar(actor, venta):
-                        cobros_pendientes += 1
-                except VentasError as error:
-                    errores.append({
-                        "id": venta.identificador,
-                        "mensaje": str(error),
-                    })
-                    continue
-                conciliadas += 1
-                total += venta.total
-                comision += venta.comision
-                ventas_conciliadas.append(venta)
+        """CU-08.3: traslada a Bancos el neto por cobrar del período.
 
-            resultado = (Resultado.RECHAZADO
-                         if errores and conciliadas == 0
-                         else Resultado.EXITOSO)
+        Cada período se concilia una sola vez; un rango que se solape con
+        uno ya conciliado se rechaza.
+        """
+        self._verificar(actor, self.ROLES_REGISTRO)
+        try:
+            self._ventas_por_cobrar(desde, hasta)
+        except VentasError as error:
             self._bitacora.registrar(
-                Accion.CONCILIACION_VENTAS, resultado, actor=actor,
+                Accion.CONCILIACION_VENTAS, Resultado.RECHAZADO, actor=actor,
                 referencia=f"Steam {desde} a {hasta}"[:60],
-                detalle=(f"Conciliadas: {conciliadas}; total: {total:.2f}; "
-                         f"cuentas por cobrar: {total - comision:.2f}; "
-                         f"comisión: {comision:.2f}; "
-                         f"cobros en período cerrado: {cobros_pendientes}; "
-                         f"errores: {len(errores)}"),
+                detalle=str(error)[:500],
+            )
+            raise
+        with self._transaccion():
+            self._repositorio.bloquear_conciliacion()
+            ventas = self._ventas_por_cobrar(desde, hasta)
+            for venta in ventas:
+                self._cobrar(actor, venta)
+            total, neto, comision = self._importes(ventas)
+            self._repositorio.crear_conciliacion(
+                desde=desde, hasta=hasta, ventas=len(ventas), importe=neto,
+                usuario=actor,
+            )
+            self._bitacora.registrar(
+                Accion.CONCILIACION_VENTAS, Resultado.EXITOSO, actor=actor,
+                referencia=f"Steam {desde} a {hasta}"[:60],
+                detalle=(f"Ventas cobradas: {len(ventas)}; "
+                         f"Bancos {self._config.cuenta_bancos} / "
+                         f"{self._config.cuenta_por_cobrar}: {neto:.2f}"),
             )
             return ResumenConciliacion(
-                conciliadas, total, total - comision, comision,
-                tuple(errores), tuple(self._cuentas_afectadas(
-                    ventas_conciliadas
-                )),
+                len(ventas), total, neto, comision, (),
+                tuple(self._cuentas_afectadas(neto)),
             )
 
-    def _cobrar(self, actor, venta):
-        """Traslada el neto conciliado de la cuenta por cobrar a Bancos.
+    def conciliar_cierre(self, actor, desde, hasta):
+        """Al cerrar el período: cobra lo que quede por conciliar.
 
-        Debe Bancos / Haber Cuentas por cobrar a plataformas, una sola vez
-        por venta. Devuelve ``False`` si el período de la venta está
-        cerrado (el cobro no se asienta en un período cerrado).
+        Lo llama el cierre dentro de su transacción, antes de marcar el
+        período como cerrado. Sin ventas por cobrar no hace nada.
         """
-        if venta.transaccion_cobro_id or venta.neto <= CERO:
-            return True
+        self._verificar(actor, self.ROLES_REGISTRO)
+        ventas = [venta for venta in
+                  self._repositorio.ventas_en_periodo(desde, hasta)
+                  if venta.estado == EstadoVenta.REGISTRADA
+                  and not venta.transaccion_cobro_id and venta.neto > CERO]
+        if not ventas:
+            return None
+        for venta in ventas:
+            self._cobrar(actor, venta)
+        total, neto, comision = self._importes(ventas)
+        self._repositorio.crear_conciliacion(
+            desde=desde, hasta=hasta, ventas=len(ventas), importe=neto,
+            usuario=actor,
+        )
+        self._bitacora.registrar(
+            Accion.CONCILIACION_VENTAS, Resultado.EXITOSO, actor=actor,
+            referencia=f"Cierre {desde} a {hasta}"[:60],
+            detalle=(f"Conciliación al cierre. Ventas cobradas: "
+                     f"{len(ventas)}; Bancos {self._config.cuenta_bancos} / "
+                     f"{self._config.cuenta_por_cobrar}: {neto:.2f}"),
+        )
+        return ResumenConciliacion(
+            len(ventas), total, neto, comision, (),
+            tuple(self._cuentas_afectadas(neto)),
+        )
+
+    def _ventas_por_cobrar(self, desde, hasta):
+        if desde > hasta:
+            raise RangoConciliacionInvalidoError()
+        previa = self._repositorio.conciliacion_que_se_solapa(desde, hasta)
+        if previa is not None:
+            raise PeriodoYaConciliadoError(
+                f"El período del {previa.desde:%d/%m/%Y} al "
+                f"{previa.hasta:%d/%m/%Y} ya fue conciliado; no se puede "
+                "volver a conciliar."
+            )
+        ventas = self._repositorio.ventas_en_periodo(desde, hasta)
+        pendientes = sum(1 for venta in ventas
+                         if venta.estado != EstadoVenta.REGISTRADA)
+        if pendientes:
+            raise ConciliacionNoPermitidaError(
+                f"Hay {pendientes} venta(s) sin contabilizar en el período; "
+                "contabilízalas antes de conciliar."
+            )
+        por_cobrar = [venta for venta in ventas
+                      if not venta.transaccion_cobro_id
+                      and venta.neto > CERO]
+        if not por_cobrar:
+            raise ConciliacionNoPermitidaError(
+                "No hay ventas contabilizadas por cobrar en el período."
+            )
         try:
-            if self._mayor.periodo_de(venta.fecha).cerrado:
-                return False
-            lineas = [
-                (self._cuenta(self._config.cuenta_bancos), venta.neto),
-                (self._cuenta(self._config.cuenta_por_cobrar), -venta.neto),
-            ]
+            cerrado = any(self._mayor.periodo_de(venta.fecha).cerrado
+                          for venta in por_cobrar)
+        except LibroMayorError as exc:
+            raise ConciliacionNoPermitidaError(str(exc)) from exc
+        if cerrado:
+            raise ConciliacionNoPermitidaError(
+                "El período contable está cerrado; no admite el cobro."
+            )
+        return por_cobrar
+
+    @staticmethod
+    def _importes(ventas):
+        total = sum((venta.total for venta in ventas), CERO)
+        comision = sum((venta.comision for venta in ventas), CERO)
+        return total, total - comision, comision
+
+    def _cobrar(self, actor, venta):
+        """Debe Bancos / Haber Cuentas por cobrar a plataformas (neto)."""
+        if venta.transaccion_cobro_id:
+            return
+        try:
             transaccion = self._mayor.crear_transaccion(usuario=actor)
-            for cuenta, importe in lineas:
+            for codigo, importe in (
+                    (self._config.cuenta_bancos, venta.neto),
+                    (self._config.cuenta_por_cobrar, -venta.neto)):
                 self._mayor.crear_movimiento(
-                    transaccion=transaccion, cuenta=cuenta,
+                    transaccion=transaccion, cuenta=self._cuenta(codigo),
                     fecha=venta.fecha,
                     concepto=(f"Cobro conciliado Steam "
                               f"{venta.identificador}")[:200],
@@ -258,50 +316,20 @@ class VentasService:
         except LibroMayorError as exc:
             raise ContabilizacionError(str(exc)) from exc
         self._repositorio.marcar_cobrada(venta, transaccion)
-        return True
 
-    def _cuentas_afectadas(self, ventas):
-        """Resume los movimientos por cuenta y lado contable, incluido el
-        cobro conciliado (Debe Bancos / Haber cuenta por cobrar)."""
-        debe, haber = {}, {}
-
-        def sumar(codigo, importe):
-            lado = debe if importe > CERO else haber
-            lado[codigo] = lado.get(codigo, CERO) + abs(importe)
-
-        for venta in ventas:
-            cuenta_ingreso = (
-                self._config.cuenta_ingreso_dlc
-                if venta.tipo_producto == TipoProducto.DLC
-                else self._config.cuenta_ingreso_juego
-            )
-            sumar(self._config.cuenta_por_cobrar, venta.neto)
-            if venta.comision:
-                sumar(self._config.cuenta_comision, venta.comision)
-            sumar(cuenta_ingreso, -venta.total)
-            if venta.neto > CERO:
-                sumar(self._config.cuenta_bancos, venta.neto)
-                sumar(self._config.cuenta_por_cobrar, -venta.neto)
-
+    def _cuentas_afectadas(self, neto):
         filas = []
-        for codigo in dict.fromkeys([*debe, *haber]):
+        for codigo, debe, haber in (
+                (self._config.cuenta_bancos, neto, CERO),
+                (self._config.cuenta_por_cobrar, CERO, neto)):
             try:
                 cuenta = self._mayor.obtener_cuenta(codigo)
                 denominacion = getattr(cuenta, "denominacion", codigo)
             except (AttributeError, LibroMayorError):
                 denominacion = codigo
-            filas.append({
-                "codigo": codigo,
-                "denominacion": denominacion,
-                "debe": debe.get(codigo, CERO),
-                "haber": haber.get(codigo, CERO),
-            })
+            filas.append({"codigo": codigo, "denominacion": denominacion,
+                          "debe": debe, "haber": haber})
         return filas
-
-    def _ventas_para_conciliar(self, desde, hasta):
-        if desde > hasta:
-            raise RangoConciliacionInvalidoError()
-        return self._repositorio.ventas_en_periodo(desde, hasta)
 
     def contabilizar(self, actor, identificador):
         """CU-08.2: registra la venta en el Libro Mayor, una sola vez."""
