@@ -38,3 +38,7 @@ htmlcov/
 
 # Logs
 *.log
+
+#backups
+!backup_2.json
+!backup_antes_de_vaciar.json

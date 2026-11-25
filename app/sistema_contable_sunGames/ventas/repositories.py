@@ -1,12 +1,22 @@
+from decimal import Decimal
+
 from django.db import DatabaseError, IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Q, Sum
+
+from libro_mayor.models import Movimiento
 
 from .exceptions import (
     ContabilizacionError,
     VentaDuplicadaError,
     VentaNoEncontradaError,
 )
-from .models import ConexionSteam, EstadoVenta, OrigenVenta, Venta
+from .models import (
+    ConciliacionVentas,
+    ConexionSteam,
+    EstadoVenta,
+    OrigenVenta,
+    Venta,
+)
 
 
 def _rango_fecha_hora(desde, hasta):
@@ -60,6 +70,37 @@ class VentaRepository:
             fecha_recepcion__gte=desde,
             fecha_recepcion__lte=hasta,
         ).exists()
+
+    def bloquear_conciliacion(self):
+        """Serializa las conciliaciones concurrentes (fila única)."""
+        ConexionSteam.objects.get_or_create(pk=1)
+        ConexionSteam.objects.select_for_update().get(pk=1)
+
+    def conciliacion_que_se_solapa(self, desde, hasta):
+        return ConciliacionVentas.objects.filter(
+            desde__lte=hasta, hasta__gte=desde
+        ).order_by("desde").first()
+
+    def crear_conciliacion(self, **datos):
+        try:
+            return ConciliacionVentas.objects.create(**datos)
+        except DatabaseError as exc:
+            raise ContabilizacionError() from exc
+
+    def importe_por_cobrar(self, venta, codigo_cuenta):
+        if not venta.transaccion_id:
+            return venta.neto
+        return Movimiento.objects.filter(
+            transaccion_id=venta.transaccion_id,
+            cuenta__codigo=codigo_cuenta,
+        ).aggregate(t=Sum("importe"))["t"] or Decimal("0.00")
+
+    def marcar_cobrada(self, venta, transaccion_mayor):
+        venta.transaccion_cobro = transaccion_mayor
+        try:
+            venta.save(update_fields=["transaccion_cobro"])
+        except DatabaseError as exc:
+            raise ContabilizacionError() from exc
 
     def marcar_registrada(self, venta, transaccion_mayor):
         venta.estado = EstadoVenta.REGISTRADA

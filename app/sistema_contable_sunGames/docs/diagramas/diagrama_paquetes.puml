@@ -1,0 +1,177 @@
+@startuml
+title Sistema Contable SunGames — Diagrama de paquetes
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam ArrowColor #294C69
+skinparam PackageBorderColor #294C69
+skinparam PackageFontColor #102A43
+skinparam ComponentBorderColor #547A9C
+
+package "sistema_contable_sunGames\nConfiguración Django" as CONFIG {
+  component "settings.py" as SETTINGS
+  component "urls.py" as ROOT_URLS
+  component "wsgi.py / asgi.py" as GATEWAYS
+}
+
+package "sic_sunGames\nPresentación general" as UI {
+  component "urls.py" as UI_URLS
+  component "views/*\nAutenticación, paneles y operaciones" as UI_VIEWS
+  component "forms.py" as UI_FORMS
+  component "templates y static" as UI_ASSETS
+  component "management/commands\n iniciar_sistema, simular_ventas" as COMMANDS
+}
+
+package "usuarios" as USERS {
+  component "forms.py / roles.py" as USERS_FORMS
+  component "services.py / autenticacion.py" as USERS_SERVICES
+  component "repositories.py" as USERS_REPOS
+  component "models.py" as USERS_MODELS
+}
+
+package "bitacora" as AUDIT {
+  component "services.py / eventos.py" as AUDIT_SERVICES
+  component "repositories.py" as AUDIT_REPOS
+  component "models.py" as AUDIT_MODELS
+  component "exportadores.py" as AUDIT_EXPORT
+}
+
+package "catalogo" as CATALOG {
+  component "forms.py" as CATALOG_FORMS
+  component "services.py" as CATALOG_SERVICES
+  component "repositories.py" as CATALOG_REPOS
+  component "models.py" as CATALOG_MODELS
+}
+
+package "libro_mayor" as LEDGER {
+  component "forms.py" as LEDGER_FORMS
+  component "services.py" as LEDGER_SERVICES
+  component "repositories.py" as LEDGER_REPOS
+  component "models.py" as LEDGER_MODELS
+  component "exportadores.py" as LEDGER_EXPORT
+}
+
+package "estados_financieros" as FINANCIAL {
+  component "forms.py" as FIN_FORMS
+  component "services.py / calculo.py" as FIN_SERVICES
+  component "repositories.py" as FIN_REPOS
+  component "models.py / hoja_trabajo.py" as FIN_MODELS
+  component "exportadores.py" as FIN_EXPORT
+}
+
+package "ventas" as SALES {
+  component "forms.py" as SALES_FORMS
+  component "services.py" as SALES_SERVICES
+  component "repositories.py" as SALES_REPOS
+  component "models.py" as SALES_MODELS
+}
+
+package "estimacion" as ESTIMATE {
+  component "forms.py" as EST_FORMS
+  component "services.py / calculos.py" as EST_SERVICES
+  component "repositories.py" as EST_REPOS
+  component "models.py" as EST_MODELS
+}
+
+package "costos" as COSTS {
+  component "views.py / urls.py / forms.py" as COSTS_UI
+  component "services.py / calculos.py" as COSTS_SERVICES
+  component "repositories.py" as COSTS_REPOS
+  component "models.py" as COSTS_MODELS
+  component "templates y static" as COSTS_ASSETS
+}
+
+package "simulador_steam" as SIMULATOR {
+  component "simulador.py" as SIM_GENERATOR
+  component "ciclos.py" as SIM_CYCLES
+}
+
+package "Dependencias externas" as EXTERNAL {
+  component "Django" as DJANGO
+  component "psycopg" as PSYCOPG
+  component "WhiteNoise" as WHITENOISE
+  component "ReportLab / openpyxl" as EXPORT_LIBS
+}
+
+database "PostgreSQL" as DB
+
+SETTINGS --> DJANGO
+ROOT_URLS --> UI_URLS
+ROOT_URLS --> COSTS_UI
+GATEWAYS --> DJANGO
+UI_URLS --> UI_VIEWS
+UI_VIEWS --> UI_FORMS
+UI_VIEWS ..> USERS_SERVICES
+UI_VIEWS ..> CATALOG_SERVICES
+UI_VIEWS ..> LEDGER_SERVICES
+UI_VIEWS ..> FIN_SERVICES
+UI_VIEWS ..> SALES_SERVICES
+UI_VIEWS ..> EST_SERVICES
+COSTS_UI --> COSTS_SERVICES
+
+USERS_SERVICES --> USERS_REPOS
+USERS_REPOS --> USERS_MODELS
+CATALOG_SERVICES --> CATALOG_REPOS
+CATALOG_REPOS --> CATALOG_MODELS
+LEDGER_SERVICES --> LEDGER_REPOS
+LEDGER_REPOS --> LEDGER_MODELS
+FIN_SERVICES --> FIN_REPOS
+FIN_REPOS --> FIN_MODELS
+SALES_SERVICES --> SALES_REPOS
+SALES_REPOS --> SALES_MODELS
+EST_SERVICES --> EST_REPOS
+EST_REPOS --> EST_MODELS
+COSTS_SERVICES --> COSTS_REPOS
+COSTS_REPOS --> COSTS_MODELS
+
+USERS_SERVICES ..> AUDIT_SERVICES : registra acciones
+CATALOG_SERVICES ..> AUDIT_SERVICES
+LEDGER_SERVICES ..> AUDIT_SERVICES
+FIN_SERVICES ..> AUDIT_SERVICES
+SALES_SERVICES ..> AUDIT_SERVICES
+EST_SERVICES ..> AUDIT_SERVICES
+COSTS_SERVICES ..> AUDIT_SERVICES
+AUDIT_SERVICES --> AUDIT_REPOS
+AUDIT_REPOS --> AUDIT_MODELS
+AUDIT_EXPORT ..> EXPORT_LIBS
+FIN_EXPORT ..> EXPORT_LIBS
+LEDGER_EXPORT ..> EXPORT_LIBS
+
+LEDGER_MODELS ..> CATALOG_MODELS : cuentas
+SALES_MODELS ..> LEDGER_MODELS : transacciones
+EST_MODELS ..> USERS_MODELS : usuarios
+COSTS_MODELS ..> EST_MODELS : presupuestos
+COSTS_MODELS ..> LEDGER_MODELS : períodos y transacciones
+COSTS_MODELS ..> CATALOG_MODELS : cuentas
+FIN_MODELS ..> LEDGER_MODELS : período y movimientos
+FIN_REPOS ..> CATALOG_MODELS : cuentas
+
+COMMANDS --> SIM_CYCLES
+SIM_CYCLES --> SIM_GENERATOR
+SIM_CYCLES ..> SALES_REPOS : omite ciclos tras ventas reales
+SIM_CYCLES ..> UI_VIEWS : HTTP al webhook de ventas
+UI_VIEWS ..> SALES_SERVICES : procesa el webhook
+COSTS_ASSETS ..> DJANGO
+UI_ASSETS ..> DJANGO
+SETTINGS --> WHITENOISE
+
+USERS_MODELS ..> DB
+AUDIT_MODELS ..> DB
+CATALOG_MODELS ..> DB
+LEDGER_MODELS ..> DB
+FIN_MODELS ..> DB
+SALES_MODELS ..> DB
+EST_MODELS ..> DB
+COSTS_MODELS ..> DB
+SETTINGS --> PSYCOPG
+
+note bottom of UI
+  La presentación usa vistas y formularios Django.
+  La lógica funcional principal vive en servicios,
+  con repositorios para acceso al ORM.
+end note
+
+@enduml

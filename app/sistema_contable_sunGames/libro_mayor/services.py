@@ -245,7 +245,7 @@ class LibroMayorService:
         )
 
     def balance_comprobacion(self, actor, fecha_corte):
-        """Saldos a la fecha de corte de las cuentas con movimientos."""
+        """Saldos a la fecha de corte; omite las cuentas con saldo cero."""
         self._verificar(actor, self.ROLES_CONSULTA)
         if fecha_corte is None:
             raise CampoObligatorioError(campo="corte")
@@ -254,6 +254,7 @@ class LibroMayorService:
             for cuenta in self._repositorio.saldos_por_cuenta(
                 hasta=fecha_corte
             )
+            if cuenta.saldo
         )
         return BalanceComprobacion(fecha_corte, filas)
 

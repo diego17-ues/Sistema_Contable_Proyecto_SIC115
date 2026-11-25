@@ -23,6 +23,7 @@ from .composition import (
 )
 from .exceptions import CostosError
 from .forms import (
+    AmortizacionForm,
     AplicarIndirectosForm,
     AnularForm,
     ConfiguracionCuentaForm,
@@ -473,7 +474,7 @@ def registro_nuevo(request, orden_id, tipo):
         return redirect("costos_orden", orden_id=orden_id)
     clase = ManoObraForm if elemento == Elemento.MANO_OBRA else CostoForm
     form = clase(request.POST if request.method == "POST" else None,
-                 procesos=procesos, configuracion=configuracion)
+                 procesos=procesos)
     if request.method == "POST" and form.is_valid():
         try:
             _registrar(servicio, request.user, orden_id, elemento,
@@ -496,7 +497,6 @@ def _registrar(servicio, actor, orden_id, elemento, datos):
     comunes = dict(
         orden_id=orden_id, fecha=datos["fecha"],
         proceso_id=_int(datos["proceso"]),
-        contrapartida_id=_int(datos.get("contrapartida")),
         clave=datos["clave"],
     )
     if elemento == Elemento.MANO_OBRA:
@@ -554,10 +554,14 @@ def _render_catalogos(request, **extra):
         cuentas_fuentes = servicio.cuentas_fuentes_disponibles(request.user)
         cuentas_excluidas = servicio.cuentas_indirectas_excluidas(request.user)
         cuentas_activas = servicio.cuentas(request.user)
+        amortizacion = servicio.parametro_amortizacion(request.user)
     except SIN_PERMISO as error:
         _sin_permiso(error)
     contexto = _contexto(request)
     contexto.update(
+        amortizacion=amortizacion,
+        amortizacion_modalidades=[("ANUAL", "Anual"), ("MENSUAL", "Mensual"),
+                                  ("DIARIA", "Diaria")],
         procesos=procesos,
         fuentes_indirectas=fuentes_indirectas,
         cuentas_fuentes=cuentas_fuentes,
@@ -573,6 +577,27 @@ def _render_catalogos(request, **extra):
 @login_required
 def catalogos(request):
     return _render_catalogos(request)
+
+
+@login_required
+@require_POST
+def amortizacion_editar(request):
+    form = AmortizacionForm(request.POST)
+    if form.is_valid():
+        try:
+            crear_catalogo_costos_service().guardar_parametro_amortizacion(
+                request.user, **form.cleaned_data
+            )
+        except SIN_PERMISO as error:
+            _sin_permiso(error)
+        except CostosError as error:
+            messages.error(request, str(error))
+        else:
+            messages.success(request, "Amortización de videojuegos "
+                                      "actualizada.")
+    else:
+        messages.error(request, "Revisa la modalidad y la vida útil.")
+    return redirect("costos_catalogos")
 
 
 @login_required
@@ -627,23 +652,18 @@ def configuracion_editar(request, elemento):
         _sin_permiso(error)
     inicial = None
     if actual is not None:
-        inicial = {
-            "cuenta_costo": str(actual.cuenta_costo_id),
-            "contrapartidas": [str(c.pk)
-                               for c in actual.contrapartidas.all()],
-            "contrapartida_defecto": str(actual.contrapartida_defecto_id),
-        }
+        inicial = {"cuenta_costo": str(actual.cuenta_costo_id),
+                   "contrapartida": str(actual.contrapartida_id or "")}
     form = ConfiguracionCuentaForm(
         request.POST if request.method == "POST" else None,
         initial=inicial, cuentas=cuentas,
     )
     if request.method == "POST" and form.is_valid():
-        cuenta_costo, contrapartidas, defecto = form.cuentas_elegidas()
         try:
             servicio.guardar_configuracion(
-                request.user, elemento=elemento, cuenta_costo=cuenta_costo,
-                contrapartidas=contrapartidas,
-                contrapartida_defecto=defecto,
+                request.user, elemento=elemento,
+                cuenta_costo=form.cuenta_elegida(),
+                contrapartida=form.contrapartida_elegida(),
             )
         except SIN_PERMISO as error:
             _sin_permiso(error)

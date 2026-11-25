@@ -22,7 +22,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        intervalo = int(getattr(settings, "SIMULATOR_INTERVAL_SECONDS", 300))
+        intervalo = int(getattr(settings, "SIMULATOR_INTERVAL_SECONDS", 86400))
         if intervalo < 1:
             raise CommandError("SIMULATOR_INTERVAL_SECONDS debe ser mayor a 0.")
 

@@ -9,20 +9,33 @@
 <div class="page-heading"><div><h1>Costos · Catálogos</h1></div><div class="heading-actions"><a class="button button-secondary" href="{% url 'costos_indirectos_periodo' %}">Indirectos del período</a><a class="button button-secondary" href="{% url 'costos_ordenes' %}">← Órdenes</a></div></div>
 
 <section class="card">
+  <div class="card-header"><div><h2>Amortización de videojuegos terminados</h2><p>La cuota del período se asienta al cierre: Debe 4104 Costo de ventas / Haber 1108 Amortización acumulada de videojuegos.</p></div></div>
+  <div class="card-body">
+    <form class="filter-bar" method="post" action="{% url 'costos_amortizacion_editar' %}" novalidate>
+      {% csrf_token %}
+      <div class="field"><label for="amortizacionModalidad">Modalidad *</label>
+        <select id="amortizacionModalidad" name="modalidad">
+          {% for valor, texto in amortizacion_modalidades %}<option value="{{ valor }}"{% if amortizacion.modalidad == valor %} selected{% endif %}>{{ texto }}</option>{% endfor %}
+        </select></div>
+      <div class="field"><label for="amortizacionVida">Vida útil (meses) *</label><input id="amortizacionVida" type="number" name="vida_util_meses" min="1" step="1" value="{{ amortizacion.vida_util_meses|default_if_none:'' }}"></div>
+      <button class="button button-secondary" type="submit">Guardar</button>
+    </form>
+  </div>
+</section>
+
+<section class="card">
   <div class="card-header"><div><h2>Cuentas por elemento del costo</h2></div></div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Elemento</th><th>Cuenta de costo</th><th>Contrapartidas</th><th>Por defecto</th><th></th></tr></thead>
+      <thead><tr><th>Elemento</th><th>Cuenta de costo</th><th></th></tr></thead>
       <tbody>
         {% for valor, nombre, config in elementos %}
         <tr>
           <td><strong>{{ nombre }}</strong></td>
           {% if config %}
-          <td>{{ config.cuenta_costo.codigo }} · {{ config.cuenta_costo.denominacion }}</td>
-          <td>{% for c in config.contrapartidas.all %}{{ c.codigo }} {{ c.denominacion }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td>
-          <td>{{ config.contrapartida_defecto.codigo }}</td>
+          <td>{{ config.cuenta_costo.codigo }} · {{ config.cuenta_costo.denominacion }}<br><small>Haber: {% if config.contrapartida %}{{ config.contrapartida.codigo }} · {{ config.contrapartida.denominacion }}{% else %}sin contrapartida · bloqueado{% endif %}</small></td>
           {% else %}
-          <td colspan="3"><span class="tag tag-warn">Sin configurar · bloqueado</span></td>
+          <td><span class="tag tag-warn">Sin configurar · bloqueado</span></td>
           {% endif %}
           <td class="num"><a class="text-button" href="{% url 'costos_configuracion_editar' valor %}">Configurar</a></td>
         </tr>

@@ -129,11 +129,32 @@ class EstimacionService:
             self._repositorio.nuevo_rol(nombre.strip(), nivel)
         )
 
+    def obtener_rol(self, actor, rol_id):
+        self._verificar(actor)
+        return self._repositorio.obtener_rol(rol_id)
+
+    def actualizar_rol(self, actor, rol_id, nombre, nivel):
+        self._verificar(actor)
+        rol = self._repositorio.obtener_rol(rol_id)
+        rol.nombre = nombre.strip()
+        rol.nivel = nivel
+        return self._repositorio.guardar_rol(rol)
+
     def crear_experto(self, actor, nombre):
         self._verificar(actor)
         return self._repositorio.guardar_experto(
             self._repositorio.nuevo_experto(nombre.strip())
         )
+
+    def obtener_experto(self, actor, experto_id):
+        self._verificar(actor)
+        return self._repositorio.obtener_experto(experto_id)
+
+    def actualizar_experto(self, actor, experto_id, nombre):
+        self._verificar(actor)
+        experto = self._repositorio.obtener_experto(experto_id)
+        experto.nombre = nombre.strip()
+        return self._repositorio.guardar_experto(experto)
 
     @staticmethod
     def _verificar_solape_vigencia(existentes, desde, hasta, excluir_id=None):
@@ -165,6 +186,29 @@ class EstimacionService:
             )
         )
 
+    def obtener_parametro(self, actor, parametro_id):
+        self._verificar(actor)
+        return self._repositorio.obtener_parametro(parametro_id)
+
+    def actualizar_parametro(self, actor, parametro_id, *, valor,
+                             vigente_desde, vigente_hasta=None,
+                             verificado=False):
+        self._verificar(actor)
+        parametro = self._repositorio.obtener_parametro(parametro_id)
+        existentes = [
+            p for p in self._repositorio.parametros()
+            if p.clave == parametro.clave
+        ]
+        self._verificar_solape_vigencia(
+            existentes, vigente_desde, vigente_hasta,
+            excluir_id=parametro.pk,
+        )
+        parametro.valor = valor
+        parametro.vigente_desde = vigente_desde
+        parametro.vigente_hasta = vigente_hasta
+        parametro.verificado = verificado
+        return self._repositorio.guardar_parametro(parametro)
+
     def crear_salario(self, actor, rol_id, salario_bruto, vigente_desde,
                       vigente_hasta=None):
         self._verificar(actor)
@@ -182,6 +226,29 @@ class EstimacionService:
                 vigente_desde=vigente_desde, vigente_hasta=vigente_hasta,
             )
         )
+
+    def obtener_salario(self, actor, salario_id):
+        self._verificar(actor)
+        return self._repositorio.obtener_salario(salario_id)
+
+    def actualizar_salario(self, actor, salario_id, *, rol_id,
+                           salario_bruto, vigente_desde, vigente_hasta=None):
+        self._verificar(actor)
+        salario = self._repositorio.obtener_salario(salario_id)
+        rol = self._repositorio.obtener_rol(rol_id)
+        existentes = [
+            s for s in self._repositorio.salarios()
+            if s.rol_id == rol.pk
+        ]
+        self._verificar_solape_vigencia(
+            existentes, vigente_desde, vigente_hasta,
+            excluir_id=salario.pk,
+        )
+        salario.rol = rol
+        salario.salario_bruto = salario_bruto
+        salario.vigente_desde = vigente_desde
+        salario.vigente_hasta = vigente_hasta
+        return self._repositorio.guardar_salario(salario)
 
     # --- Estimaciones Delphi ---
 

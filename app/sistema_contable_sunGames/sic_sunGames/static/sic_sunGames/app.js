@@ -478,7 +478,7 @@
     return accounts.filter(account => account.status === 'Activa' || ledgerRows.some(row => row.code === account.code)).map(account => {
       const net = ledgerRows.filter(row => row.code === account.code && row.date <= asOf).reduce((sum, row) => sum + (row.side === 'Cargo' ? row.amount : -row.amount), 0);
       return { ...account, debit: Math.max(net, 0), credit: Math.max(-net, 0) };
-    });
+    }).filter(row => Math.abs(row.debit - row.credit) > 0.005);
   }
 
   function trialBalancePage() {
@@ -748,7 +748,7 @@
       const errores = state.reconciliationResult.errores || [];
       const mensaje = errores.length
         ? `${state.reconciliationResult.conciliadas} conciliadas; ${errores.length} no se contabilizaron. Revisa el detalle.`
-        : 'Conciliación procesada y auditada.';
+        : 'Cobro registrado en Bancos y auditado.';
       showToast(mensaje, errores.length ? 'warning' : 'success');
       await loadSales();
     } catch (error) {
@@ -781,8 +781,9 @@
     const emitido = state.closedStatements?.resultados;
     if (emitido) return emittedStatement(emitido, 'Estado de Resultados');
     const sheet = state.worksheet;
-    const incomeRows = sheet.rows.filter(row => row.code && row.group === 'Ingreso').map(row => ({ label: `${row.code} · ${row.name}`, amount: -row.periodNet, kind: 'detail' }));
-    const expenseRows = sheet.rows.filter(row => row.code && row.group === 'Egreso').map(row => ({ label: `${row.code} · ${row.name}`, amount: row.periodNet, kind: 'detail' }));
+    if (sheet.statements?.resultados) return emittedStatement(sheet.statements.resultados, 'Estado de Resultados');
+    const incomeRows = sheet.rows.filter(row => row.code && row.group === 'Ingreso').map(row => ({ label: `${row.code} · ${row.name}`, amount: -row.periodNet, kind: 'detail' })).filter(row => Math.abs(row.amount) > 0.005);
+    const expenseRows = sheet.rows.filter(row => row.code && row.group === 'Egreso').map(row => ({ label: `${row.code} · ${row.name}`, amount: row.periodNet, kind: 'detail' })).filter(row => Math.abs(row.amount) > 0.005);
     const incomeTotal = incomeRows.reduce((sum, row) => sum + row.amount, 0);
     const expenseTotal = expenseRows.reduce((sum, row) => sum + row.amount, 0);
     const finalResult = incomeTotal - expenseTotal;
@@ -798,9 +799,10 @@
     const emitido = state.closedStatements?.balance;
     if (emitido) return emittedStatement(emitido, 'Estado de Situación Financiera');
     const sheet = state.worksheet;
+    if (sheet.statements?.balance) return emittedStatement(sheet.statements.balance, 'Estado de Situación Financiera');
     const balances = sheet.rows.filter(row => row.code && ['Activo', 'Pasivo', 'Patrimonio'].includes(row.group));
     const result = sheet.rows.find(row => row.name === 'Resultado del período');
-    const groupRows = (group, sign) => balances.filter(row => row.group === group).map(row => ({ label: `${row.code} · ${row.name}`, amount: (row.balanceCredit - row.balanceDebit) * sign, kind: 'detail' }));
+    const groupRows = (group, sign) => balances.filter(row => row.group === group).map(row => ({ label: `${row.code} · ${row.name}`, amount: (row.balanceCredit - row.balanceDebit) * sign, kind: 'detail' })).filter(row => Math.abs(row.amount) > 0.005);
     const assets = groupRows('Activo', -1);
     const liabilities = groupRows('Pasivo', 1);
     const equity = groupRows('Patrimonio', 1);
@@ -821,7 +823,7 @@
 
   function changesStatement() {
     const sheet = state.worksheet;
-    const rows = sheet.rows.filter(row => row.code && row.group === 'Patrimonio').map(row => {
+    const rows = sheet.rows.filter(row => row.code && row.group === 'Patrimonio' && [row.openingNet, row.periodCredit, row.periodDebit, row.balanceCredit - row.balanceDebit].some(v => Math.abs(v || 0) > 0.005)).map(row => {
       const opening = -(row.openingNet || 0);
       const increases = row.periodCredit;
       const decreases = row.periodDebit;
@@ -990,11 +992,11 @@
   function reconcilePanel() {
     const preview = state.reconciliationPreview;
     const result = state.reconciliationResult;
-    const impactTable = (resumen, titulo) => `<section class="card section-gap"><div class="card-header"><div><h2>${titulo}</h2><p>${resumen.conciliadas ?? resumen.eventos} eventos · Total conciliado ${money(resumen.total)}</p></div></div><div class="table-wrap"><table><thead><tr><th>Cuenta afectada</th><th class="num">Debe</th><th class="num">Haber</th></tr></thead><tbody>${(resumen.cuentasAfectadas || []).map(cuenta => `<tr><td><strong>${safe(cuenta.codigo)}</strong><small>${safe(cuenta.denominacion)}</small></td><td class="num">${money(cuenta.debe)}</td><td class="num">${money(cuenta.haber)}</td></tr>`).join('') || '<tr><td colspan="3"><div class="empty-state"><strong>No hay movimientos para este período.</strong></div></td></tr>'}</tbody><tfoot><tr><th>Total de movimientos</th><th class="num">${money((resumen.cuentasAfectadas || []).reduce((sum, cuenta) => sum + Number(cuenta.debe), 0))}</th><th class="num">${money((resumen.cuentasAfectadas || []).reduce((sum, cuenta) => sum + Number(cuenta.haber), 0))}</th></tr></tfoot></table></div></section>`;
-    const previewMarkup = preview ? `<div class="notice section-gap"><span class="notice-icon">i</span><span>${preview.eventos} eventos Steam · Vista previa de su afectación en el Libro Mayor.</span></div>${impactTable(preview, 'Cuentas que afectaría') }<div class="heading-actions section-gap"><button class="button button-primary" type="button" data-action="confirm-reconciliation">Confirmar y contabilizar</button></div>` : '';
+    const impactTable = (resumen, titulo) => `<section class="card section-gap"><div class="card-header"><div><h2>${titulo}</h2><p>${resumen.conciliadas ?? resumen.eventos} ventas · Cobro a Bancos ${money(resumen.cuentasPorCobrar)}</p></div></div><div class="table-wrap"><table><thead><tr><th>Cuenta afectada</th><th class="num">Debe</th><th class="num">Haber</th></tr></thead><tbody>${(resumen.cuentasAfectadas || []).map(cuenta => `<tr><td><strong>${safe(cuenta.codigo)}</strong><small>${safe(cuenta.denominacion)}</small></td><td class="num">${money(cuenta.debe)}</td><td class="num">${money(cuenta.haber)}</td></tr>`).join('') || '<tr><td colspan="3"><div class="empty-state"><strong>No hay movimientos para este período.</strong></div></td></tr>'}</tbody><tfoot><tr><th>Total de movimientos</th><th class="num">${money((resumen.cuentasAfectadas || []).reduce((sum, cuenta) => sum + Number(cuenta.debe), 0))}</th><th class="num">${money((resumen.cuentasAfectadas || []).reduce((sum, cuenta) => sum + Number(cuenta.haber), 0))}</th></tr></tfoot></table></div></section>`;
+    const previewMarkup = preview ? `<div class="notice section-gap"><span class="notice-icon">i</span><span>${preview.eventos} ventas contabilizadas · Vista previa del cobro en el Libro Mayor.</span></div>${impactTable(preview, 'Cuentas que afectaría') }<div class="heading-actions section-gap"><button class="button button-primary" type="button" data-action="confirm-reconciliation">Confirmar cobro</button></div>` : '';
     const errors = result?.errores?.length ? `<ul class="form-errors">${result.errores.map(error => `<li>${safe(error.id)}: ${safe(error.mensaje)}</li>`).join('')}</ul>` : '<p class="help">Sin errores.</p>';
     const resultMarkup = result ? `${impactTable(result, 'Resultado de la conciliación')}<section class="card section-gap"><div class="card-body">${errors}</div></section>` : '';
-    return `<div class="demo-banner"><span><strong>Resumen de eventos Steam</strong> · Esta pantalla muestra el efecto contable de las ventas del período. El formato de liquidación bancaria de Steam sigue pendiente de definición.</span></div><section class="card"><div class="card-header"><div><h2>Conciliar ventas</h2><p>Calcula importes por período antes de confirmar el registro en el Libro Mayor.</p></div></div><div class="card-body"><div class="filter-bar" style="margin:0"><div class="field"><label for="reconcileFrom">Desde</label><input id="reconcileFrom" type="date" value="${safe(state.reconcileFrom || '2026-10-01')}"/></div><div class="field"><label for="reconcileTo">Hasta</label><input id="reconcileTo" type="date" value="${safe(state.reconcileTo || '2026-10-31')}"/></div><button class="button button-secondary" type="button" data-action="preview-reconciliation">Calcular período</button></div>${previewMarkup}${resultMarkup}</div></section>`;
+    return `<div class="demo-banner"><span><strong>Cobro de ventas Steam</strong> · Traslada el neto de las ventas contabilizadas de Cuentas por cobrar a plataformas a Bancos. Cada período se concilia una sola vez.</span></div><section class="card"><div class="card-header"><div><h2>Conciliar ventas</h2><p>Calcula el cobro del período antes de confirmar el registro en el Libro Mayor.</p></div></div><div class="card-body"><div class="filter-bar" style="margin:0"><div class="field"><label for="reconcileFrom">Desde</label><input id="reconcileFrom" type="date" value="${safe(state.reconcileFrom || '2026-10-01')}"/></div><div class="field"><label for="reconcileTo">Hasta</label><input id="reconcileTo" type="date" value="${safe(state.reconcileTo || '2026-10-31')}"/></div><button class="button button-secondary" type="button" data-action="preview-reconciliation">Calcular período</button></div>${previewMarkup}${resultMarkup}</div></section>`;
   }
 
   function steamPanel() {

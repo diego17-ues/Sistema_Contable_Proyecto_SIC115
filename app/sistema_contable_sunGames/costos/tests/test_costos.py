@@ -22,7 +22,6 @@ from django.urls import reverse
 from catalogo.models import Cuenta
 from costos import calculos
 from costos.exceptions import (
-    AsientoDescuadradoError,
     ConfiguracionNoEncontradaError,
     CuentaNoValidaError,
     DatosInsuficientesError,
@@ -98,14 +97,22 @@ class CalculosPurosTests(SimpleTestCase):
         )
         self.assertEqual(sum(reparto.values()), D("10000.00"))
 
-    def test_lineas_cuadran_y_contrarias(self):
-        lineas = calculos.lineas_registro("debe", "haber", D("83.33"))
-        self.assertEqual(lineas,
-                         [("debe", D("83.33")), ("haber", D("-83.33"))])
+    def test_acumulacion_reclasificacion_y_contrarias(self):
+        self.assertEqual(
+            calculos.linea_acumulacion("4101", D("83.33")),
+            [("4101", D("83.33"))],
+        )
+        lineas = calculos.lineas_reclasificacion(
+            "origen", "destino", D("83.33")
+        )
+        self.assertEqual(
+            lineas, [("destino", D("83.33")), ("origen", D("-83.33"))]
+        )
         self.assertTrue(calculos.cuadra(lineas))
-        self.assertEqual(calculos.lineas_contrarias(lineas),
-                         [("debe", D("-83.33")), ("haber", D("83.33"))])
-        self.assertFalse(calculos.cuadra([("debe", D("1"))]))
+        self.assertEqual(
+            calculos.lineas_contrarias(lineas),
+            [("destino", D("-83.33")), ("origen", D("83.33"))],
+        )
 
     def test_comparacion_estimado_real_y_porcentaje(self):
         evaluacion = calculos.comparar_estimado_real(
@@ -228,10 +235,9 @@ class _MayorMemoria:
 class RegistroServiceUnitTests(SimpleTestCase):
     def setUp(self):
         self.debe = SimpleNamespace(pk=1, codigo="D", activa=True)
-        self.haber = SimpleNamespace(pk=2, codigo="H", activa=True)
         config = SimpleNamespace(
-            cuenta_costo=self.debe, contrapartida_defecto_id=2,
-            contrapartidas=SimpleNamespace(all=lambda: [self.haber]),
+            cuenta_costo=self.debe,
+            contrapartida=SimpleNamespace(pk=2, codigo="H", activa=True),
         )
         self.repo = _RepoMemoria(config)
         self.mayor = _MayorMemoria()
@@ -242,10 +248,10 @@ class RegistroServiceUnitTests(SimpleTestCase):
     def _mano_obra(self, clave_="k1"):
         return self.servicio.registrar_mano_obra(
             self.actor, orden_id=1, fecha=FECHA, proceso_id=7, horas="40",
-            costo_hora="20.00", contrapartida_id=None, clave=clave_,
+            costo_hora="20.00", clave=clave_,
         )
 
-    def test_asiento_cuadrado_con_auxiliar_y_clave(self):
+    def test_asiento_acumula_en_cuenta_de_costo(self):
         registro = self._mano_obra()
         self.assertEqual(registro.importe, D("800.00"))
         importes = [m["importe"] for m in self.mayor.movimientos]
@@ -275,18 +281,7 @@ class RegistroServiceUnitTests(SimpleTestCase):
         with self.assertRaises(DatosInsuficientesError):
             self.servicio.registrar_mano_obra(
                 self.actor, orden_id=1, fecha=FECHA, proceso_id=7,
-                horas="0.01", costo_hora="0.01", contrapartida_id=None,
-                clave="k3",
-            )
-        self.assertEqual(self.mayor.movimientos, [])
-
-    def test_asiento_descuadrado_no_se_registra(self):
-        registro = SimpleNamespace(pk=1, orden_id=1)
-        with self.assertRaises(AsientoDescuadradoError):
-            self.servicio._asentar(
-                self.actor, registro, [(self.debe, D("1"))], fecha=FECHA,
-                tipo="REGISTRO", tipo_movimiento="DIARIO", concepto="x",
-                clave="k",
+                horas="0.01", costo_hora="0.01", clave="k3",
             )
         self.assertEqual(self.mayor.movimientos, [])
 
@@ -294,8 +289,7 @@ class RegistroServiceUnitTests(SimpleTestCase):
         with self.assertRaises(DatosInsuficientesError):
             self.servicio.registrar_mano_obra(
                 self.actor, orden_id=1, fecha=FECHA, proceso_id=7,
-                horas="0", costo_hora="20", contrapartida_id=None,
-                clave="k2",
+                horas="0", costo_hora="20", clave="k2",
             )
 
 
@@ -330,8 +324,7 @@ class BaseCostos(TestCase):
         return self.servicio.registrar_mano_obra(
             self.actor, orden_id=self.orden.pk, fecha=FECHA,
             proceso_id=(proceso or self.programacion).pk, horas=horas,
-            costo_hora=costo, contrapartida_id=extra.get("contrapartida"),
-            clave=extra.get("clave") or clave(),
+            costo_hora=costo, clave=extra.get("clave") or clave(),
         )
 
     def costo(self, elemento, importe, proceso=None, **extra):
@@ -340,18 +333,13 @@ class BaseCostos(TestCase):
             fecha=extra.get("fecha", FECHA),
             proceso_id=proceso.pk if proceso else None,
             descripcion=extra.get("descripcion", "Servicio"),
-            importe=importe, contrapartida_id=extra.get("contrapartida"),
-            clave=extra.get("clave") or clave(),
+            importe=importe, clave=extra.get("clave") or clave(),
         )
 
     def movimientos(self, registro, tipo=AsientoCosto.TIPO_REGISTRO):
         asiento = registro.asientos.get(tipo=tipo)
         return {m.cuenta.codigo: m.importe for m in
                 Movimiento.objects.filter(transaccion=asiento.transaccion)}
-
-    def contrapartida_defecto(self, elemento):
-        return ConfiguracionCuentaCosto.objects.get(
-            elemento=elemento).contrapartida_defecto.codigo
 
     def total_vigente(self):
         return RegistroCosto.objects.filter(
@@ -362,22 +350,17 @@ class BaseCostos(TestCase):
 class RegistroElementosTests(BaseCostos):
     def test_administrador_puede_crear_orden_y_registrar_costos(self):
         admin = Usuario.objects.create(
-            username="admin-costos", nombre_completo="Administrador",
+            username="admcost", nombre_completo="Administrador",
             rol=Rol.ADMINISTRADOR, activo=True,
         )
         orden = self.ordenes.crear_orden(
             admin, nombre_juego="Orden Administrador", fecha_inicio=FECHA,
         )
-        configuracion = ConfiguracionCuentaCosto.objects.get(
-            elemento=Elemento.DIRECTO
-        )
 
         registro = self.servicio.registrar_costo(
             admin, elemento=Elemento.DIRECTO, orden_id=orden.pk,
             fecha=FECHA, proceso_id=None, descripcion="Servicio de arte",
-            importe="75.00",
-            contrapartida_id=configuracion.contrapartida_defecto_id,
-            clave=clave(),
+            importe="75.00", clave=clave(),
         )
 
         self.assertEqual(registro.orden_id, orden.pk)
@@ -386,25 +369,18 @@ class RegistroElementosTests(BaseCostos):
     def test_mano_obra_40_horas_por_20_es_800(self):
         registro = self.mano_obra()
         self.assertEqual(registro.importe, D("800.00"))
-        haber = self.contrapartida_defecto(Elemento.MANO_OBRA)
         self.assertEqual(self.movimientos(registro),
-                         {"4101": D("800.00"), haber: D("-800.00")})
+                         {"4101": D("800.00"), "2106": D("-800.00")})
 
     def test_costo_directo_1200(self):
         registro = self.costo(Elemento.DIRECTO, "1200.00")
-        haber = self.contrapartida_defecto(Elemento.DIRECTO)
         self.assertEqual(self.movimientos(registro),
-                         {"4102": D("1200.00"), haber: D("-1200.00")})
+                         {"4102": D("1200.00"), "1103": D("-1200.00")})
 
-    def test_costo_indirecto_83_33_con_contrapartida_elegida(self):
-        config = ConfiguracionCuentaCosto.objects.get(
-            elemento=Elemento.INDIRECTO)
-        elegida = config.contrapartidas.exclude(
-            pk=config.contrapartida_defecto_id).first()
-        registro = self.costo(Elemento.INDIRECTO, "83.33",
-                              contrapartida=elegida.pk)
+    def test_costo_indirecto_83_33_con_contrapartida(self):
+        registro = self.costo(Elemento.INDIRECTO, "83.33")
         self.assertEqual(self.movimientos(registro),
-                         {"4103": D("83.33"), elegida.codigo: D("-83.33")})
+                         {"4103": D("83.33"), "1203": D("-83.33")})
 
     def test_total_de_los_tres_registros(self):
         self.mano_obra()
@@ -412,13 +388,14 @@ class RegistroElementosTests(BaseCostos):
         self.costo(Elemento.INDIRECTO, "83.33")
         self.assertEqual(self.total_vigente(), D("2083.33"))
 
-    def test_asientos_cuadran_con_origen_y_clave(self):
+    def test_asientos_acumulan_con_origen_y_clave(self):
         registros = [self.mano_obra(clave="mo-1"),
                      self.costo(Elemento.DIRECTO, "1200", clave="cd-1")]
         for registro in registros:
             asiento = registro.asientos.get()
             movimientos = Movimiento.objects.filter(
                 transaccion=asiento.transaccion)
+            self.assertEqual(len(movimientos), 2)
             self.assertEqual(sum(m.importe for m in movimientos), 0)
             self.assertTrue(all(f"OT-{self.orden.pk}" in m.referencia
                                 for m in movimientos))
@@ -450,12 +427,6 @@ class RegistroElementosTests(BaseCostos):
         with self.assertRaises(PeriodoNoAbiertoError):
             self.costo(Elemento.DIRECTO, "100", fecha=date(2027, 1, 10))
         self.assertEqual(RegistroCosto.objects.count(), 0)
-        self.assertEqual(Movimiento.objects.count(), 0)
-
-    def test_contrapartida_no_permitida_rechaza(self):
-        with self.assertRaises(CuentaNoValidaError):
-            self.costo(Elemento.DIRECTO, "100",
-                       contrapartida=self.cuenta("4104").pk)
         self.assertEqual(Movimiento.objects.count(), 0)
 
     def test_sin_configuracion_el_elemento_queda_bloqueado(self):
@@ -510,8 +481,7 @@ class AplicacionIndirectosTests(BaseCostos):
         self.servicio.registrar_mano_obra(
             self.actor, orden_id=orden.pk, fecha=FECHA,
             proceso_id=(proceso or self.programacion).pk,
-            horas=horas, costo_hora="1.00", contrapartida_id=None,
-            clave=clave(),
+            horas=horas, costo_hora="1.00", clave=clave(),
         )
         return orden
 
@@ -630,10 +600,9 @@ class AnulacionTests(BaseCostos):
         directo.refresh_from_db()
         self.assertEqual(directo.estado, RegistroCosto.ESTADO_ANULADO)
         self.assertEqual(self.total_vigente(), D("800.00"))
-        haber = self.contrapartida_defecto(Elemento.DIRECTO)
         self.assertEqual(
             self.movimientos(directo, AsientoCosto.TIPO_ANULACION),
-            {"4102": D("-1200.00"), haber: D("1200.00")},
+            {"4102": D("-1200.00"), "1103": D("1200.00")},
         )
         self.assertTrue(RegistroCosto.objects.filter(pk=directo.pk).exists())
         saldo_4102 = Movimiento.objects.filter(
@@ -668,21 +637,24 @@ class AnulacionTests(BaseCostos):
 class CatalogoTests(BaseCostos):
     def test_configuracion_editable_desde_catalogo(self):
         catalogo = CatalogoCostosService(self.repo, None, transaction.atomic)
-        bancos, proveedores = self.cuenta("1103"), self.cuenta("2101")
         catalogo.guardar_configuracion(
             self.actor, elemento=Elemento.MANO_OBRA,
-            cuenta_costo=self.cuenta("4101"),
-            contrapartidas=[bancos, proveedores],
-            contrapartida_defecto=bancos,
+            cuenta_costo=self.cuenta("4102"),
+            contrapartida=self.cuenta("2106"),
         )
         registro = self.mano_obra()
-        self.assertIn("1103", self.movimientos(registro))
+        self.assertEqual(self.movimientos(registro),
+                         {"4102": D("800.00"), "2106": D("-800.00")})
+        with self.assertRaises(CuentaNoValidaError):
+            catalogo.guardar_configuracion(
+                self.actor, elemento=Elemento.MANO_OBRA,
+                cuenta_costo=None, contrapartida=self.cuenta("2106"),
+            )
         with self.assertRaises(CuentaNoValidaError):
             catalogo.guardar_configuracion(
                 self.actor, elemento=Elemento.MANO_OBRA,
                 cuenta_costo=self.cuenta("4101"),
-                contrapartidas=[bancos],
-                contrapartida_defecto=proveedores,
+                contrapartida=self.cuenta("4101"),
             )
 
 
@@ -764,9 +736,7 @@ class VistasCostosTests(BaseCostos):
         url = reverse("costos_registro_nuevo",
                       args=[self.orden.pk, "directo"])
         datos = {"fecha": "2026-06-15", "descripcion": "Licencia motor",
-                 "importe": "1200.00", "clave": "form-1",
-                 "contrapartida": ConfiguracionCuentaCosto.objects.get(
-                     elemento=Elemento.DIRECTO).contrapartida_defecto_id}
+                 "importe": "1200.00", "clave": "form-1"}
         for _ in range(2):
             respuesta = self.client.post(url, datos)
             self.assertRedirects(
@@ -792,8 +762,6 @@ class VistasCostosTests(BaseCostos):
         respuesta = self.client.post(url, {
             "fecha": "2030-01-01", "descripcion": "Luz", "importe": "10",
             "clave": "form-2",
-            "contrapartida": ConfiguracionCuentaCosto.objects.get(
-                elemento=Elemento.INDIRECTO).contrapartida_defecto_id,
         })
         self.assertContains(respuesta, "período contable")
         self.assertContains(respuesta, 'value="Luz"')

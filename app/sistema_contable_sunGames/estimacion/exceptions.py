@@ -52,6 +52,10 @@ class RondaSinAprobarError(EstimacionError):
     mensaje = "Una ronda no se cierra sin aprobación registrada."
 
 
+class ParametroNoEncontradoError(EstimacionError):
+    mensaje = "El parámetro seleccionado no existe."
+
+
 class ParametroInvalidoError(EstimacionError):
     mensaje = "El parámetro no es válido."
 

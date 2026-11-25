@@ -142,11 +142,11 @@ class Proceso(models.Model):
 
 
 class ConfiguracionCuentaCosto(models.Model):
-    """Cuentas del catálogo por elemento del costo.
+    """Cuenta del catálogo por elemento del costo.
 
-    Cuenta de costo (debe), contrapartidas permitidas (haber) y la
-    contrapartida por defecto. Sin configuración el elemento queda
-    bloqueado.
+    Debe a la cuenta de costo (serie 41) y haber a la contrapartida
+    (2106 sueldos por pagar, Bancos o acumulada), que conserva su saldo
+    hasta el pago. Sin configuración el elemento queda bloqueado.
     """
 
     elemento = models.CharField(
@@ -155,13 +155,9 @@ class ConfiguracionCuentaCosto(models.Model):
     cuenta_costo = models.ForeignKey(
         Cuenta, on_delete=models.PROTECT, related_name="config_costo_debe"
     )
-    contrapartidas = models.ManyToManyField(
-        Cuenta, related_name="config_costo_haber",
-        verbose_name="contrapartidas permitidas",
-    )
-    contrapartida_defecto = models.ForeignKey(
-        Cuenta, on_delete=models.PROTECT,
-        related_name="config_costo_defecto",
+    contrapartida = models.ForeignKey(
+        Cuenta, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="config_costo_haber", verbose_name="contrapartida",
     )
 
     class Meta:
@@ -169,79 +165,6 @@ class ConfiguracionCuentaCosto(models.Model):
 
     def __str__(self):
         return f"{self.get_elemento_display()} → {self.cuenta_costo.codigo}"
-
-
-class ParametrosCostosManoObra(models.Model):
-    """Tasas parametrizables para calcular el costo de la mano de obra."""
-
-    isss_patronal = models.DecimalField(
-        "ISSS patronal (%)", max_digits=5, decimal_places=2,
-        default="7.50",
-    )
-    isss_empleado = models.DecimalField(
-        "ISSS empleado (%)", max_digits=5, decimal_places=2,
-        default="3.00",
-    )
-    isss_tope_mensual = models.DecimalField(
-        "Base máxima mensual ISSS", max_digits=10, decimal_places=2,
-        default="1000.00",
-    )
-    afp_patronal = models.DecimalField(
-        "AFP patronal (%)", max_digits=5, decimal_places=2,
-        default="7.75",
-    )
-    afp_empleado = models.DecimalField(
-        "AFP empleado (%)", max_digits=5, decimal_places=2,
-        default="7.25",
-    )
-    incaf_patronal = models.DecimalField(
-        "INCAF patronal (%)", max_digits=5, decimal_places=2,
-        default="1.00",
-    )
-    renta_tramo_1_hasta = models.DecimalField(
-        max_digits=10, decimal_places=2, default="550.00",
-    )
-    renta_tramo_2_hasta = models.DecimalField(
-        max_digits=10, decimal_places=2, default="895.24",
-    )
-    renta_tramo_2_porcentaje = models.DecimalField(
-        max_digits=5, decimal_places=2, default="10.00",
-    )
-    renta_tramo_2_exceso = models.DecimalField(
-        max_digits=10, decimal_places=2, default="550.00",
-    )
-    renta_tramo_2_cuota = models.DecimalField(
-        max_digits=10, decimal_places=2, default="17.67",
-    )
-    renta_tramo_3_hasta = models.DecimalField(
-        max_digits=10, decimal_places=2, default="2038.10",
-    )
-    renta_tramo_3_porcentaje = models.DecimalField(
-        max_digits=5, decimal_places=2, default="20.00",
-    )
-    renta_tramo_3_exceso = models.DecimalField(
-        max_digits=10, decimal_places=2, default="895.24",
-    )
-    renta_tramo_3_cuota = models.DecimalField(
-        max_digits=10, decimal_places=2, default="60.00",
-    )
-    renta_tramo_4_porcentaje = models.DecimalField(
-        max_digits=5, decimal_places=2, default="30.00",
-    )
-    renta_tramo_4_exceso = models.DecimalField(
-        max_digits=10, decimal_places=2, default="2038.10",
-    )
-    renta_tramo_4_cuota = models.DecimalField(
-        max_digits=10, decimal_places=2, default="288.57",
-    )
-    actualizado_en = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        verbose_name = "parámetros de mano de obra"
-        verbose_name_plural = "parámetros de mano de obra"
-
-    def __str__(self):
-        return "Parámetros de mano de obra"
 
 
 class FuenteIndirecta(models.Model):
@@ -343,7 +266,7 @@ class RegistroCosto(models.Model):
         Cuenta, on_delete=models.PROTECT, related_name="registros_costo_debe"
     )
     contrapartida = models.ForeignKey(
-        Cuenta, on_delete=models.PROTECT,
+        Cuenta, on_delete=models.PROTECT, null=True, blank=True,
         related_name="registros_costo_haber",
     )
     fuente_indirecta = models.ForeignKey(
@@ -512,3 +435,88 @@ class ReclasificacionCosto(models.Model):
     def __str__(self):
         return (f"{self.get_tipo_display()} · OT-{self.orden_id} · "
                 f"${self.importe}")
+
+
+class ParametroAmortizacion(models.Model):
+    """Política de amortización de videojuegos terminados (editable).
+
+    La cuota del período se carga a Costo de ventas y se abona a la
+    amortización acumulada de videojuegos.
+    """
+
+    MODALIDAD_ANUAL = "ANUAL"
+    MODALIDAD_MENSUAL = "MENSUAL"
+    MODALIDAD_DIARIA = "DIARIA"
+    MODALIDADES = [
+        (MODALIDAD_ANUAL, "Anual"),
+        (MODALIDAD_MENSUAL, "Mensual"),
+        (MODALIDAD_DIARIA, "Diaria"),
+    ]
+
+    modalidad = models.CharField(
+        "modalidad", max_length=8, choices=MODALIDADES,
+        default=MODALIDAD_MENSUAL,
+    )
+    vida_util_meses = models.PositiveIntegerField(
+        "vida útil (meses)", validators=[MinValueValidator(1)],
+    )
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "parámetro de amortización"
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(vida_util_meses__gt=0),
+                name="amortizacion_vida_util_positiva",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.get_modalidad_display()} · {self.vida_util_meses} m"
+
+
+class AmortizacionVideojuego(models.Model):
+    """Cuota de amortización asentada por orden y período (o su reversión).
+
+    Debe Costo de ventas / Haber Amortización acumulada de videojuegos.
+    """
+
+    periodo = models.ForeignKey(
+        PeriodoContable, on_delete=models.PROTECT,
+        related_name="amortizaciones_videojuegos",
+    )
+    orden = models.ForeignKey(
+        OrdenTrabajo, on_delete=models.PROTECT,
+        related_name="amortizaciones",
+    )
+    transaccion = models.OneToOneField(
+        Transaccion, on_delete=models.PROTECT,
+        related_name="amortizacion_videojuego",
+    )
+    importe = models.DecimalField(
+        "cuota", max_digits=DINERO_MAX, decimal_places=2,
+        validators=[MinValueValidator(0.01)],
+    )
+    base = models.DecimalField("base amortizable", max_digits=DINERO_MAX,
+                               decimal_places=2)
+    modalidad = models.CharField("modalidad", max_length=8)
+    desde = models.DateField("amortizado desde")
+    hasta = models.DateField("amortizado hasta")
+    revierte = models.OneToOneField(
+        "self", on_delete=models.PROTECT, null=True, blank=True,
+        related_name="reversion",
+    )
+    clave_idempotencia = models.CharField(
+        "clave de idempotencia", max_length=100, unique=True,
+    )
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+        constraints = [
+            models.CheckConstraint(check=models.Q(importe__gt=0),
+                                   name="amortizacion_importe_positivo"),
+        ]
+
+    def __str__(self):
+        return f"Amortización OT-{self.orden_id} · ${self.importe}"

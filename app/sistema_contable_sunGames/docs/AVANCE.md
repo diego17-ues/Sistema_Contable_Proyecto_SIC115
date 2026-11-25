@@ -319,3 +319,81 @@ punto de acceso por rol.
   `docs/PROPUESTA_COMPARACION.md`; no implementado.
 - Costeo real por órdenes de trabajo: fuera de esta sesión.
 - Definiciones abiertas en `docs/PREGUNTAS.md`.
+
+## Costos: registros sin contrapartida (2026-11-22)
+
+- Los cargos de la orden acumulan solo en la cuenta de costo del
+  elemento; el movimiento del mayor es un debe único (sin haber a
+  contrapartida). La contrapartida del pago/pasivo la registra la
+  contabilidad general, no el módulo.
+- `ConfiguracionCuentaCosto` queda con una sola cuenta por elemento.
+- `RegistroCosto` pierde el campo `contrapartida`; en indirectos
+  automáticos la cuenta origen se deriva de `fuente_indirecta`.
+- Mano de obra acumula `horas × costo_hora` directo a la cuenta de
+  costo; se eliminó el desglose de retenciones/cargas (solo existía
+  para los haberes) y el modelo `ParametrosCostosManoObra`.
+- Migración `costos.0012_sin_contrapartida`.
+- Los indirectos por período mantienen debe 4103 / haber cuenta origen:
+  es la reclasificación del pool, no una contrapartida elegible.
+
+
+## Estados financieros congruentes por período (costo de ventas, amortización, depreciación)
+
+- Estado de Resultados: la serie 41 capitalizable (4101, 4102, 4103) ya
+  no es gasto del período; el costo de ventas es solo 4104. Se agrega la
+  nota «Depreciación y amortización del período» (abonos netos a 1108,
+  1203 y 1205).
+- Balance General: la serie 41 aún no trasladada se presenta en el
+  activo; la utilidad del ejercicio (desde el 1 de enero hasta el fin del
+  período) se separa de resultados acumulados, de modo que cuadra con
+  cualquier período cerrado (mensual, provisional o anual).
+- Cierre: el pendiente de capitalizar se calcula acumulado y descuenta
+  traslados de cualquier período (antes un cierre mensual después de una
+  finalización registrada en el ejercicio anual capitalizaba dos veces).
+  Se trasladan 4101, 4102 y 4103.
+- Amortización de videojuegos terminados al cierre: Debe 4104 / Haber
+  1108, modalidad anual, mensual o diaria configurable en Costos ·
+  Catálogos (`ParametroAmortizacion`, por defecto mensual a 48 meses).
+  Cada tramo empieza donde terminó el anterior, así que períodos
+  solapados no repiten cuotas; reabrir el cierre revierte la cuota.
+- Conciliación de ventas: asienta el cobro Debe 1103 / Haber 1104 una sola
+  vez por venta (`Venta.transaccion_cobro`). TODO CU-08.3: la diferencia
+  entre liquidación real y registrada queda pendiente porque el formato
+  de liquidación de Steam no está definido.
+- La depreciación de equipo y la amortización de licencias se registran
+  una sola vez en contabilidad general (Debe 4207/4208 · Haber 1203/1205)
+  y entran a la serie 41 por la aplicación de indirectos (Debe 4103 ·
+  Haber 4207/4208); el módulo de costos no las recalcula.
+- Migraciones: costos 0013 y 0014, ventas 0004.
+- Pruebas: `estados_financieros/tests/test_congruencia.py`.
+
+## Costos: contrapartidas que cuadran con Videojuegos terminados
+
+- Cada registro de costo vuelve a ser un asiento cuadrado: Debe serie 41
+  · Haber contrapartida configurada por elemento (mano de obra 2106,
+  directos 1103, indirectos 1203; editables en Costos · Catálogos). Los
+  indirectos automáticos guardan como contrapartida su cuenta de origen.
+- Al finalizar la orden la serie 41 pasa a 1107; las contrapartidas
+  (p. ej. 2106 Sueldos y prestaciones por pagar) conservan su saldo hasta
+  que contabilidad general registre el pago, por lo que 1107 queda
+  respaldado sin descuadre.
+- Mano de obra sigue siendo horas × costo por hora, sin desglose.
+- Migración `costos.0015_contrapartida_registros` (campos nulos para los
+  registros anteriores y semilla de contrapartidas).
+
+## Estados sin cuentas en cero
+
+- Balance de comprobación, hoja de trabajo, Balance General, Estado de
+  Resultados, Cambios en el Patrimonio y la nota de depreciación y
+  amortización omiten las cuentas con saldo cero (servidor y pantalla).
+  Los totales y la utilidad del ejercicio se siguen mostrando.
+
+## Estado de Resultados completo
+
+- Por función: ingresos ordinarios netos de descuentos (5103), (-) costo
+  de ventas (4104), (-) gastos de administración y de venta, (+/-)
+  financieros y otros, (-) impuesto sobre la renta (4503) = utilidad del
+  período. La serie 41 capitalizable no se resta.
+- La pantalla del período abierto usa el mismo cálculo del servidor
+  (`statements` en la API de la hoja de trabajo) para el Estado de
+  Resultados y el Balance General, en lugar del cálculo propio de app.js.

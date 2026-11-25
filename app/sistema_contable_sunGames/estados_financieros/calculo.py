@@ -36,8 +36,7 @@ def _encabezado(periodo, tipo, titulo, cubre):
 
 def resultado_del_ejercicio(saldos):
     return sum(
-        (-cuenta.saldo for cuenta in saldos
-         if cuenta.rubro.codigo in (c.EGRESOS, c.INGRESOS)),
+        (-cuenta.saldo for cuenta in saldos if c.es_resultado(cuenta)),
         CERO,
     )
 
@@ -46,7 +45,13 @@ def _del_rubro(saldos, rubro):
     return [cuenta for cuenta in saldos if cuenta.rubro.codigo == rubro]
 
 
-def _seccion_por_subtipo(filas, titulo, cuentas, signo):
+def _con_saldo(cuentas):
+    """Solo las cuentas que aportan al estado (saldo distinto de cero)."""
+    return [cuenta for cuenta in cuentas if cuenta.saldo]
+
+
+def _seccion_por_subtipo(filas, titulo, cuentas, signo, extra=None):
+    cuentas = _con_saldo(cuentas)
     filas.append(fila("seccion", titulo))
     total = CERO
     for (_, nombre), grupo in groupby(
@@ -62,29 +67,53 @@ def _seccion_por_subtipo(filas, titulo, cuentas, signo):
             subtotal += importe
         filas.append(fila("subtotal", f"Total {nombre.lower()}", subtotal))
         total += subtotal
+    if extra:
+        nombre, cuentas_extra = extra
+        filas.append(fila("grupo", nombre))
+        subtotal = CERO
+        for cuenta in cuentas_extra:
+            importe = signo * cuenta.saldo
+            filas.append(fila("cuenta", cuenta.denominacion, importe,
+                              cuenta.codigo))
+            subtotal += importe
+        filas.append(fila("subtotal", f"Total {nombre.lower()}", subtotal))
+        total += subtotal
     filas.append(fila("total", f"TOTAL {titulo}", total))
     return total
 
 
-def balance_general(periodo, saldos):
-    """Saldos acumulados a la fecha de fin del período."""
+def balance_general(periodo, saldos, saldos_ejercicio=None):
+    """Saldos acumulados a la fecha de fin del período.
+
+    ``saldos_ejercicio`` son los del inicio del ejercicio al fin del
+    período: separan la utilidad del ejercicio de los resultados de
+    ejercicios anteriores que no se han trasladado al patrimonio.
+    """
     filas = []
+    desarrollo = [x for x in saldos if c.es_costo_desarrollo(x) and x.saldo]
     activo = _seccion_por_subtipo(
-        filas, "ACTIVO", _del_rubro(saldos, c.ACTIVO), 1
+        filas, "ACTIVO", _del_rubro(saldos, c.ACTIVO), 1,
+        extra=(("Costos de desarrollo por capitalizar (serie 41)",
+                desarrollo) if desarrollo else None),
     )
     pasivo = _seccion_por_subtipo(
         filas, "PASIVO", _del_rubro(saldos, c.PASIVO), -1
     )
     filas.append(fila("seccion", "PATRIMONIO"))
     patrimonio = CERO
-    for cuenta in _del_rubro(saldos, c.PATRIMONIO):
+    for cuenta in _con_saldo(_del_rubro(saldos, c.PATRIMONIO)):
         filas.append(fila("cuenta", cuenta.denominacion, -cuenta.saldo,
                           cuenta.codigo))
         patrimonio -= cuenta.saldo
-    resultado = resultado_del_ejercicio(saldos)
+    acumulado = resultado_del_ejercicio(saldos)
+    resultado = (acumulado if saldos_ejercicio is None
+                 else resultado_del_ejercicio(saldos_ejercicio))
+    if acumulado != resultado:
+        filas.append(fila("cuenta", "Resultados de ejercicios anteriores",
+                          acumulado - resultado))
     filas.append(fila("cuenta", "Utilidad (pérdida) del ejercicio",
                       resultado))
-    patrimonio += resultado
+    patrimonio += acumulado
     filas.append(fila("total", "TOTAL PATRIMONIO", patrimonio))
     filas.append(fila("resultado", "TOTAL PASIVO Y PATRIMONIO",
                       pasivo + patrimonio))
@@ -101,12 +130,13 @@ def balance_general(periodo, saldos):
     }
 
 
+MENOS, MAS = "(-) ", "(+) "
+
+
 def estado_resultados(periodo, saldos):
     """Por función, con los saldos del rango del período."""
-    resultados = [
-        cuenta for cuenta in saldos
-        if cuenta.rubro.codigo in (c.EGRESOS, c.INGRESOS)
-    ]
+    resultados = [cuenta for cuenta in _con_saldo(saldos)
+                  if c.es_resultado(cuenta)]
 
     def egresos(subtipo, excluir=frozenset()):
         return [
@@ -120,10 +150,12 @@ def estado_resultados(periodo, saldos):
     especiales = c.INGRESOS_ORDINARIOS | c.INGRESOS_FINANCIEROS
     filas = []
 
-    def bloque(titulo, cuentas, siempre=False):
+    def bloque(titulo, cuentas, siempre=False, operacion=""):
+        """Sección firmada: los egresos restan (negativo) y los ingresos
+        suman; ``operacion`` rotula si la sección se suma o se resta."""
         if not cuentas and not siempre:
             return CERO
-        filas.append(fila("seccion", titulo))
+        filas.append(fila("seccion", f"{operacion}{titulo}"))
         total = CERO
         for cuenta in cuentas:
             filas.append(fila("cuenta", cuenta.denominacion, -cuenta.saldo,
@@ -135,20 +167,27 @@ def estado_resultados(periodo, saldos):
     bruta = bloque(
         "Ingresos de actividades ordinarias",
         [x for x in ingresos if x.codigo in c.INGRESOS_ORDINARIOS], True,
-    ) + bloque("Costo de ventas", egresos(c.COSTO_VENTAS), True)
+    ) + bloque(
+        "Costo de ventas", egresos(c.COSTO_VENTAS), True, operacion=MENOS,
+    )
     filas.append(fila("total", "Utilidad (pérdida) bruta", bruta))
     operacion = bruta + bloque(
-        "Gastos de administración", egresos(c.GASTOS_ADMINISTRACION)
-    ) + bloque("Gastos de venta", egresos(c.GASTOS_VENTA))
+        "Gastos de administración", egresos(c.GASTOS_ADMINISTRACION),
+        operacion=MENOS,
+    ) + bloque("Gastos de venta", egresos(c.GASTOS_VENTA), operacion=MENOS)
     filas.append(fila("total", "Utilidad (pérdida) de operación", operacion))
     antes = operacion + sum((
         bloque("Ingresos financieros",
-               [x for x in ingresos if x.codigo in c.INGRESOS_FINANCIEROS]),
-        bloque("Gastos financieros", egresos(c.GASTOS_FINANCIEROS)),
+               [x for x in ingresos if x.codigo in c.INGRESOS_FINANCIEROS],
+               operacion=MAS),
+        bloque("Gastos financieros", egresos(c.GASTOS_FINANCIEROS),
+               operacion=MENOS),
         bloque("Otros ingresos",
-               [x for x in ingresos if x.codigo not in especiales]),
+               [x for x in ingresos if x.codigo not in especiales],
+               operacion=MAS),
         bloque("Otros gastos",
-               egresos(c.OTROS_EGRESOS, excluir=c.IMPUESTO_RENTA)),
+               egresos(c.OTROS_EGRESOS, excluir=c.IMPUESTO_RENTA),
+               operacion=MENOS),
     ), CERO)
     filas.append(fila(
         "total", "Utilidad (pérdida) antes de impuesto sobre la renta", antes
@@ -156,9 +195,11 @@ def estado_resultados(periodo, saldos):
     impuesto = bloque(
         "Impuesto sobre la renta",
         [x for x in resultados if x.codigo in c.IMPUESTO_RENTA],
+        operacion=MENOS,
     )
     filas.append(fila("resultado", "Utilidad (pérdida) del período",
                       antes + impuesto))
+    _depreciacion_amortizacion(filas, saldos)
     return {
         **_encabezado(
             periodo, TipoEstado.ESTADO_RESULTADOS, "Estado de Resultados",
@@ -167,3 +208,26 @@ def estado_resultados(periodo, saldos):
         ),
         "filas": filas,
     }
+
+
+def _depreciacion_amortizacion(filas, saldos):
+    """Nota informativa: abonos netos del período a las acumuladas.
+
+    Incluye la amortización de videojuegos (igual al costo de ventas) y la
+    depreciación/amortización cargada a gastos o a la serie 41 (equipo y
+    licencias de desarrollo), de modo que se vea completa aunque parte
+    esté capitalizada.
+    """
+    por_codigo = {cuenta.codigo: cuenta.saldo for cuenta in saldos}
+    filas.append(fila(
+        "seccion", "Depreciación y amortización del período (informativo)"
+    ))
+    total = CERO
+    for codigo, texto in c.DEPRECIACION_AMORTIZACION:
+        importe = -por_codigo.get(codigo, CERO)
+        if not importe:
+            continue
+        filas.append(fila("cuenta", texto, importe, codigo))
+        total += importe
+    filas.append(fila("subtotal", "Total depreciación y amortización",
+                      total))

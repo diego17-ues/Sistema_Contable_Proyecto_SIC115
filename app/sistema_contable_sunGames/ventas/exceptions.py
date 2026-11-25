@@ -31,3 +31,11 @@ class VentaYaRegistradaError(VentasError):
 
 class ContabilizacionError(VentasError):
     mensaje = "No se pudo registrar la venta en el Libro Mayor."
+
+
+class PeriodoYaConciliadoError(VentasError):
+    mensaje = "El período ya fue conciliado; no se puede volver a conciliar."
+
+
+class ConciliacionNoPermitidaError(VentasError):
+    mensaje = "No se puede conciliar el período."

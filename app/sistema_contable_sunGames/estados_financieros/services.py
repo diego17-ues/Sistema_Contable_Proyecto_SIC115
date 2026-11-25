@@ -49,6 +49,11 @@ def _verificar(actor, roles):
         raise RolNoAutorizadoError()
 
 
+def inicio_ejercicio(fecha):
+    """Ejercicio fiscal calendario (El Salvador): 1 de enero."""
+    return fecha.replace(month=1, day=1)
+
+
 def _validar_rango(desde, hasta):
     if not desde or not hasta or desde > hasta:
         raise RangoInvalidoError(campo="desde")
@@ -100,7 +105,11 @@ class EstadosFinancierosService:
             )
         if tipo == TipoEstado.BALANCE_GENERAL:
             return calculo.balance_general(
-                periodo, self._repositorio.saldos(hasta=periodo.fecha_fin)
+                periodo, self._repositorio.saldos(hasta=periodo.fecha_fin),
+                self._repositorio.saldos(
+                    desde=inicio_ejercicio(periodo.fecha_fin),
+                    hasta=periodo.fecha_fin,
+                ),
             )
         if tipo == TipoEstado.ESTADO_RESULTADOS:
             return calculo.estado_resultados(periodo, self._repositorio.saldos(
@@ -171,7 +180,27 @@ class EstadosFinancierosService:
     def hoja_trabajo(self, actor, desde, hasta):
         _verificar(actor, ROLES_CONSULTA)
         _validar_rango(desde, hasta)
-        return self._construir_hoja_trabajo(desde, hasta)
+        hoja = self._construir_hoja_trabajo(desde, hasta)
+        hoja["statements"] = self._estados_rango(desde, hasta)
+        return hoja
+
+    def _estados_rango(self, desde, hasta):
+        """Estado de Resultados y Balance del rango con el mismo cálculo
+        que se emite al cerrar, para que la pantalla no use otro."""
+        periodo = self._repositorio.nuevo_periodo(
+            nombre=f"{desde:%d/%m/%Y}–{hasta:%d/%m/%Y}", desde=desde,
+            hasta=hasta,
+        )
+        return {
+            "resultados": calculo.estado_resultados(
+                periodo, self._repositorio.saldos(desde=desde, hasta=hasta)
+            ),
+            "balance": calculo.balance_general(
+                periodo, self._repositorio.saldos(hasta=hasta),
+                self._repositorio.saldos(desde=inicio_ejercicio(hasta),
+                                         hasta=hasta),
+            ),
+        }
 
     def cierre_activo(self, actor):
         """Devuelve el cierre más reciente y sus documentos de consulta."""
@@ -415,6 +444,9 @@ class CierrePeriodoService:
     def _emitir_y_cerrar(self, actor, periodo, motivo):
         if periodo.pk is None:
             self._repositorio.guardar_periodo(periodo)
+        if self._ventas is not None:
+            self._ventas.conciliar_cierre(actor, periodo.fecha_inicio,
+                                          periodo.fecha_fin)
         if self._costos is not None:
             self._costos.trasladar_cierre(actor, periodo)
         for tipo, datos in self._estados.calcular_todos(periodo).items():
